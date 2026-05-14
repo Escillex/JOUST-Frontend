@@ -128,4 +128,12 @@ export const API_ENDPOINTS = {
     LIST_ASSETS: '/images/assets',
     GET_ASSET: (key: string) => `/images/assets/${key}`,
   },
+  STORE: {
+    LIST_ALL: '/store/all',
+    CREATE: '/store',
+    UPDATE: (id: string) => `/store/${id}`,
+    DELETE: (id: string) => `/store/${id}`,
+    UPLOAD_IMAGE: (id: string) => `/store/${id}/image`,
+    DELETE_IMAGE: (id: string) => `/store/${id}/image`,
+  },
 };

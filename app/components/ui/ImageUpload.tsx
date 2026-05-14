@@ -16,6 +16,7 @@ interface ImageUploadProps {
   /** Numeric aspect ratio for the cropper, e.g. 21/9 or 1 */
   cropAspectRatio?: number;
   label?: string;
+  placeholder?: React.ReactNode;
 }
 
 export default function ImageUpload({
@@ -26,6 +27,7 @@ export default function ImageUpload({
   aspectRatio = "aspect-video",
   cropAspectRatio = 21 / 9,
   label = "UPDATE IMAGE",
+  placeholder,
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -79,11 +81,23 @@ export default function ImageUpload({
         className={`relative group overflow-hidden border-2 border-component-border hover:border-primary/50 transition-colors bg-component-background ${aspectRatio}`}
       >
         {/* Current / preview image */}
-        <img
-          src={displayUrl}
-          alt="Uploaded content"
-          className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
-        />
+        {currentUrl ? (
+          <img
+            src={displayUrl}
+            alt="Uploaded content"
+            className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
+          />
+        ) : placeholder ? (
+          <div className="w-full h-full flex items-center justify-center bg-[#111]">
+            {placeholder}
+          </div>
+        ) : (
+          <img
+            src="/placeholder.jpg"
+            alt="Uploaded content"
+            className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
+          />
+        )}
 
         {/* Scanline overlay */}
         <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_2px]" />

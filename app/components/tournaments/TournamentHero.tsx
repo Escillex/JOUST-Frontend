@@ -39,16 +39,16 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
 
     const prioritizedTournaments = useMemo(() => {
         if (loadingUser) return [];
-        
+
         // 1. Tournaments user is in (excluding completed)
-        const userTournaments = tournaments.filter(t => 
-            t.status !== "COMPLETED" && 
+        const userTournaments = tournaments.filter(t =>
+            t.status !== "COMPLETED" &&
             t.participants?.some(p => p.userId === userId)
         );
 
         // 2. Available tournaments (OPEN/UPCOMING) that user is NOT in
-        const availableTournaments = tournaments.filter(t => 
-            (t.status === "OPEN" || t.status === "UPCOMING") && 
+        const availableTournaments = tournaments.filter(t =>
+            (t.status === "OPEN" || t.status === "UPCOMING") &&
             !t.participants?.some(p => p.userId === userId)
         );
 
@@ -59,30 +59,30 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
 
     if (loadingUser) {
         return (
-            <div className="h-full w-full bg-component-background border-2 border-component-border animate-pulse flex items-center justify-center">
-                <div className="text-[10px] font-black text-white/20 uppercase tracking-widest">Synchronizing...</div>
+            <div className="h-full w-full bg-surface border-2 border-white/5 animate-pulse flex items-center justify-center">
+                <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">Synchronizing...</div>
             </div>
         );
     }
 
     if (!hasActiveContent) {
         return (
-            <div className="h-full w-full bg-component-background border-2 border-component-border flex flex-col items-center justify-center space-y-8 p-12 text-center group">
+            <div className="h-full w-full bg-surface border-2 border-white/5 flex flex-col items-center justify-center space-y-8 p-12 text-center group">
                 <div className="space-y-4">
                     <div className="w-16 h-[2px] bg-primary/20 mx-auto group-hover:w-32 transition-all duration-700" />
                     <h2 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter leading-none font-poppins italic">
-                        COMING<br/>
+                        COMING<br />
                         <span className="text-primary">SOON</span>
                     </h2>
                     <div className="w-16 h-[2px] bg-primary/20 mx-auto group-hover:w-32 transition-all duration-700" />
                 </div>
                 <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.5em] max-w-xs leading-relaxed">
-                    We're currently organizing the next set of events for you.<br/>
+                    We're currently organizing the next set of events for you.<br />
                     Stay tuned for more tournaments!
                 </p>
-                
+
                 {canManage && (
-                    <Link 
+                    <Link
                         href="/tournaments/manage"
                         className="px-8 py-3 border-2 border-primary text-primary hover:bg-primary hover:text-black font-black text-[10px] uppercase tracking-[0.3em] transition-all"
                     >
@@ -91,17 +91,17 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
                 )}
 
                 <div className="flex gap-4">
-                    <div className="px-4 py-1 border border-component-border text-[8px] font-bold text-white/20 uppercase tracking-widest">Status: Preparing</div>
-                    <div className="px-4 py-1 border border-component-border text-[8px] font-bold text-white/20 uppercase tracking-widest">Mode: Browse</div>
+                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">Status: Preparing</div>
+                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">Mode: Browse</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <TournamentList 
-            tournaments={prioritizedTournaments} 
-            variant="bento" 
+        <TournamentList
+            tournaments={prioritizedTournaments}
+            variant="bento"
             canManage={canManage}
             currentUserId={userId}
         />

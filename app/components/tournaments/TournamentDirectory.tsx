@@ -66,7 +66,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                     <div className="space-y-4">
                         <h3 className="text-[11px] font-black text-white/30 uppercase tracking-widest">Search</h3>
                         <div className="relative">
-                            <input 
+                            <input
                                 type="text"
                                 placeholder="Search by name or ID"
                                 value={searchTerm}
@@ -84,9 +84,8 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                 <button
                                     key={field}
                                     onClick={() => toggleSort(field)}
-                                    className={`w-full px-5 py-4 border-2 font-black text-[10px] uppercase tracking-widest transition-all flex justify-between items-center ${
-                                        sortField === field ? "bg-white text-black border-white" : "bg-component-background border-component-border text-white/40 hover:border-white hover:text-white"
-                                    }`}
+                                    className={`w-full px-5 py-4 border-2 font-black text-[10px] uppercase tracking-widest transition-all flex justify-between items-center ${sortField === field ? "bg-white text-black border-white" : "bg-component-background border-component-border text-white/40 hover:border-white hover:text-white"
+                                        }`}
                                 >
                                     {field === "prizePool" ? "Prize Pool" : field}
                                     {sortField === field && <span className="text-xs">{sortOrder === "asc" ? "↑" : "↓"}</span>}
@@ -102,9 +101,8 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                 <button
                                     key={status}
                                     onClick={() => setStatusFilter(status)}
-                                    className={`px-4 py-2 border-2 font-black text-[9px] uppercase tracking-widest transition-all ${
-                                        statusFilter === status ? "bg-primary border-primary text-black" : "bg-component-background border-component-border text-white/20 hover:border-white/20 hover:text-white"
-                                    }`}
+                                    className={`px-4 py-2 border-2 font-black text-[9px] uppercase tracking-widest transition-all ${statusFilter === status ? "bg-primary border-primary text-black" : "bg-component-background border-component-border text-white/20 hover:border-white/20 hover:text-white"
+                                        }`}
                                 >
                                     {status}
                                 </button>
@@ -123,25 +121,22 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: idx * 0.05 }}
-                                    className={`group relative bg-component-background border-2 transition-all overflow-hidden ${
-                                        t.status === 'COMPLETED' 
-                                        ? 'border-component-border hover:border-white/40 hover:bg-white/5 hover:shadow-[12px_12px_0px_0px_rgba(255,255,255,0.1)]' 
-                                        : 'border-component-border hover:border-primary hover:bg-primary/5 hover:shadow-[12px_12px_0px_0px_#52B946]'
-                                    }`}
+                                    className={`group relative bg-component-background border-2 transition-all overflow-hidden ${t.status === 'COMPLETED'
+                                            ? 'border-component-border hover:border-white/40 hover:bg-white/5 hover:shadow-[12px_12px_0px_0px_rgba(255,255,255,0.1)]'
+                                            : 'border-component-border hover:border-primary hover:bg-primary/5 hover:shadow-[12px_12px_0px_0px_#52B946]'
+                                        }`}
                                 >
                                     <Link href={`/tournaments/${t.id}`} className="flex flex-col h-full">
-                                        <div className={`h-40 w-full overflow-hidden border-b-2 transition-colors bg-component-background relative ${
-                                            t.status === 'COMPLETED' ? 'border-component-border' : 'border-component-border group-hover:border-primary'
-                                        }`}>
-                                            <img 
-                                                src={t.bannerUrl 
+                                        <div className={`h-40 w-full overflow-hidden border-b-2 transition-colors bg-component-background relative ${t.status === 'COMPLETED' ? 'border-component-border' : 'border-component-border group-hover:border-primary'
+                                            }`}>
+                                            <img
+                                                src={t.bannerUrl
                                                     ? (t.bannerUrl.startsWith("http") ? t.bannerUrl : `${API_URL}${t.bannerUrl}`)
                                                     : "/placeholder.jpg"
-                                                } 
+                                                }
                                                 alt={t.name}
-                                                className={`w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700 ${
-                                                    t.status === 'COMPLETED' ? 'grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100' : ''
-                                                }`}
+                                                className={`w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700 ${t.status === 'COMPLETED' ? 'grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100' : ''
+                                                    }`}
                                             />
                                             <div className="absolute top-4 right-4 bg-component-background/80 border border-component-border px-3 py-1 text-[8px] font-black text-white uppercase tracking-widest">
                                                 ID: {t.id.slice(0, 8)}
@@ -151,15 +146,13 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-2 h-2 rounded-full ${t.status === "OPEN" ? "bg-primary animate-pulse shadow-[0_0_8px_#52B946]" : "bg-white/20"}`} />
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${
-                                                        t.status === "OPEN" ? "text-primary" : "text-white/40"
-                                                    }`}>
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${t.status === "OPEN" ? "text-primary" : "text-white/40"
+                                                        }`}>
                                                         {t.status}
                                                     </span>
                                                 </div>
-                                                <h4 className={`text-3xl font-black uppercase tracking-tighter leading-none font-poppins transition-colors italic ${
-                                                    t.status === 'COMPLETED' ? 'text-white/40 group-hover:text-white' : 'text-white group-hover:text-primary'
-                                                }`}>
+                                                <h4 className={`text-3xl font-black uppercase tracking-tighter leading-none font-poppins transition-colors italic ${t.status === 'COMPLETED' ? 'text-white/40 group-hover:text-white' : 'text-white group-hover:text-primary'
+                                                    }`}>
                                                     {t.name}
                                                 </h4>
                                             </div>
@@ -185,7 +178,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                     ) : (
                         <div className="h-[400px] flex flex-col items-center justify-center border-4 border-dashed border-white/5 space-y-6">
                             <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em]">No tournaments found</p>
-                            <button onClick={() => {setSearchTerm(""); setStatusFilter("ALL");}} className="px-8 py-3 border-2 border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all">Clear Filters</button>
+                            <button onClick={() => { setSearchTerm(""); setStatusFilter("ALL"); }} className="px-8 py-3 border-2 border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all">Clear Filters</button>
                         </div>
                     )}
                 </div>
