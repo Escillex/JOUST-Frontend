@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Tournament } from "../../tournaments/types";
+import { API_URL } from "../../utils/api";
 
 type SortField = "name" | "date" | "status" | "prizePool";
 type SortOrder = "asc" | "desc";
@@ -52,22 +53,22 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
         <section className="space-y-16">
             <div className="border-b-8 border-white pb-8">
                 <h2 className="text-6xl md:text-9xl font-black text-white uppercase tracking-tighter leading-none font-poppins italic">
-                    DIRECTORY
+                    Tournaments
                 </h2>
                 <p className="text-primary text-[10px] font-black uppercase tracking-[0.5em] mt-4">
-                    {filteredAndSortedTournaments.length} MATCHING RECORDS FOUND
+                    {filteredAndSortedTournaments.length} tournaments found
                 </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-                {/* Tactical Control Sidebar */}
+                {/* Control Sidebar */}
                 <aside className="lg:col-span-3 space-y-10 sticky top-24">
                     <div className="space-y-4">
-                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Search_Registry</h3>
+                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Search</h3>
                         <div className="relative">
                             <input 
                                 type="text"
-                                placeholder="TOURNAMENT_ID / NAME"
+                                placeholder="Search by name or ID"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full bg-[#1B1B1B] border-2 border-white/10 px-4 py-4 text-xs text-white placeholder:text-white/10 focus:border-primary transition-all outline-none uppercase font-poppins"
@@ -77,7 +78,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Sort_By</h3>
+                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Sort By</h3>
                         <div className="flex flex-col gap-2">
                             {(["name", "date", "status", "prizePool"] as SortField[]).map(field => (
                                 <button
@@ -95,7 +96,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Status_Filter</h3>
+                        <h3 className="text-[11px] font-black text-white/30 uppercase tracking-[0.3em]">Filter by Status</h3>
                         <div className="flex flex-wrap gap-2">
                             {["ALL", "UPCOMING", "OPEN", "ONGOING", "COMPLETED"].map(status => (
                                 <button
@@ -127,12 +128,15 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                     <Link href={`/tournaments/${t.id}`} className="flex flex-col h-full">
                                         <div className="h-40 w-full overflow-hidden border-b-2 border-white/10 group-hover:border-primary transition-colors bg-[#1B1B1B] relative">
                                             <img 
-                                                src={t.image || `/placeholder.jpg`} 
+                                                src={t.bannerUrl 
+                                                    ? (t.bannerUrl.startsWith("http") ? t.bannerUrl : `${API_URL}${t.bannerUrl}`)
+                                                    : "/placeholder.jpg"
+                                                } 
                                                 alt={t.name}
-                                                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 opacity-60 group-hover:opacity-100"
+                                                className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700"
                                             />
                                             <div className="absolute top-4 right-4 bg-[#1B1B1B]/80 border border-white/20 px-3 py-1 text-[8px] font-black text-white uppercase tracking-widest">
-                                                ID_{t.id.slice(0, 8)}
+                                                ID: {t.id.slice(0, 8)}
                                             </div>
                                         </div>
                                         <div className="p-8 space-y-8 flex-1 flex flex-col justify-between">
@@ -157,7 +161,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Prize_Pool</span>
+                                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Prize Pool</span>
                                                     <span className="text-xl font-black text-primary">${t.prizePool?.toLocaleString() || "0"}</span>
                                                 </div>
                                             </div>
@@ -168,8 +172,8 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                         </div>
                     ) : (
                         <div className="h-[400px] flex flex-col items-center justify-center border-4 border-dashed border-white/5 space-y-6">
-                            <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em]">No matching tournament data</p>
-                            <button onClick={() => {setSearchTerm(""); setStatusFilter("ALL");}} className="px-8 py-3 border-2 border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all">Clear_Filters</button>
+                            <p className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em]">No tournaments found</p>
+                            <button onClick={() => {setSearchTerm(""); setStatusFilter("ALL");}} className="px-8 py-3 border-2 border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all">Clear Filters</button>
                         </div>
                     )}
                 </div>

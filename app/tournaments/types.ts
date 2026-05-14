@@ -51,8 +51,8 @@ export interface Tournament {
     }[];
   }[];
   formatConfig?: FormatConfig;
-  // Fields for UI that might not be in backend yet
-  image?: string;
+  // Fields for UI
+  bannerUrl?: string | null;
   color?: string;
   description?: string;
 }

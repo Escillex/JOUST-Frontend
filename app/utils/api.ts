@@ -118,4 +118,14 @@ export const API_ENDPOINTS = {
     BASE: '/templates',
     BY_ID: (id: string) => `/templates/${id}`,
   },
+  IMAGES: {
+    UPLOAD_AVATAR: (userId: string) => `/images/avatar/${userId}`,
+    DELETE_AVATAR: (userId: string) => `/images/avatar/${userId}`,
+    UPLOAD_BANNER: (tournamentId: string) => `/images/banner/${tournamentId}`,
+    DELETE_BANNER: (tournamentId: string) => `/images/banner/${tournamentId}`,
+    UPSERT_ASSET: (key: string) => `/images/assets/${key}`,
+    DELETE_ASSET: (key: string) => `/images/assets/${key}`,
+    LIST_ASSETS: '/images/assets',
+    GET_ASSET: (key: string) => `/images/assets/${key}`,
+  },
 };

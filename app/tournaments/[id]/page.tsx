@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, API_URL } from "../../utils/api";
 import { Tournament } from "../types";
 import Image from "next/image";
 import Link from "next/link";
@@ -159,7 +159,10 @@ function TournamentViewContent() {
                 <div className="relative group border-2 border-white/5 overflow-hidden">
                   <div className="aspect-video relative overflow-hidden">
                     <Image 
-                      src={tournament.image || "/placeholder.jpg"} 
+                      src={tournament.bannerUrl 
+                        ? (tournament.bannerUrl.startsWith("http") ? tournament.bannerUrl : `${API_URL}${tournament.bannerUrl}`)
+                        : "/placeholder.jpg"
+                      } 
                       alt={tournament.name} 
                       fill 
                       className="object-cover transition-transform duration-1000 group-hover:scale-105"

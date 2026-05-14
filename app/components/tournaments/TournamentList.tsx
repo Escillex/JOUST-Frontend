@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as m from "motion/react";
 import { BentoBox } from "../ui/Bento";
 import { Tournament } from "../../tournaments/types";
+import { API_URL } from "../../utils/api";
 
 interface TournamentListProps {
   tournaments: Tournament[];
@@ -111,9 +112,12 @@ export default function TournamentList({ tournaments, variant = "default", limit
                   }}
                 >
                   <img 
-                    src={currentTournament.image || "/placeholder.jpg"} 
+                    src={currentTournament.bannerUrl 
+                      ? (currentTournament.bannerUrl.startsWith("http") ? currentTournament.bannerUrl : `${API_URL}${currentTournament.bannerUrl}`)
+                      : "/placeholder.jpg"
+                    } 
                     alt={currentTournament.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 pointer-events-none"
+                    className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700"
                   />
                 </m.motion.div>
                 {isJoined && (

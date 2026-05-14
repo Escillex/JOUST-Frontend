@@ -60,7 +60,7 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
     if (loadingUser) {
         return (
             <div className="h-full w-full bg-surface border-2 border-white/5 animate-pulse flex items-center justify-center">
-                <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">SYNCING_IDENTITY</div>
+                <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">Synchronizing...</div>
             </div>
         );
     }
@@ -86,13 +86,13 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
                         href="/tournaments/manage"
                         className="px-8 py-3 border-2 border-primary text-primary hover:bg-primary hover:text-black font-black text-[10px] uppercase tracking-[0.3em] transition-all"
                     >
-                        MANAGE_OPERATIONS
+                        Manage Tournaments
                     </Link>
                 )}
 
                 <div className="flex gap-4">
-                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">STATE: PREPARING</div>
-                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">MODE: DISCOVERY</div>
+                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">Status: Preparing</div>
+                    <div className="px-4 py-1 border border-white/10 text-[8px] font-bold text-white/20 uppercase tracking-widest">Mode: Browse</div>
                 </div>
             </div>
         );

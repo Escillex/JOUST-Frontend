@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import ImageUpload from "../../ui/ImageUpload";
+import { useImageUpload } from "../../../utils/useImageUpload";
 
 const inputCls = "w-full h-12 bg-background border border-foreground/10 px-4 text-xs text-foreground focus:outline-none focus:border-primary transition-all rounded-xl appearance-none";
 
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export default function SpecsPanel({ tournament, tournamentId, isEditing, editState, formatOptions, onToggleEdit, onEditChange, onSubmit, onOpenRegistration, onStartTournament, fetchData, setMessage }: Props) {
+  const { upload, remove, uploading } = useImageUpload();
   const stages = ["UPCOMING", "OPEN", "ONGOING", "COMPLETED"];
 
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -82,12 +85,41 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
     }
   };
 
+  const handleBannerUpload = async (file: File) => {
+    const url = await upload(API_ENDPOINTS.IMAGES.UPLOAD_BANNER(tournamentId), file);
+    if (url) {
+      setMessage("Banner updated successfully");
+      fetchData();
+    }
+  };
+
+  const handleBannerDelete = async () => {
+    if (!confirm("Remove tournament banner?")) return;
+    const ok = await remove(API_ENDPOINTS.IMAGES.DELETE_BANNER(tournamentId));
+    if (ok) {
+      setMessage("Banner removed");
+      fetchData();
+    }
+  };
+
   return (
     <div className="bg-[#1B1B1B] backdrop-blur-md border border-white/10 p-8 md:p-10 rounded-[2.5rem] shadow-2xl transition-all duration-500">
+      <div className="mb-10">
+        <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1 mb-3 block">Tournament Image</label>
+        <ImageUpload
+          currentUrl={tournament.bannerUrl}
+          onUpload={handleBannerUpload}
+          onDelete={handleBannerDelete}
+          uploading={uploading}
+          aspectRatio="aspect-[21/9]"
+          label="UPDATE IMAGE"
+        />
+      </div>
+
       <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/5">
-        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/60 font-poppins">Technical Specs</h3>
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/60 font-poppins">Tournament Details</h3>
         <button onClick={onToggleEdit} className="text-[10px] font-black uppercase text-primary hover:brightness-110 tracking-widest font-poppins transition-all">
-          {isEditing ? "Discard Changes" : "Modify Terminal"}
+          {isEditing ? "Cancel Editing" : "Edit Tournament"}
         </button>
       </div>
 
@@ -96,14 +128,14 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
           {/* Hierarchical Step 1 */}
           <div className="p-6 bg-primary/[0.03] border border-primary/20 rounded-2xl">
             <div className="space-y-3">
-              <label className="text-[9px] font-black text-primary/60 uppercase tracking-[0.2em] font-poppins ml-1">Tournament Format Preset</label>
+              <label className="text-[9px] font-black text-primary/60 uppercase tracking-[0.2em] font-poppins ml-1">Tournament Format</label>
               <div className="relative">
                 <select 
                   value={editState.formatId} 
                   onChange={e => onEditChange("formatId", e.target.value)} 
                   className={`${inputCls} !border-primary/20 !bg-transparent focus:!border-primary !text-primary font-black uppercase text-[10px] tracking-widest h-14`}
                 >
-                  <option value="" className="bg-[#1B1B1B] text-white/40">Select Preset</option>
+                  <option value="" className="bg-[#1B1B1B] text-white/40">Select a format</option>
                   {formatOptions.map(f => (
                     <option key={f.id} value={f.id} className="bg-[#1B1B1B] text-white">{f.name.toUpperCase()} ({f.gameName || "GENERAL"})</option>
                   ))}
@@ -131,7 +163,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             </div>
 
             <div className="space-y-2 pt-4 border-t border-white/[0.05]">
-              <p className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Status Shift</p>
+              <p className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Current Status</p>
               <select
                 value={tournament.status}
                 onChange={e => handleStatusChange(e.target.value)}
@@ -147,17 +179,17 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             </div>
 
             <button type="submit" className="w-full h-14 bg-primary text-black font-black text-xs uppercase tracking-[0.3em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-primary/20">
-              Commit Terminal Specs
+              Save Tournament Changes
             </button>
           </div>
         </form>
       ) : (
         <div className="grid grid-cols-2 gap-y-10 gap-x-6">
           {[
-            { label: "Designation", value: tournament.name },
-            { label: "Game Context", value: (typeof tournament.format === 'object' ? tournament.format?.gameName : null) || "GENERAL" },
-            { label: "Format Preset", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
-            { label: "System",      value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
+            { label: "Tournament Name", value: tournament.name },
+            { label: "Game", value: (typeof tournament.format === 'object' ? tournament.format?.gameName : null) || "GENERAL" },
+            { label: "Format", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
+            { label: "Bracket Type",      value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
             { label: "Capacity",    value: `${tournament.participants.length} / ${tournament.maxPlayers}` },
             { label: "Status",      value: tournament.status, highlight: true },
           ].map(({ label, value, highlight }) => (
@@ -171,10 +203,10 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
 
 
-      {timeLeft !== null && timeLeft > 0 && (
+       {timeLeft !== null && timeLeft > 0 && (
         <div className="mt-10 p-6 bg-primary/5 border border-primary/20 rounded-[2rem] flex flex-col items-center gap-6 animate-pulse">
            <div className="text-center">
-             <p className="text-[8px] font-black text-primary/60 uppercase tracking-[0.3em] font-poppins mb-2">Guest Purge Sequence</p>
+             <p className="text-[8px] font-black text-primary/60 uppercase tracking-[0.3em] font-poppins mb-2">Guest Account Cleanup</p>
              <p className="text-3xl font-black text-primary font-mono tracking-tighter">
                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
              </p>
@@ -183,7 +215,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
              onClick={handleCancelCleanup}
              className="w-full py-4 bg-primary text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl hover:brightness-110 transition-all font-poppins"
            >
-             Halt Sequence
+             Cancel Cleanup
            </button>
         </div>
       )}

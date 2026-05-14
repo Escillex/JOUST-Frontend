@@ -35,6 +35,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "http",
+        hostname: hostIp,
+        port: String(backendPort),
+        pathname: "/uploads/**",
+      },
+      {
+        protocol: "https",
+        hostname: "joust.escillex.com",
+        pathname: "/api/backend/uploads/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

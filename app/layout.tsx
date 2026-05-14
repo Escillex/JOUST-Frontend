@@ -41,7 +41,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
         <UserProvider>
           {/* Desktop Navigation */}
-          <div className="hidden md:block">
+          <div className="hidden md:block sticky top-0 z-50">
             <Navibar />
           </div>
 

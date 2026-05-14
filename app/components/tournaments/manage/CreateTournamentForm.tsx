@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { TournamentFormatModel, TournamentTemplate } from "../../../tournaments/types";
+import ImageUpload from "../../ui/ImageUpload";
+import { useImageUpload } from "../../../utils/useImageUpload";
 
 const inputCls = "w-full h-11 bg-[#1B1B1B] border border-white/10 px-4 text-sm text-white focus:outline-none focus:border-primary transition-all rounded-[4px] appearance-none placeholder:text-white/10";
 
@@ -55,6 +57,11 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [visitedSteps, setVisitedSteps] = useState<Set<string>>(new Set(["IDENTITY"]));
   const [nameError, setNameError] = useState<string | null>(null);
   const [isValidatingName, setIsValidatingName] = useState(false);
+
+  // IMAGE HANDLING
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const { upload, uploading } = useImageUpload();
 
   // FULL RULE ENGINE STATE
   const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
@@ -139,22 +146,19 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const isIdentityValid = !!(name && !nameError && selectedFormatId && maxPlayers >= 2 && !isValidatingName);
   const isRulesValid = !!(bestOf >= 1);
   const isDeploymentValid = !!(startNow || date);
+  const allStepsVisited = visitedSteps.size >= 3;
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    
+    // Safety: prevent submission unless on the final step, already submitting, or haven't seen all steps
+    if (activeStep !== "DEPLOYMENT" || isSubmitting || !allStepsVisited || showSuccess) return;
+
+    setIsSubmitting(true);
     const finalDate = date ? (startTime ? `${date}T${startTime}` : `${date}T00:00:00`) : null;
-
-    const formatConfig: any = {
-      bestOf: Number(bestOf) || 1,
-      allowDraw,
-    };
-
-    if (format === "SWISS") {
-      formatConfig.swissRounds = Number(swissRounds) || 3;
-      formatConfig.swissPointsForWin = Number(swissPointsWin);
-      formatConfig.swissPointsForDraw = Number(swissPointsDraw);
-      formatConfig.swissPointsForLoss = Number(swissPointsLoss);
-    }
 
     const body = {
       name, 
@@ -168,23 +172,56 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       createdById: userId,
     };
 
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.CREATE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.CREATE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (res.ok) onSuccess("Tournament Created Successfully");
-    else {
-      const data = await safeJson(res);
-      onSuccess(`Error: ${data?.message || "Failed to create"}`);
+      if (res.ok) {
+        const data = await safeJson(res);
+        const tournamentId = data.id;
+
+        if (bannerFile && tournamentId) {
+          await upload(API_ENDPOINTS.IMAGES.UPLOAD_BANNER(tournamentId), bannerFile);
+        }
+
+        // SHOW SUCCESS ANIMATION
+        setShowSuccess(true);
+        setTimeout(() => {
+          onSuccess("Tournament Created Successfully");
+        }, 2000);
+      } else {
+        const data = await safeJson(res);
+        onSuccess(`Error: ${data?.message || "Failed to create"}`);
+      }
+    } catch (err) {
+      onSuccess("Error: Connection failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const steps = [
-    { id: "IDENTITY", label: "01. IDENTITY", valid: isIdentityValid && visitedSteps.has("IDENTITY") },
-    { id: "RULES", label: "02. RULES", valid: isRulesValid && visitedSteps.has("RULES") },
-    { id: "DEPLOYMENT", label: "03. SCHEDULE", valid: isDeploymentValid && visitedSteps.has("DEPLOYMENT") },
+    { 
+      id: "IDENTITY", 
+      label: "01. IDENTITY", 
+      // Only validated if valid AND we've moved past it
+      valid: isIdentityValid && (activeStep === "RULES" || activeStep === "DEPLOYMENT")
+    },
+    { 
+      id: "RULES", 
+      label: "02. RULES", 
+      // Only validated if valid AND we've moved past it
+      valid: isRulesValid && activeStep === "DEPLOYMENT"
+    },
+    { 
+      id: "DEPLOYMENT", 
+      label: "03. SCHEDULE", 
+      // Validated if we are on it and it's valid
+      valid: isDeploymentValid && activeStep === "DEPLOYMENT"
+    },
   ] as const;
 
   return (
@@ -248,7 +285,44 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
             <div className="flex-1">
               <AnimatePresence mode="wait">
-                {activeStep === "IDENTITY" && (
+                {showSuccess ? (
+                  <motion.div 
+                    key="success"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="absolute inset-0 z-50 bg-[#1B1B1B] flex flex-col items-center justify-center text-center p-12"
+                  >
+                    <motion.div 
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", damping: 15 }}
+                      className="relative"
+                    >
+                      <div className="w-24 h-24 border-4 border-primary rounded-full flex items-center justify-center mb-8 relative">
+                        <motion.div 
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          className="text-primary text-4xl font-black"
+                        >
+                          ✓
+                        </motion.div>
+                        <div className="absolute inset-0 rounded-full border-4 border-primary animate-ping opacity-20" />
+                      </div>
+                    </motion.div>
+                    
+                    <h2 className="text-2xl font-black text-white uppercase tracking-[0.4em] mb-4">Tournament Initiated</h2>
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-[0.6em] animate-pulse">Syncing with deployment nodes...</p>
+                    
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                      <motion.div 
+                        initial={{ top: "-100%" }}
+                        animate={{ top: "100%" }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                        className="absolute left-0 right-0 h-[2px] bg-primary/20 shadow-[0_0_15px_rgba(82,185,70,0.5)]"
+                      />
+                    </div>
+                  </motion.div>
+                ) : activeStep === "IDENTITY" && (
                   <motion.section 
                     key="identity"
                     initial={{ opacity: 0, y: 10 }}
@@ -339,8 +413,27 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                                 <input type="number" value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))} className={inputCls} required />
                               </Field>
                              </div>
+
+                             <div className="pt-6 border-t border-white/5">
+                               <Field label="Tournament Banner">
+                                 <ImageUpload 
+                                   currentUrl={bannerPreview} 
+                                   onUpload={async (file) => {
+                                     setBannerFile(file);
+                                     setBannerPreview(URL.createObjectURL(file));
+                                   }}
+                                   onDelete={() => {
+                                     setBannerFile(null);
+                                     setBannerPreview(null);
+                                   }}
+                                   uploading={uploading}
+                                   aspectRatio="aspect-[21/9]"
+                                   label="SELECT BANNER IMAGE"
+                                 />
+                               </Field>
+                             </div>
                           </div>
-                       </motion.div>
+                        </motion.div>
                      )}
                    </motion.section>
                  )}
@@ -502,25 +595,47 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                 <button 
                   type="button" 
                   onClick={() => {
-                    if (activeStep === "IDENTITY") {
-                      setActiveStep("RULES");
-                    } else {
-                      setActiveStep("DEPLOYMENT");
-                    }
+                    const nextStep = activeStep === "IDENTITY" ? "RULES" : "DEPLOYMENT";
+                    setActiveStep(nextStep);
                   }}
-                  disabled={!steps.find(s => s.id === activeStep)?.valid}
-                  className="px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale"
+                  disabled={
+                    (activeStep === "IDENTITY" && !isIdentityValid) ||
+                    (activeStep === "RULES" && !isRulesValid)
+                  }
+                  className="group relative px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale overflow-hidden"
                 >
-                  Proceed
+                  <motion.span 
+                    initial={false}
+                    animate={{ x: 0 }}
+                    whileTap={{ x: 5 }}
+                    className="relative z-10"
+                  >
+                    Proceed
+                  </motion.span>
+                  <motion.div 
+                    className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-12" 
+                  />
                 </button>
               ) : (
-                <button 
-                  type="submit" 
-                  disabled={!isIdentityValid || !isRulesValid || !isDeploymentValid}
-                  className="px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale"
-                >
-                  Create Tournament
-                </button>
+                <div className="flex flex-col items-end gap-3">
+                  {!allStepsVisited && (
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest animate-pulse">
+                      Review all sections to finalize
+                    </span>
+                  )}
+                  <button 
+                    type="submit" 
+                    disabled={!isIdentityValid || !isRulesValid || !isDeploymentValid || uploading || !allStepsVisited}
+                    className="px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale flex items-center gap-2"
+                  >
+                    {uploading ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-black/30 border-t-black animate-spin rounded-full" />
+                        FINALIZING...
+                      </>
+                    ) : "Create Tournament"}
+                  </button>
+                </div>
               )}
              </div>
            </div>
