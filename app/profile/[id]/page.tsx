@@ -16,6 +16,7 @@ interface UserProfile {
   email?: string;
   roles?: string[];
   isGuest?: boolean;
+  avatarUrl?: string | null;
   createdAt?: string;
 }
 
@@ -107,7 +108,7 @@ function ProfileContent() {
       <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-primary font-black uppercase tracking-widest text-sm">Synchronizing Profile...</p>
+          <p className="text-primary font-black uppercase tracking-widest text-sm font-poppins">LOADING_PROFILE...</p>
         </div>
       </div>
     );
@@ -118,7 +119,7 @@ function ProfileContent() {
       <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
         <div className="flex-1 flex items-center justify-center text-center p-8">
           <div>
-            <h2 className="text-3xl font-black uppercase tracking-tighter text-foreground mb-4 font-poppins">User Not Found</h2>
+            <h2 className="text-3xl font-black uppercase tracking-tighter text-foreground mb-4 font-poppins">USER_NOT_FOUND</h2>
             <p className="text-foreground/40 font-bold uppercase tracking-widest font-questrial">
               This user may not exist, or they haven&apos;t established a competitive record yet.
             </p>
@@ -151,7 +152,7 @@ function ProfileContent() {
                    <div className="flex items-center justify-between mb-8">
                       <h3 className="text-xl font-black uppercase tracking-widest text-foreground font-poppins flex items-center gap-3">
                         <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2 2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        Performance Stats
+                        PERFORMANCE_STATS
                       </h3>
                     </div>
                   <StatsGrid stats={stats} />
@@ -171,7 +172,7 @@ export default function ProfilePage() {
       <div className="min-h-screen w-full bg-background flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-primary font-black uppercase tracking-widest text-sm">Loading Profile...</p>
+          <p className="text-primary font-black uppercase tracking-widest text-sm font-poppins">LOADING_DATA...</p>
         </div>
       </div>
     }>

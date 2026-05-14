@@ -20,6 +20,10 @@
   --color-surface: #0A0A0A;
   --color-white: #FFFFFF;
 
+  /* Component Colors */
+  --color-component-background: #0D0D0D;
+  --color-component-border: #3A4A38;
+
   /* Expressive Easing */
   --ease-expressive: cubic-bezier(0.4, 0, 0.2, 1);
 }

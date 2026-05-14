@@ -35,7 +35,7 @@ export default function MatchHistory({ activities = [], variant = "default", use
         </div>
       );
       default: return (
-        <div className="w-10 h-10 bg-zinc-900 text-white/40 flex items-center justify-center border-2 border-white/10 relative">
+        <div className="w-10 h-10 bg-component-background text-white/40 flex items-center justify-center border-2 border-component-border relative">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         </div>
       );
@@ -43,16 +43,16 @@ export default function MatchHistory({ activities = [], variant = "default", use
   };
 
   const content = (
-    <div className={`flex flex-col ${variant === "default" ? "min-h-[400px]" : "h-full"} bg-surface text-white`}>
+    <div className={`flex flex-col ${variant === "default" ? "min-h-[400px]" : "h-full"} bg-component-background text-white`}>
       <div className={`flex items-center justify-between ${variant === "default" ? "mb-10" : "mb-8"}`}>
         <div className="flex items-center gap-6">
           <div className="w-1.5 h-10 bg-primary" />
-          <h3 className={`${variant === "default" ? "text-3xl" : "text-[12px]"} font-black uppercase tracking-[0.2em] text-white font-poppins`}>
+          <h3 className={`${variant === "default" ? "text-3xl" : "text-[12px]"} font-black uppercase tracking-widest text-white font-poppins`}>
             Recent <span className="text-primary">Activity</span>
           </h3>
         </div>
-        <div className="bg-primary/10 border border-primary/40 text-primary px-3 py-1 text-[8px] font-black uppercase tracking-[0.2em] font-mono">
-          Sync Active
+        <div className="bg-primary/10 border border-primary/40 text-primary px-3 py-1 text-[8px] font-black uppercase tracking-widest font-mono">
+          Synchronized
         </div>
       </div>
       
@@ -66,7 +66,7 @@ export default function MatchHistory({ activities = [], variant = "default", use
               whileHover={{ backgroundColor: "rgba(255,255,255,0.05)", borderColor: "rgba(var(--color-primary), 0.3)" }}
               viewport={{ once: true }}
               transition={{ delay: idx * 0.05 }}
-              className="flex items-center gap-8 p-6 border-2 border-white/5 bg-surface relative group overflow-hidden"
+              className="flex items-center gap-8 p-6 border-2 border-component-border bg-component-background relative group overflow-hidden"
             >
               {/* Technical detail: bottom progress line */}
               <div className="absolute bottom-0 left-0 h-[1px] bg-primary/40 w-0 group-hover:w-full transition-all duration-700" />
@@ -95,14 +95,14 @@ export default function MatchHistory({ activities = [], variant = "default", use
             </m.motion.div>
           ))
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-20 bg-zinc-900/10 border-2 border-dashed border-white/5">
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-20 bg-background/10 border-2 border-dashed border-component-border">
             <div className="w-16 h-16 bg-white/5 flex items-center justify-center mb-6">
               <svg className="w-8 h-8 text-white/10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.6em] text-white/10 font-poppins">
-              DATA_VOID // EMPTY_RECORDS
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/20 font-poppins">
+              No activity recorded.
             </p>
           </div>
         )}
@@ -125,7 +125,7 @@ export default function MatchHistory({ activities = [], variant = "default", use
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
-      className="bg-surface border-2 border-white/5 p-12 flex flex-col min-h-[500px] relative overflow-hidden group shadow-[0_0_50px_rgba(0,0,0,1)]"
+      className="bg-component-background border-2 border-component-border p-12 flex flex-col min-h-[500px] relative overflow-hidden group shadow-[0_0_50px_rgba(0,0,0,1)]"
     >
       {/* Subtle grid background for the container */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />

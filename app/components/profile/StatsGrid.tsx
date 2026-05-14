@@ -24,13 +24,13 @@ interface StatsGridProps {
 export default function StatsGrid({ stats, variant = "default" }: StatsGridProps) {
   if (!stats) {
     const emptyState = (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-12 min-h-[300px] bg-[#1B1B1B] border-2 border-white/5 relative overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-12 min-h-[300px] bg-component-background border-2 border-component-border relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_2px_2px,rgba(var(--color-primary),0.02)_1px,transparent_0)] bg-[size:16px_16px] pointer-events-none" />
         <svg className="w-16 h-16 text-primary/10 mb-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em] leading-relaxed max-w-xs font-poppins">
-          NULL_DATA_DETECTED // SYSTEM_IDLE
+        <p className="text-white/20 text-[10px] font-black uppercase tracking-widest leading-relaxed max-w-xs font-poppins">
+          No statistics available.
         </p>
       </div>
     );
@@ -41,7 +41,7 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
     { label: "WIN_RATE", value: `${(stats.matchWinPct * 100).toFixed(0)}%`, color: "primary" },
     { label: "WINS", value: stats.wins, color: "default" },
     { label: "LOSSES", value: stats.losses, color: "default" },
-    { label: "TOURNEYS", value: stats.tournamentsPlayed, color: "default" },
+    { label: "TOURNAMENTS", value: stats.tournamentsPlayed, color: "default" },
   ];
 
   const grid = (
@@ -53,7 +53,7 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
           whileInView={{ opacity: 1 }}
           transition={{ delay: idx * 0.05 }}
           className={`
-            p-8 flex flex-col justify-center items-center transition-all border border-white/5 bg-surface/50 group
+            p-8 flex flex-col justify-center items-center transition-all border border-component-border bg-component-background group
           `}
         >
           <span className="text-white/30 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center font-poppins">
@@ -68,7 +68,7 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
   );
 
   return variant === "bento" ? (
-    <div className="h-full bg-[#1B1B1B]">
+    <div className="h-full bg-component-background">
       {grid}
     </div>
   ) : grid;

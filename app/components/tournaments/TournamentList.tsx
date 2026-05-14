@@ -45,13 +45,13 @@ export default function TournamentList({ tournaments, variant = "default", limit
   const content = (
     <div 
       className={`flex flex-col h-full text-white relative group/container overflow-hidden transition-all duration-700 ${
-        isJoined ? "bg-primary/5 shadow-[inset_0_0_50px_rgba(82,185,70,0.05)]" : "bg-surface"
+        isJoined ? "bg-primary/5 shadow-[inset_0_0_50px_rgba(82,185,70,0.05)]" : "bg-component-background"
       }`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => { mouseX.set(0); mouseY.set(0); }}
     >
       {variant === "bento" && (
-        <div className={`p-6 border-b flex items-center justify-between transition-colors duration-500 ${isJoined ? "bg-primary/10 border-primary/20" : "bg-surface/30 border-white/5"}`}>
+        <div className={`p-6 border-b flex items-center justify-between transition-colors duration-500 ${isJoined ? "bg-primary/10 border-primary/20" : "bg-component-background/30 border-component-border"}`}>
           <div className="flex items-center gap-6">
             <h3 className={`text-[10px] font-black uppercase tracking-[0.5em] font-poppins transition-colors ${isJoined ? "text-primary" : "text-white/40"}`}>
               {isJoined ? "MY TOURNAMENTS" : "Active Tournaments"}
@@ -68,13 +68,13 @@ export default function TournamentList({ tournaments, variant = "default", limit
           <div className="flex items-center gap-2">
             <button 
               onClick={prev}
-              className="w-8 h-8 border border-white/10 flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-[#1B1B1B]"
+              className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
             >
               ←
             </button>
             <button 
               onClick={next}
-              className="w-8 h-8 border border-white/10 flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-[#1B1B1B]"
+              className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
             >
               →
             </button>
@@ -101,7 +101,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
               className="h-full w-full grid grid-cols-1 md:grid-cols-2 cursor-grab active:cursor-grabbing"
             >
               {/* Image Side - Isolated Parallax */}
-              <div className={`relative h-full overflow-hidden border-r bg-[#1B1B1B] group transition-colors duration-500 ${isJoined ? "border-primary/20" : "border-white/5"}`}>
+              <div className={`relative h-full overflow-hidden border-r bg-component-background group transition-colors duration-500 ${isJoined ? "border-primary/20" : "border-component-border"}`}>
                 <m.motion.div 
                   className="absolute inset-0"
                   style={{ 

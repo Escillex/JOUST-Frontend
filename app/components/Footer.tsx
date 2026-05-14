@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function Footer() {
   return (
-    <footer className="bg-neutral-950 border-t border-neutral-900 py-16 px-8 mt-auto">
+    <footer className="bg-component-background border-t border-component-border py-16 px-8 mt-auto">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
         <div className="space-y-6">
           <div className="flex items-center gap-2">
@@ -40,7 +40,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto pt-16 mt-16 border-t border-neutral-900 flex flex-col md:flex-row justify-between items-center gap-8">
+      <div className="max-w-7xl mx-auto pt-16 mt-16 border-t border-component-border flex flex-col md:flex-row justify-between items-center gap-8">
         <p className="text-[10px] font-black uppercase tracking-widest text-neutral-600">
           © {new Date().getFullYear()} Hobby+ Technologies. All Rights Reserved.
         </p>

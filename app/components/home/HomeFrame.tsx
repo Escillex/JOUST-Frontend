@@ -17,7 +17,7 @@ export default function HomeFrame({
   showPattern = true 
 }: HomeFrameProps) {
   return (
-    <div className={`relative w-full overflow-hidden bg-[#1B1B1B] ${className}`}>
+    <div className={`relative w-full overflow-hidden bg-background ${className}`}>
       {/* Sensory Breathing Background */}
       <motion.div 
         animate={{ 

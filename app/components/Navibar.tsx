@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { authenticatedFetch, API_ENDPOINTS } from "../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, API_URL } from "../utils/api";
 import { useUser } from "./UserProvider";
 
 /**
@@ -55,7 +55,7 @@ export default function Navibar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#1B1B1B] border-b border-white/10 h-20 backdrop-blur-md bg-[#1B1B1B]/80">
+    <header className="sticky top-0 z-50 w-full bg-background border-b border-component-border h-20 backdrop-blur-md bg-background/80">
       <div className="max-w-7xl mx-auto h-full px-8 flex items-center justify-between relative z-10">
         {/* Branding */}
         <div className="flex items-center gap-12">
@@ -112,20 +112,47 @@ export default function Navibar() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                    className={`w-10 h-10 flex items-center justify-center font-black text-xs transition-all border-2 font-poppins ${
+                    className={`w-10 h-10 flex items-center justify-center font-black text-xs transition-all border-2 font-poppins overflow-hidden relative ${
                       isProfileMenuOpen 
                       ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--color-primary),0.5)]" 
-                      : "bg-[#1B1B1B] text-white border-white/20 hover:border-primary"
+                      : "bg-component-background text-white border-component-border hover:border-primary"
                     }`}
                   >
-                    {user?.username?.[0]?.toUpperCase() || "U"}
+                    {user?.avatarUrl ? (
+                      <Image 
+                        src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_URL}${user.avatarUrl}`} 
+                        alt={user.username || "User"} 
+                        fill 
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      user?.username?.[0]?.toUpperCase() || "U"
+                    )}
                   </motion.button>
               {/* Profile Dropdown */}
               {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-4 w-72 bg-[#1B1B1B] border-2 border-white/10 shadow-[0_0_40px_rgba(0,0,0,1)] py-0 overflow-hidden z-50">
-                  <div className="px-8 py-6 border-b border-white/10 bg-zinc-900/50">
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-1 font-poppins">USER</p>
-                    <p className="text-lg font-black truncate font-poppins text-white">{user.username?.toUpperCase()}</p>
+                <div className="absolute right-0 mt-4 w-72 bg-component-background border-2 border-component-border shadow-[0_0_40px_rgba(0,0,0,1)] py-0 overflow-hidden z-50">
+                  <div className="px-8 py-6 border-b border-component-border bg-zinc-900/30 flex items-center gap-4">
+                    <div className="w-12 h-12 border border-primary/20 relative overflow-hidden flex-shrink-0">
+                      {user.avatarUrl ? (
+                        <Image 
+                          src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_URL}${user.avatarUrl}`} 
+                          alt={user.username || "User"} 
+                          fill 
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-background text-primary flex items-center justify-center font-black">
+                          {user.username?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-1 font-poppins">USER</p>
+                      <p className="text-lg font-black truncate font-poppins text-white">{user.username?.toUpperCase()}</p>
+                    </div>
                   </div>
                   
                   <div className="divide-y divide-white/10">

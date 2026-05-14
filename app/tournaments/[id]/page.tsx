@@ -105,7 +105,7 @@ function TournamentViewContent() {
     );
   }
 
-  if (!tournament) return <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center text-white font-black uppercase tracking-widest">Tournament Not Found</div>;
+  if (!tournament) return <div className="min-h-screen bg-background flex items-center justify-center text-white font-black uppercase tracking-widest">TOURNAMENT_NOT_FOUND</div>;
 
   const myId = user?.sub || (user as any)?.id;
   const isJoined = tournament.participants.some(p => p.userId === myId);
@@ -135,10 +135,10 @@ function TournamentViewContent() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-8 py-4 text-[10px] font-black uppercase tracking-[0.3em] transition-all border-2 ${
+              className={`px-8 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
                 activeTab === tab.id 
                   ? "bg-primary border-primary text-black" 
-                  : "border-white/10 text-white/40 hover:border-white/20 hover:text-white"
+                  : "border-component-border text-white/40 hover:border-white/20 hover:text-white"
               }`}
             >
               {tab.label}
@@ -156,7 +156,7 @@ function TournamentViewContent() {
               className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20"
             >
               <div className="lg:col-span-7 flex flex-col gap-12">
-                <div className="relative group border-2 border-white/5 overflow-hidden">
+                <div className="relative group border-2 border-component-border overflow-hidden">
                   <div className="aspect-video relative overflow-hidden">
                     <Image 
                       src={tournament.bannerUrl 
@@ -165,6 +165,7 @@ function TournamentViewContent() {
                       } 
                       alt={tournament.name} 
                       fill 
+                      unoptimized
                       className="object-cover transition-transform duration-1000 group-hover:scale-105"
                     />
                   </div>
@@ -179,8 +180,8 @@ function TournamentViewContent() {
                       </motion.div>
                       
                       <div className="absolute top-full left-0 mt-4 opacity-0 peer-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-30">
-                        <div className="bg-[#1B1B1B] p-6 border border-primary/40 w-64 shadow-[0_0_40px_rgba(82,185,70,0.2)]">
-                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2 italic">TOURNAMENT FORMAT</p>
+                        <div className="bg-component-background p-6 border border-primary/40 w-64 shadow-[0_0_40px_rgba(82,185,70,0.2)]">
+                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">FORMAT_DETAILS</p>
                           <p className="text-[11px] text-white/80 leading-relaxed font-light italic">
                             {formatExplanations[typeof tournament.format === 'object' ? tournament.format?.system : ""] || "Standard tournament protocol."}
                           </p>
@@ -227,8 +228,8 @@ function TournamentViewContent() {
                       GO TO TOURNAMENT
                     </Link>
                   ) : (
-                    <div className="w-full h-full border-2 border-white/5 bg-[#1B1B1B] text-white/20 text-center font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center">
-                      {tournament.status === "COMPLETED" ? "TOURNAMENT FINISHED" : "REGISTRATION CLOSED"}
+                    <div className="w-full h-full border-2 border-component-border bg-component-background text-white/20 text-center font-black text-xs uppercase tracking-widest flex items-center justify-center">
+                      {tournament.status === "COMPLETED" ? "TOURNAMENT_FINISHED" : "REGISTRATION_CLOSED"}
                     </div>
                   )}
                 </div>
@@ -273,7 +274,7 @@ function TournamentViewContent() {
                 {tournament.participants.map((p: any, idx: number) => (
                   <div 
                     key={p.userId} 
-                    className="p-8 border border-white/10 bg-[#1B1B1B] relative group hover:border-primary/40 transition-all"
+                    className="p-8 border border-component-border bg-component-background relative group hover:border-primary/40 transition-all"
                   >
                     <div className="absolute top-4 right-4 text-[8px] font-black text-white/10 group-hover:text-primary transition-colors">
                       {String(idx + 1).padStart(2, '0')}
@@ -302,10 +303,10 @@ function TournamentViewContent() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="min-h-[600px] flex flex-col bg-[#1B1B1B] p-4 rounded-xl"
+              className="min-h-[600px] flex flex-col bg-component-background p-4 rounded-xl"
             >
                {tournament.status === "ONGOING" || tournament.status === "COMPLETED" ? (
-                 <div className="flex-1 bg-[#1B1B1B] border border-white/5 p-8 rounded-3xl">
+                 <div className="flex-1 bg-component-background border border-component-border p-8 rounded-3xl">
                     <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em] mb-12 text-center">Tournament Match History</p>
                     <div className="flex flex-col items-center justify-center gap-8 py-20">
                       <div className="w-16 h-16 rounded-full border-2 border-primary/20 flex items-center justify-center text-primary animate-pulse">
@@ -394,7 +395,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
       }}
       layout
       className={`p-8 border-2 transition-all duration-500 cursor-pointer relative overflow-hidden min-h-[160px] flex flex-col justify-center ${
-        isExpanded ? "border-primary bg-primary/10" : "border-white/5 bg-[#1B1B1B] hover:border-white/20"
+        isExpanded ? "border-primary bg-primary/10" : "border-component-border bg-component-background hover:border-white/20"
       }`}
     >
       {!isExpanded && isHovered && (
@@ -434,7 +435,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
                 exit={{ opacity: 0 }}
                 className="text-[8px] font-black text-white/10 uppercase tracking-widest italic"
               >
-                {isHovered ? "Syncing..." : "Automatic Rotation"}
+                {isHovered ? "Syncing..." : "Auto-Refresh"}
               </motion.span>
             ) : (
               <motion.span 
@@ -444,7 +445,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
                 className="text-[8px] font-black text-primary uppercase tracking-widest italic flex items-center gap-2"
               >
                 <div className="w-1 h-1 bg-primary rounded-full animate-ping" />
-                Live_Data
+                Active_Status
               </motion.span>
             )}
           </AnimatePresence>

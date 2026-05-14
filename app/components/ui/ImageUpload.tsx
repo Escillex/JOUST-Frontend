@@ -76,7 +76,7 @@ export default function ImageUpload({
 
       {/* ── Upload Card ── */}
       <div
-        className={`relative group overflow-hidden border-2 border-white/10 hover:border-[#52B946]/50 transition-colors bg-black ${aspectRatio}`}
+        className={`relative group overflow-hidden border-2 border-component-border hover:border-primary/50 transition-colors bg-component-background ${aspectRatio}`}
       >
         {/* Current / preview image */}
         <img
@@ -86,7 +86,7 @@ export default function ImageUpload({
         />
 
         {/* Scanline overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,118,0.06))] bg-[length:100%_2px,3px_100%]" />
+        <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_2px]" />
 
         {/* Hover action overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
@@ -94,7 +94,7 @@ export default function ImageUpload({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="px-6 py-2 bg-[#52B946] text-black font-black text-xs tracking-[0.2em] hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:scale-100"
+            className="px-6 py-2 bg-primary text-black font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:scale-100"
           >
             {uploading ? "UPLOADING..." : label}
           </button>
@@ -105,7 +105,7 @@ export default function ImageUpload({
               onClick={onDelete}
               className="text-[10px] font-bold text-red-500 hover:text-red-400 tracking-widest uppercase"
             >
-              Remove
+              REMOVE_IMAGE
             </button>
           )}
         </div>
@@ -120,8 +120,8 @@ export default function ImageUpload({
               className="absolute inset-0 bg-black/80 flex items-center justify-center"
             >
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-[#52B946] border-t-transparent animate-spin rounded-full" />
-                <span className="text-[10px] font-black tracking-[0.3em] text-[#52B946]">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent animate-spin rounded-full" />
+                <span className="text-[10px] font-black tracking-widest text-primary">
                   UPLOADING...
                 </span>
               </div>
@@ -138,8 +138,8 @@ export default function ImageUpload({
         />
 
         {/* Corner accents */}
-        <div className="absolute top-2 left-2 w-2 h-2 border-t border-l border-[#52B946] opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="absolute bottom-2 right-2 w-2 h-2 border-b border-r border-[#52B946] opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute top-2 left-2 w-2 h-2 border-t border-l border-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute bottom-2 right-2 w-2 h-2 border-b border-r border-primary opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </>
   );

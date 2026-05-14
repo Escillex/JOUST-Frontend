@@ -9,6 +9,7 @@ export type User = {
   email?: string;
   roles?: string[];
   isGuest?: boolean;
+  avatarUrl?: string | null;
   sub?: string;
 } | null;
 
