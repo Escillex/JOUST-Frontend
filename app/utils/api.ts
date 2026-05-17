@@ -1,4 +1,4 @@
-// Prioritize the environment variable if it's an absolute URL, otherwise fallback to the proxy
+// Prioritize the environment variable if it's an absolute URL, otherwise fallback to the proxy.
 const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
 export const API_URL = (envApiUrl && envApiUrl.startsWith('http')) 
   ? envApiUrl.replace(/\/$/, '') // Remove trailing slash
@@ -129,6 +129,7 @@ export const API_ENDPOINTS = {
     GET_ASSET: (key: string) => `/images/assets/${key}`,
   },
   STORE: {
+    LIST: '/store',
     LIST_ALL: '/store/all',
     CREATE: '/store',
     UPDATE: (id: string) => `/store/${id}`,

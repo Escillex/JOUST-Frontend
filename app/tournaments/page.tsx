@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 import { Tournament } from "./types";
-import HomeFrame from "../components/home/HomeFrame";
+import HomeFrame from "../components/HomeFrame";
 import TournamentHero from "../components/tournaments/TournamentHero";
 import TournamentDirectory from "../components/tournaments/TournamentDirectory";
 

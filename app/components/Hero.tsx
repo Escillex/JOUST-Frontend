@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
 import BrandButton from "./BrandButton";
+import { API_URL } from "../utils/api";
 
 interface Slide {
   image: string;
@@ -79,7 +80,16 @@ export default function Hero({
             className="absolute inset-0"
           >
             <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/20 to-background z-10" />
-            <div className="relative w-full h-full bg-zinc-900" />
+            {slides[currentSlide].image && (
+              <img
+                src={slides[currentSlide].image.startsWith("http") || slides[currentSlide].image.startsWith("/")
+                  ? slides[currentSlide].image
+                  : `${API_URL}${slides[currentSlide].image}`}
+                alt={slides[currentSlide].title || "Hero Image"}
+                className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-700 scale-105"
+              />
+            )}
+            <div className="relative w-full h-full bg-zinc-900 -z-10" />
           </motion.div>
         </AnimatePresence>
       </div>

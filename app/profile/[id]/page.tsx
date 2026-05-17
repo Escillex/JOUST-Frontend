@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
 import { useUser } from "../../components/UserProvider";
-import HomeFrame from "../../components/home/HomeFrame";
+import HomeFrame from "../../components/HomeFrame";
 import FadeIn, { StaggerContainer } from "../../components/FadeIn";
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import StatsGrid from "../../components/profile/StatsGrid";

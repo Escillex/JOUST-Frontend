@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 import { useUser } from "../components/UserProvider";
-import HomeFrame from "../components/home/HomeFrame";
-import HomeDashboard from "../components/home/HomeDashboard";
+import HomeFrame from "../components/HomeFrame";
+import HomeDashboard from "../components/HomeDashboard";
 
 export default function HomePage() {
   const router = useRouter();

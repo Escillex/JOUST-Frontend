@@ -11,6 +11,8 @@ interface UserRankProps {
     losses: number;
     draws: number;
     matchWinPct: number;
+    omw: number;
+    oomw: number;
   } | null;
   loading?: boolean;
 }
@@ -56,18 +58,30 @@ export default function UserRankCard({ stats, loading }: UserRankProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-12 md:gap-24 border-t-4 md:border-t-0 md:border-l-4 border-white/10 pt-12 md:pt-0 md:pl-24 w-full md:w-auto">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 border-t-4 md:border-t-0 md:border-l-4 border-white/10 pt-12 md:pt-0 md:pl-24 w-full md:w-auto">
           <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-4 font-poppins">WINS</p>
-            <p className="text-5xl md:text-7xl font-black text-white italic tracking-tighter font-poppins">{stats.wins}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">WINS</p>
+            <p className="text-4xl md:text-5xl font-black text-white italic tracking-tighter font-poppins">{stats.wins}</p>
           </div>
           <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-4 font-poppins">LOSSES</p>
-            <p className="text-5xl md:text-7xl font-black text-white/40 italic tracking-tighter font-poppins">{stats.losses}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">LOSSES</p>
+            <p className="text-4xl md:text-5xl font-black text-white/40 italic tracking-tighter font-poppins">{stats.losses}</p>
           </div>
           <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-4 font-poppins">WIN RATE</p>
-            <p className="text-5xl md:text-7xl font-black text-primary italic tracking-tighter font-poppins">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">DRAWS</p>
+            <p className="text-4xl md:text-5xl font-black text-white/20 italic tracking-tighter font-poppins">{stats.draws}</p>
+          </div>
+          <div className="text-center md:text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">OMW</p>
+            <p className="text-4xl md:text-5xl font-black text-white/60 italic tracking-tighter font-poppins">{(stats.omw * 100).toFixed(1)}%</p>
+          </div>
+          <div className="text-center md:text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">OOMW</p>
+            <p className="text-4xl md:text-5xl font-black text-white/60 italic tracking-tighter font-poppins">{(stats.oomw * 100).toFixed(1)}%</p>
+          </div>
+          <div className="text-center md:text-left">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">WIN RATE</p>
+            <p className="text-4xl md:text-5xl font-black text-primary italic tracking-tighter font-poppins">
               {(stats.matchWinPct * 100).toFixed(0)}%
             </p>
           </div>

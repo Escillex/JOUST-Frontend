@@ -38,10 +38,14 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
   }
 
   const statItems = [
+    { label: "POINTS", value: stats.points, color: "default" },
     { label: "WIN_RATE", value: `${(stats.matchWinPct * 100).toFixed(0)}%`, color: "primary" },
     { label: "WINS", value: stats.wins, color: "default" },
     { label: "LOSSES", value: stats.losses, color: "default" },
+    { label: "DRAWS", value: stats.draws, color: "default" },
     { label: "TOURNAMENTS", value: stats.tournamentsPlayed, color: "default" },
+    { label: "OMW", value: `${(stats.omw * 100).toFixed(1)}%`, color: "default" },
+    { label: "OOMW", value: `${(stats.oomw * 100).toFixed(1)}%`, color: "default" },
   ];
 
   const grid = (
@@ -59,7 +63,7 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
           <span className="text-white/30 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center font-poppins">
             {item.label}
           </span>
-          <span className={`text-6xl font-black tracking-tighter font-poppins ${item.color === "primary" ? "text-primary" : "text-white"}`}>
+          <span className={`text-4xl font-black tracking-tighter font-poppins ${item.color === "primary" ? "text-primary" : "text-white"}`}>
             {item.value}
           </span>
         </m.motion.div>

@@ -14,7 +14,7 @@ import { useUser } from "./UserProvider";
 export default function Navibar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, refreshUser } = useUser();
+  const { user, loading, refreshUser } = useUser();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -74,14 +74,20 @@ export default function Navibar() {
  
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-10">
-            {navLinks.map((link, idx) => {
+            {navLinks.map((link) => {
               const isActive = pathname === link.href;
+              const linkDelays: Record<string, number> = {
+                Home: 0,
+                Tournaments: 0.1,
+                Leaderboards: 0.2,
+                Admin: 0.3,
+              };
               return (
                 <motion.div
                   key={link.name}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1, type: "spring", stiffness: 300, damping: 20 }}
+                  transition={{ delay: linkDelays[link.name] ?? 0.1, type: "spring", stiffness: 300, damping: 20 }}
                 >
                   <Link
                     href={link.href}
@@ -105,8 +111,11 @@ export default function Navibar() {
         </div>
 
         {/* User Actions */}
-        <div className="flex items-center gap-6">
-          {user ? (
+        <div className="flex items-center gap-6 min-w-[80px] justify-end">
+          {loading ? (
+            /* Stable greeble-style loading placeholder to prevent layout shifts */
+            <div className="w-10 h-10 border-2 border-white/10 bg-[#1B1B1B] animate-pulse" />
+          ) : user ? (
             <div className="relative" ref={profileMenuRef}>
                   <motion.button
                     whileHover={{ scale: 1.05 }}

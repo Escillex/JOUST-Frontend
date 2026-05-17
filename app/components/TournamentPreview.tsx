@@ -2,9 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Tournament } from "../../tournaments/types";
+import { Tournament } from "../tournaments/types";
 import HomeFrame from "./HomeFrame";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 
 interface TournamentPreviewProps {
   tournaments: Tournament[];

@@ -378,6 +378,15 @@ export default function AdminDashboard() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                         </svg>
                       </button>
+                      <button 
+                        onClick={() => router.push("/admin/editor")} 
+                        className="p-4 border border-white/10 hover:border-primary/50 text-[10px] font-bold text-white uppercase tracking-widest transition-all text-left flex justify-between items-center group"
+                      >
+                        Site Visual Editor
+                        <svg className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
-import HomeFrame from "../components/home/HomeFrame";
+import HomeFrame from "../components/HomeFrame";
 import UserRankCard from "../components/leaderboard/UserRankCard";
 import LeaderboardTable from "../components/leaderboard/LeaderboardTable";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";

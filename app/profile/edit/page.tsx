@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import HomeFrame from "../../components/home/HomeFrame";
+import HomeFrame from "../../components/HomeFrame";
 import FadeIn from "../../components/FadeIn";
 import ImageUpload from "../../components/ui/ImageUpload";
 import { authenticatedFetch, API_ENDPOINTS, API_URL } from "../../utils/api";

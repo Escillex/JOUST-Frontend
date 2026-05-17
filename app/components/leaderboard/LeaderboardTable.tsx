@@ -113,6 +113,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic">COMPETITOR</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">POINTS</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">W / L / D</th>
+              <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">OMW / OOMW</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-right">WIN RATE</th>
             </tr>
           </thead>
@@ -158,6 +159,12 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     <span className="text-sm font-black text-white/40">{entry.losses}</span>
                     <span className="text-[10px] font-black text-white/20">/</span>
                     <span className="text-sm font-black text-white/40">{entry.draws}</span>
+                  </div>
+                </td>
+                <td className="py-8 px-10 text-center">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xl font-black text-white tracking-tighter">{(entry.omw * 100).toFixed(1)}%</span>
+                    <span className="text-[10px] font-black text-white/20 tracking-widest uppercase">{(entry.oomw * 100).toFixed(1)}%</span>
                   </div>
                 </td>
                 <td className="py-8 px-10 text-right">

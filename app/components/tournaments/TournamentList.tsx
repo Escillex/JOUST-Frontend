@@ -65,19 +65,36 @@ export default function TournamentList({ tournaments, variant = "default", limit
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={prev}
-              className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
-            >
-              ←
-            </button>
-            <button 
-              onClick={next}
-              className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
-            >
-              →
-            </button>
+          <div className="flex items-center gap-4">
+            {/* Slide dots */}
+            <div className="flex items-center gap-1.5 mr-2">
+              {sorted.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-1.5 h-1.5 transition-all duration-300 ${
+                    idx === currentIndex 
+                      ? "bg-primary w-3 shadow-[0_0_8px_rgba(82,185,70,0.6)]" 
+                      : "bg-white/20 hover:bg-white/40"
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={prev}
+                className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
+              >
+                ←
+              </button>
+              <button 
+                onClick={next}
+                className="w-8 h-8 border border-component-border flex items-center justify-center text-white/40 hover:text-primary hover:border-primary transition-all bg-component-background"
+              >
+                →
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -134,14 +151,24 @@ export default function TournamentList({ tournaments, variant = "default", limit
                     </h4>
                     
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className="shrink-0 px-3 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] border border-primary text-primary whitespace-nowrap">
-                        {currentTournament.status}
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                        STATUS: {currentTournament.status}
                       </span>
                       {isJoined && (
-                        <span className="px-3 py-1 bg-primary text-black text-[8px] font-black uppercase tracking-widest italic animate-pulse">
-                          JOINED
-                        </span>
+                        <>
+                          <span className="text-white/20">•</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/70 italic">
+                            JOINED
+                          </span>
+                        </>
                       )}
+                      <span className="text-white/20">•</span>
+                      <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.2em] border border-white/10 text-white/30 rounded whitespace-nowrap">
+                        {(() => {
+                          const fs = typeof currentTournament.format === 'string' ? currentTournament.format : currentTournament.format?.system || "UNKNOWN";
+                          return fs === "HYBRID" ? "TOP CUT" : fs.replace(/_/g, ' ');
+                        })()}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -151,14 +178,15 @@ export default function TournamentList({ tournaments, variant = "default", limit
                 </p>
 
                 <div className="flex flex-wrap items-center gap-4 mt-auto">
-                  <div className={`px-3 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-colors ${isJoined ? "bg-white text-black" : "bg-primary text-black"}`}>
-                    {(() => {
-                      const fs = typeof currentTournament.format === 'string' ? currentTournament.format : currentTournament.format?.system || "UNKNOWN";
-                      return fs === "HYBRID" ? "TOP CUT" : fs.replace(/_/g, ' ');
-                    })()}
-                  </div>
-                  <Link href={`/tournaments/${currentTournament.id}`} className="text-white font-black text-[10px] md:text-xs uppercase tracking-[0.3em] group-hover:translate-x-2 transition-transform flex items-center gap-2 whitespace-nowrap">
-                    {isJoined ? "GO TO TOURNAMENT" : "VIEW TOURNAMENT"} <span className="text-primary text-lg">→</span>
+                  <Link 
+                    href={`/tournaments/${currentTournament.id}`} 
+                    className={`px-5 py-2.5 border-2 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] transition-all flex items-center gap-2 whitespace-nowrap ${
+                      isJoined 
+                        ? "bg-primary text-black border-primary hover:bg-transparent hover:text-primary" 
+                        : "bg-white text-black border-white hover:bg-transparent hover:text-white"
+                    }`}
+                  >
+                    {isJoined ? "GO TO TOURNAMENT" : "VIEW TOURNAMENT"} <span>→</span>
                   </Link>
                 </div>
               </div>
