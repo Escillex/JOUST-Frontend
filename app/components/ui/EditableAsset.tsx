@@ -69,7 +69,7 @@ export default function EditableAsset({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await authenticatedFetch(`${API_URL}/images/assets/${assetKey}`, {
+      const res = await authenticatedFetch(`/images/assets/${assetKey}`, {
         method: "POST",
         body: formData,
       });
@@ -87,10 +87,9 @@ export default function EditableAsset({
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`Delete asset ${assetKey}?`)) return;
     setUploading(true);
     try {
-      const res = await authenticatedFetch(`${API_URL}/images/assets/${assetKey}`, { method: "DELETE" });
+      const res = await authenticatedFetch(`/images/assets/${assetKey}`, { method: "DELETE" });
       if (res.ok) {
         window.location.reload();
       }

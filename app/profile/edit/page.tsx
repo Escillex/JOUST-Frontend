@@ -28,7 +28,7 @@ export default function ProfileEditPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await authenticatedFetch(`${API_URL}/images/avatar/${user.id}`, {
+      const res = await authenticatedFetch(`/images/avatar/${user.id}`, {
         method: "POST",
         body: formData,
       });
@@ -47,11 +47,10 @@ export default function ProfileEditPage() {
 
   const handleAvatarDelete = async () => {
     if (!user) return;
-    if (!confirm("Are you sure you want to remove your profile picture?")) return;
     
     setUploading(true);
     try {
-      const res = await authenticatedFetch(`${API_URL}/images/avatar/${user.id}`, {
+      const res = await authenticatedFetch(`/images/avatar/${user.id}`, {
         method: "DELETE",
       });
 
