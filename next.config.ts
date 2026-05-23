@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const hostIp = process.env.HOST_IP || "localhost";
@@ -7,6 +8,7 @@ const backendUrl = process.env.BACKEND_URL || `http://${hostIp}:${backendPort}`;
 const nextConfig: NextConfig = {
   // Only enable standalone output for production/Docker builds
   output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname),
   serverExternalPackages: [],
   allowedDevOrigins: [
     "localhost",
