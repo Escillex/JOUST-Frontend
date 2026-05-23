@@ -7,6 +7,7 @@ import Footer from "./components/Footer";
 import FadeIn, { StaggerContainer } from "./components/FadeIn";
 import { API_ENDPOINTS } from "./utils/api";
 
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const hostIp = process.env.HOST_IP || "localhost";
