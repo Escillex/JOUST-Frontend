@@ -4,10 +4,11 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api"
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
-const inputCls = "w-full h-12 bg-background border border-foreground/10 px-4 text-xs text-foreground focus:outline-none focus:border-primary transition-all rounded-xl appearance-none";
+const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded";
 
 interface EditState {
   name: string;
+  description: string;
   formatId: string;
   maxPlayers: number;
   prizePool: string | number;
@@ -60,7 +61,6 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
   }, [tournament.guestCleanupAt]);
 
   const handleCancelCleanup = async () => {
-    if (!confirm("Stop automated guest purge? Accounts will be preserved indefinitely.")) return;
     const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.CANCEL_CLEANUP(tournamentId), { method: "PATCH" });
     if (res.ok) { setMessage("Cleanup halted."); fetchData(); }
     else { setMessage("Failed to halt cleanup."); }
@@ -69,13 +69,10 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
   const handleStatusChange = async (target: string) => {
     const current = tournament.status;
     if (current === "UPCOMING" && target === "OPEN") {
-      if (!confirm("Open registration?")) return;
       onOpenRegistration();
     } else if (current === "OPEN" && target === "ONGOING") {
-      if (!confirm("Initiate combat?")) return;
       onStartTournament();
     } else if (current === "ONGOING" && target === "COMPLETED") {
-      if (!confirm("Mark as completed?")) return;
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(tournamentId!), { method: "PATCH" });
       const data = await safeJson(res);
       if (res.ok) { setMessage("Tournament completed!"); fetchData(); }
@@ -94,7 +91,6 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
   };
 
   const handleBannerDelete = async () => {
-    if (!confirm("Remove tournament banner?")) return;
     const ok = await remove(API_ENDPOINTS.IMAGES.DELETE_BANNER(tournamentId));
     if (ok) {
       setMessage("Banner removed");
@@ -103,9 +99,9 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
   };
 
   return (
-    <div className="bg-[#1B1B1B] backdrop-blur-md border border-white/10 p-8 md:p-10 rounded-[2.5rem] shadow-2xl transition-all duration-500">
-      <div className="mb-10">
-        <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1 mb-3 block">Tournament Image</label>
+    <div className="bg-[#000000] border border-white/20 p-4 md:p-6 rounded">
+      <div className="mb-8">
+        <label className="text-xs font-semibold text-[#888888] mb-2 block">Tournament Image</label>
         <ImageUpload
           currentUrl={tournament.bannerUrl}
           onUpload={handleBannerUpload}
@@ -116,58 +112,62 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
         />
       </div>
 
-      <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/5">
-        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/60 font-poppins">Tournament Details</h3>
-        <button onClick={onToggleEdit} className="text-[10px] font-black uppercase text-primary hover:brightness-110 tracking-widest font-poppins transition-all">
-          {isEditing ? "Cancel Editing" : "Edit Tournament"}
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
+        <h3 className="text-sm font-semibold text-white">Specifications</h3>
+        <button onClick={onToggleEdit} className="text-xs font-semibold text-[#52B946] hover:brightness-90 transition-colors">
+          {isEditing ? "Cancel" : "Edit Settings"}
         </button>
       </div>
 
       {isEditing ? (
-        <form onSubmit={onSubmit} className="space-y-10">
-          {/* Hierarchical Step 1 */}
-          <div className="p-6 bg-primary/[0.03] border border-primary/20 rounded-2xl">
-            <div className="space-y-3">
-              <label className="text-[9px] font-black text-primary/60 uppercase tracking-[0.2em] font-poppins ml-1">Tournament Format</label>
-              <div className="relative">
-                <select 
-                  value={editState.formatId} 
-                  onChange={e => onEditChange("formatId", e.target.value)} 
-                  className={`${inputCls} !border-primary/20 !bg-transparent focus:!border-primary !text-primary font-black uppercase text-[10px] tracking-widest h-14`}
-                >
-                  <option value="" className="bg-[#1B1B1B] text-white/40">Select a format</option>
-                  {formatOptions.map(f => (
-                    <option key={f.id} value={f.id} className="bg-[#1B1B1B] text-white">{f.name.toUpperCase()} ({f.gameName || "GENERAL"})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        <form onSubmit={onSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-[#888888] block">Format Preset</label>
+            <select 
+              value={editState.formatId} 
+              onChange={e => onEditChange("formatId", e.target.value)} 
+              className={inputCls}
+            >
+              <option value="">Select a format</option>
+              {formatOptions.map(f => (
+                <option key={f.id} value={f.id}>{f.name} ({f.gameName || "GENERAL"})</option>
+              ))}
+            </select>
           </div>
 
-          {/* Locked Section */}
-          <div className={`space-y-8 transition-all duration-700 ${!editState.formatId ? "opacity-10 grayscale blur-sm pointer-events-none translate-y-4" : "opacity-100 translate-y-0"}`}>
+          <div className={`space-y-6 transition-opacity ${!editState.formatId ? "opacity-30 pointer-events-none" : "opacity-100"}`}>
             <div className="space-y-2">
-              <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Tournament Name</label>
-              <input value={editState.name} onChange={e => onEditChange("name", e.target.value)} className={`${inputCls} bg-transparent border-white/10`} />
+              <label className="text-xs font-semibold text-[#888888] block">Tournament Name</label>
+              <input value={editState.name} onChange={e => onEditChange("name", e.target.value)} className={inputCls} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#888888] block">Description</label>
+              <textarea 
+                value={editState.description} 
+                onChange={e => onEditChange("description", e.target.value)} 
+                className={`${inputCls} h-24 py-3 resize-none`} 
+                placeholder="Optional tournament details or lore"
+              />
             </div>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Capacity</label>
-                <input type="number" value={editState.maxPlayers} onChange={e => onEditChange("maxPlayers", Number(e.target.value))} className={`${inputCls} bg-transparent border-white/10`} />
+                <label className="text-xs font-semibold text-[#888888] block">Capacity</label>
+                <input type="number" value={editState.maxPlayers} onChange={e => onEditChange("maxPlayers", Number(e.target.value))} className={inputCls} />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Prize (₱)</label>
-                <input type="number" value={editState.prizePool} onChange={e => onEditChange("prizePool", editState.prizePool === "" ? "" : Number(e.target.value))} className={`${inputCls} bg-transparent border-white/10`} />
+                <label className="text-xs font-semibold text-[#888888] block">Prize Pool</label>
+                <input type="number" value={editState.prizePool} onChange={e => onEditChange("prizePool", editState.prizePool === "" ? "" : Number(e.target.value))} className={inputCls} />
               </div>
             </div>
 
-            <div className="space-y-2 pt-4 border-t border-white/[0.05]">
-              <p className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">Current Status</p>
+            <div className="space-y-2 pt-4 border-t border-white/10">
+              <label className="text-xs font-semibold text-[#888888] block">System Status</label>
               <select
                 value={tournament.status}
                 onChange={e => handleStatusChange(e.target.value)}
-                className={`${inputCls} !bg-transparent !border-white/10 cursor-pointer`}
+                className={inputCls}
               >
                 {stages.map(s => {
                   const currentIdx = stages.indexOf(tournament.status);
@@ -178,44 +178,79 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
               </select>
             </div>
 
-            <button type="submit" className="w-full h-14 bg-primary text-black font-black text-xs uppercase tracking-[0.3em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-primary/20">
-              Save Tournament Changes
+            <button type="submit" className="w-full h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors">
+              Save Specifications
             </button>
           </div>
         </form>
       ) : (
-        <div className="grid grid-cols-2 gap-y-10 gap-x-6">
-          {[
-            { label: "Tournament Name", value: tournament.name },
-            { label: "Game", value: (typeof tournament.format === 'object' ? tournament.format?.gameName : null) || "GENERAL" },
-            { label: "Format", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
-            { label: "Bracket Type",      value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
-            { label: "Capacity",    value: `${tournament.participants.length} / ${tournament.maxPlayers}` },
-            { label: "Status",      value: tournament.status, highlight: true },
-          ].map(({ label, value, highlight }) => (
-            <div key={label} className="space-y-1.5">
-              <p className="text-[8px] font-black text-foreground/20 uppercase tracking-[0.2em] font-poppins">{label}</p>
-              <p className={`text-[11px] font-black uppercase tracking-tight ${highlight ? "text-primary" : "text-foreground"}`}>{value}</p>
-            </div>
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+            {[
+              { label: "Name", value: tournament.name },
+              { label: "Description", value: tournament.description || "N/A" },
+              { label: "Game", value: (typeof tournament.format === 'object' ? tournament.format?.gameName : null) || "GENERAL" },
+              { label: "Format", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
+              { label: "System", value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
+              { label: "Capacity", value: `${tournament.participants.length} / ${tournament.maxPlayers}` },
+              { label: "Status", value: tournament.status, highlight: true },
+            ].map(({ label, value, highlight }) => (
+              <div key={label} className="space-y-1">
+                <p className="text-xs font-semibold text-[#888888]">{label}</p>
+                <p className={`text-sm ${highlight ? "text-[#52B946]" : "text-white"}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Placement Points Table */}
+          {(() => {
+            const cfg = (typeof tournament.format === 'object' ? tournament.format?.config : null) as any;
+            if (!cfg) return null;
+            const champion = cfg?.placementPointsChampion ?? 10;
+            const second = cfg?.placementPoints2nd ?? 7;
+            const third = cfg?.placementPoints3rd ?? 5;
+            const topCut = cfg?.placementPointsTopCut ?? 3;
+            const participation = cfg?.placementPointsParticipation ?? 1;
+            const isHybrid = (typeof tournament.format === 'object' ? tournament.format?.system : null) === 'HYBRID';
+            const rows = [
+              { label: "Champion", pts: champion },
+              { label: "1st Runner-Up", pts: second },
+              { label: "2nd Runner-Up", pts: third },
+              ...(isHybrid ? [{ label: "Top Cut", pts: topCut }] : []),
+              { label: "Participation", pts: participation },
+            ];
+            return (
+              <div className="pt-6 border-t border-white/10">
+                <p className="text-xs font-semibold text-[#888888] mb-3">Placement Points</p>
+                <div className="space-y-1">
+                  {rows.map(r => (
+                    <div key={r.label} className="flex items-center justify-between py-1.5 px-3 rounded bg-[#1B1B1B] border border-white/5">
+                      <span className="text-xs text-white">{r.label}</span>
+                      <span className="text-xs font-black text-[#52B946]">{r.pts} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
 
 
        {timeLeft !== null && timeLeft > 0 && (
-        <div className="mt-10 p-6 bg-primary/5 border border-primary/20 rounded-[2rem] flex flex-col items-center gap-6 animate-pulse">
+        <div className="mt-6 p-4 bg-[#1B1B1B] border border-[#FF4D4D]/20 rounded flex flex-col items-center gap-4">
            <div className="text-center">
-             <p className="text-[8px] font-black text-primary/60 uppercase tracking-[0.3em] font-poppins mb-2">Guest Account Cleanup</p>
-             <p className="text-3xl font-black text-primary font-mono tracking-tighter">
+             <p className="text-xs font-semibold text-[#FF4D4D] mb-1">Guest Data Cleanup Warning</p>
+             <p className="text-xl font-mono text-[#FF4D4D]">
                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
              </p>
            </div>
            <button 
              onClick={handleCancelCleanup}
-             className="w-full py-4 bg-primary text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl hover:brightness-110 transition-all font-poppins"
+             className="w-full py-2 bg-[#1B1B1B] border border-[#FF4D4D]/50 text-[#FF4D4D] font-semibold text-xs rounded hover:bg-[#FF4D4D]/10 transition-colors"
            >
-             Cancel Cleanup
+             Halt Cleanup
            </button>
         </div>
       )}

@@ -2,8 +2,8 @@
 
 import React from "react";
 import { Match, LeaderboardEntry } from "../types";
-import MobileCombatFeed from "./mobile/MobileCombatFeed";
-import MobileBracketTree from "./mobile/MobileBracketTree";
+import MobileMatchFeed from "./mobile/MobileMatchFeed";
+import EliminationLayout from "../Formats/EliminationLayout";
 
 interface MobileViewProps {
     tournament: any;
@@ -13,6 +13,7 @@ interface MobileViewProps {
     onOpenScoring: (match: Match) => void;
     addLog: (action: string, details?: string) => void;
     viewMode: "CARD" | "BRACKET";
+    currentUserId?: string | null;
 }
 
 export default function MobileView({
@@ -22,40 +23,38 @@ export default function MobileView({
     updating,
     onOpenScoring,
     addLog,
-    viewMode
+    viewMode,
+    currentUserId
 }: MobileViewProps) {
     const fs = tournament?.format?.system;
     const isElimination = fs === "SINGLE_ELIMINATION" || fs === "DOUBLE_ELIMINATION" || fs === "HYBRID";
-    const [trackedUserId, setTrackedUserId] = React.useState<string | null>(null);
     const [activePhase, setActivePhase] = React.useState<number>(0);
 
     return (
         <div className="h-full w-full overflow-hidden relative">
             {isElimination && viewMode === "BRACKET" ? (
-                <div className="h-full w-full overflow-auto">
-                    <MobileBracketTree 
+                <div className="h-full w-full">
+                    <EliminationLayout 
                         tournament={tournament}
                         leaderboard={leaderboard}
                         isAdmin={isAdmin}
                         updating={updating}
                         onOpenScoring={onOpenScoring}
                         addLog={addLog}
-                        trackedUserId={trackedUserId}
-                        setTrackedUserId={setTrackedUserId}
+                        currentUserId={currentUserId}
                     />
                 </div>
             ) : (
-                <MobileCombatFeed 
+                <MobileMatchFeed 
                     tournament={tournament}
                     leaderboard={leaderboard}
                     isAdmin={isAdmin}
                     updating={updating}
                     onOpenScoring={onOpenScoring}
                     addLog={addLog}
-                    trackedUserId={trackedUserId}
-                    setTrackedUserId={setTrackedUserId}
                     activePhase={activePhase}
                     setActivePhase={setActivePhase}
+                    currentUserId={currentUserId}
                 />
             )}
         </div>

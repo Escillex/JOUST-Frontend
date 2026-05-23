@@ -23,7 +23,7 @@ export default function LiveStandings({ leaderboard, onMaximize }: Props) {
             <thead>
               <tr className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.3em] border-b border-foreground/5 sticky top-0 bg-background z-10">
                 <th className="py-4 px-6">RANK</th>
-                <th className="py-4 px-2">COMBATANT</th>
+                <th className="py-4 px-2">PARTICIPANT</th>
                 <th className="py-4 px-6 text-center">PTS</th>
                 <th className="py-4 px-6 text-right">RATIO</th>
               </tr>

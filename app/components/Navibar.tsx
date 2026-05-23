@@ -55,7 +55,7 @@ export default function Navibar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background border-b border-component-border h-20 backdrop-blur-md bg-background/80">
+    <header className="sticky top-0 z-50 w-full bg-background border-b border-component-border h-20">
       <div className="max-w-7xl mx-auto h-full px-8 flex items-center justify-between relative z-10">
         {/* Branding */}
         <div className="flex items-center gap-12">

@@ -7,16 +7,6 @@ import Footer from "./components/Footer";
 import FadeIn, { StaggerContainer } from "./components/FadeIn";
 import { API_ENDPOINTS } from "./utils/api";
 
-export const metadata: Metadata = {
-  title: "Landing | The Next Level of Competitive Gaming",
-  description: "Welcome to Hobby+. Discover professional tournaments, elite gear, and community.",
-  openGraph: {
-    title: "Landing | Hobby+",
-    description: "The next level of hobby gaming.",
-    images: ["/hpluslogo.png"],
-  },
-};
-
 
 export default async function Home() {
   const hostIp = process.env.HOST_IP || "localhost";
@@ -42,8 +32,8 @@ export default async function Home() {
 
     if (tRes.ok) {
       const data = await tRes.json();
-      tournaments = data.filter((t: { status: string }) => 
-        t.status === "OPEN" || t.status === "UPCOMING" || t.status === "PENDING"
+      tournaments = data.filter((t: { status: string }) =>
+        t.status === "OPEN" || t.status === "UPCOMING" || t.status === "PENDING" || t.status === "ONGOING"
       );
     }
 
@@ -84,7 +74,7 @@ export default async function Home() {
         <FadeIn>
           <Hero slides={heroSlides.length > 0 ? heroSlides : undefined} />
         </FadeIn>
-        
+
         <div className="relative">
           {/* Section 01 // STORE */}
           <SectionDivider label="STORE" />

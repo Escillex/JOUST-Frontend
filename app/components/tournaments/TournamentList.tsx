@@ -50,22 +50,34 @@ export default function TournamentList({ tournaments, variant = "default", limit
       onMouseMove={handleMouseMove}
       onMouseLeave={() => { mouseX.set(0); mouseY.set(0); }}
     >
+      {/* Eager preloader to prevent dynamic image flashing on throttled connections */}
+      <div className="hidden aria-hidden pointer-events-none absolute w-0 h-0 overflow-hidden" style={{ display: 'none' }}>
+        {sorted.map((t, idx) => (
+          <img 
+            key={idx}
+            src={t.bannerUrl ? (t.bannerUrl.startsWith("http") ? t.bannerUrl : `${API_URL}${t.bannerUrl}`) : "/placeholder.jpg"}
+            alt=""
+            loading="eager"
+          />
+        ))}
+      </div>
+
       {variant === "bento" && (
-        <div className={`p-6 border-b flex items-center justify-between transition-colors duration-500 ${isJoined ? "bg-primary/10 border-primary/20" : "bg-component-background/30 border-component-border"}`}>
-          <div className="flex items-center gap-6">
+        <div className={`p-4 md:p-6 border-b flex flex-wrap md:flex-nowrap items-center justify-between gap-4 transition-colors duration-500 ${isJoined ? "bg-primary/10 border-primary/20" : "bg-component-background/30 border-component-border"}`}>
+          <div className="flex flex-wrap items-center gap-3 md:gap-6 min-w-0">
             <h3 className={`text-[10px] font-black uppercase tracking-[0.5em] font-poppins transition-colors ${isJoined ? "text-primary" : "text-white/40"}`}>
               {isJoined ? "MY TOURNAMENTS" : "Active Tournaments"}
             </h3>
             {canManage && (
               <Link 
                 href="/tournaments/manage" 
-                className="bg-white text-black px-4 py-1.5 text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-colors"
+                className="bg-white text-black px-3 py-1.5 text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-colors whitespace-nowrap"
               >
                 MANAGE TOURNAMENTS
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 ml-auto md:ml-0">
             {/* Slide dots */}
             <div className="flex items-center gap-1.5 mr-2">
               {sorted.map((_, idx) => (
@@ -118,7 +130,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
               className="h-full w-full grid grid-cols-1 md:grid-cols-2 cursor-grab active:cursor-grabbing"
             >
               {/* Image Side - Isolated Parallax */}
-              <div className={`relative h-full overflow-hidden border-r bg-component-background group transition-colors duration-500 ${isJoined ? "border-primary/20" : "border-component-border"}`}>
+              <div className={`relative aspect-[16/9] md:aspect-auto md:h-full overflow-hidden border-b md:border-b-0 md:border-r bg-component-background group transition-colors duration-500 ${isJoined ? "border-primary/20" : "border-component-border"}`}>
                 <m.motion.div 
                   className="absolute inset-0"
                   style={{ 
@@ -146,7 +158,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
               <div className="flex-1 p-6 md:p-12 flex flex-col justify-center backdrop-blur-sm min-w-0 relative [container-type:inline-size]">
                 <div className="flex flex-col items-start gap-4 mb-6">
                   <div className="min-w-0 w-full">
-                    <h4 className={`text-[clamp(1.2rem,15cqw,5.5rem)] font-[900] uppercase tracking-tighter transition-all duration-500 font-poppins leading-[0.85] mb-4 break-words italic ${isJoined ? "text-primary" : "text-white"}`}>
+                    <h4 className={`text-[clamp(1.8rem,9cqw,4.5rem)] font-[900] uppercase tracking-tighter transition-all duration-500 font-poppins leading-[0.9] mb-4 break-words italic ${isJoined ? "text-primary" : "text-white"}`}>
                       {currentTournament.name}
                     </h4>
                     
@@ -173,8 +185,8 @@ export default function TournamentList({ tournaments, variant = "default", limit
                   </div>
                 </div>
 
-                <p className="text-white/50 text-xs md:text-sm leading-relaxed max-w-xl font-poppins mb-6 md:mb-8 italic line-clamp-3 md:line-clamp-none">
-                  Experience high-level competitive gaming. Join the tournament and prove your skills against the best players in the community.
+                <p className="text-white/50 text-xs md:text-sm leading-relaxed max-w-xl font-poppins mb-6 md:mb-8 italic line-clamp-3 md:line-clamp-none whitespace-pre-wrap">
+                  {currentTournament.description || "Experience high-level competitive gaming. Join the tournament and prove your skills against the best players in the community."}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-4 mt-auto">
@@ -186,7 +198,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
                         : "bg-white text-black border-white hover:bg-transparent hover:text-white"
                     }`}
                   >
-                    {isJoined ? "GO TO TOURNAMENT" : "VIEW TOURNAMENT"} <span>→</span>
+                    {isJoined ? "ENTER TOURNAMENT" : "VIEW TOURNAMENT"} <span>→</span>
                   </Link>
                 </div>
               </div>

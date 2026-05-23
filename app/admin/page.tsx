@@ -71,17 +71,22 @@ export default function AdminDashboard() {
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
   const [guestToConvert, setGuestToConvert] = useState<AdminUser | null>(null);
 
-  // Tournament Format management
   const [formats, setFormats] = useState<any[]>([]);
   const [isCreatingFormat, setIsCreatingFormat] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(false);
+
   useEffect(() => {
     setMounted(true);
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   useEffect(() => {
     if (mounted) fetchData();
-  }, [mounted, router]);
+  }, [mounted, router, activeTab]);
 
   const fetchData = async () => {
     const startTime = performance.now();
@@ -204,6 +209,21 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteFormat = async (formatId: string) => {
+    if (!confirm("Permanently decommission this format preset?")) return;
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(formatId), { method: "DELETE" });
+      if (res.ok) {
+        setFormats(prev => prev.filter(f => f.id !== formatId));
+      } else {
+        const data = await safeJson(res);
+        setErrorMsg(`DELETE_FAILURE: ${data?.message || "REJECTION"}`);
+      }
+    } catch (err) {
+      setErrorMsg("API_ERROR: DELETE_COMMAND_TIMED_OUT");
+    }
+  };
+
   const handleBatchDelete = async (userIds: string[]) => {
     if (!confirm(`Delete ${userIds.length} selected user records?`)) return;
     setIsLoading(true);
@@ -242,6 +262,26 @@ export default function AdminDashboard() {
   };
 
   if (isAuthorized === false) return null;
+
+  if (isMobile) return (
+    <div className="min-h-screen bg-[#1B1B1B] flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-16 h-16 border border-white/10 flex items-center justify-center mb-6">
+        <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2">Desktop Required</h2>
+      <p className="text-xs text-white/40 max-w-sm mb-8 leading-relaxed font-questrial">
+        The System Admin Center contains high-density data tables and diagnostic logs that require a larger viewport. Please access this panel from a desktop device.
+      </p>
+      <button 
+        onClick={() => router.push("/tournaments")}
+        className="px-6 py-3 bg-white text-black hover:bg-primary transition-colors text-[10px] font-black uppercase tracking-widest"
+      >
+        Return to Tournaments
+      </button>
+    </div>
+  );
 
   if (isLoading && users.length === 0) return (
     <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center">
@@ -355,12 +395,18 @@ export default function AdminDashboard() {
  
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {formats.map(f => (
-                        <div key={f.id} className="flex items-center justify-between p-3 border border-white/5 hover:border-white/10 transition-all">
+                        <div key={f.id} className="flex items-center justify-between p-3 border border-white/5 hover:border-white/10 transition-all group/item">
                           <div>
                             <p className="text-[10px] font-black text-white uppercase tracking-widest">{f.name}</p>
                             {f.gameName && <p className="text-[8px] text-primary/60 mt-0.5 tracking-tighter uppercase">{f.gameName}</p>}
                             {f.isBuiltin && <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">BUILT-IN</span>}
                           </div>
+                          <button
+                            onClick={() => handleDeleteFormat(f.id)}
+                            className="opacity-0 group-hover/item:opacity-100 hover:text-red-500 text-white/20 text-xs font-bold transition-all px-2 py-1"
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                     </div>

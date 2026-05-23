@@ -113,7 +113,12 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic">COMPETITOR</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">POINTS</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">W / L / D</th>
-              <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">OMW / OOMW</th>
+              <th 
+                className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center cursor-help"
+                title="OMW (Opponent Match Win Rate) / OOMW (Opponent's Opponent Match Win Rate)"
+              >
+                OMW / OOMW
+              </th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-right">WIN RATE</th>
             </tr>
           </thead>

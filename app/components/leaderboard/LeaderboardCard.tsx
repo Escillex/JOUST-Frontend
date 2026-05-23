@@ -82,7 +82,7 @@ export default function LeaderboardCard({ entry, idx }: LeaderboardCardProps) {
           <div className="flex items-center gap-3 mt-1">
              <div className="h-px w-4 bg-primary/20" style={{ backgroundColor: isTop3 ? rankColor : undefined }} />
              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/30">
-               {isRank1 ? 'Grand Master' : isTop3 ? 'Elite Pilot' : 'Active Combatant'}
+               {isRank1 ? 'Grand Master' : isTop3 ? 'Elite Player' : 'Active Player'}
              </span>
           </div>
         </div>

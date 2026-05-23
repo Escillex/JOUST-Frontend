@@ -63,7 +63,10 @@ export default function HomeDashboard({ user, tournaments, leaderboard, stats, h
                         </div>
                     </div>
                     {/* OMW Card */}
-                    <div className="bg-surface border border-white/5 p-6 flex flex-col justify-between group hover:border-primary/40 transition-all min-h-[120px]">
+                    <div 
+                        className="bg-surface border border-white/5 p-6 flex flex-col justify-between group hover:border-primary/40 transition-all min-h-[120px] cursor-help"
+                        title="OMW (Opponent Match Win Rate) / OOMW (Opponent's Opponent Match Win Rate)"
+                    >
                         <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">OMW // OOMW</span>
                         <div className="flex flex-col">
                             <div className="text-xl font-black text-white tracking-tighter">{(stats?.omw * 100 || 0).toFixed(1)}%</div>

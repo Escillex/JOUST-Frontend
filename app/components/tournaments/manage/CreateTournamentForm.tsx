@@ -1,19 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { TournamentFormatModel, TournamentTemplate } from "../../../tournaments/types";
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
-const inputCls = "w-full h-11 bg-[#1B1B1B] border border-white/10 px-4 text-sm text-white focus:outline-none focus:border-primary transition-all rounded-[4px] appearance-none placeholder:text-white/10";
+const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded appearance-none placeholder:text-white/20";
+const labelCls = "text-xs font-semibold text-[#888888] block mb-1";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between ml-0.5">
-        <label className="text-[11px] font-bold text-white/30 uppercase tracking-widest">{label}</label>
-        {required && <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-50">(REQUIRED)</span>}
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <label className={labelCls} style={{ marginBottom: 0 }}>{label}</label>
+        {required && <span className="text-[10px] font-semibold text-[#FF4D4D]">Required</span>}
       </div>
       {children}
     </div>
@@ -28,11 +28,11 @@ interface Props {
 }
 
 export default function CreateTournamentForm({ userId, userRoles = [], onSuccess, onDiscard }: Props) {
-  const isAdmin = userRoles.includes("ADMIN");
   const [activeStep, setActiveStep] = useState<"IDENTITY" | "RULES" | "DEPLOYMENT">("IDENTITY");
 
   // IDENTITY
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [format, setFormat] = useState("SINGLE_ELIMINATION");
   const [maxPlayers, setMaxPlayers] = useState(16);
   const [formats, setFormats] = useState<TournamentFormatModel[]>([]);
@@ -47,6 +47,13 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [swissPointsWin, setSwissPointsWin] = useState(3);
   const [swissPointsDraw, setSwissPointsDraw] = useState(1);
   const [swissPointsLoss, setSwissPointsLoss] = useState(0);
+
+  // Placement points (awarded globally at tournament completion)
+  const [placementChampion, setPlacementChampion] = useState(10);
+  const [placement2nd, setPlacement2nd] = useState(7);
+  const [placement3rd, setPlacement3rd] = useState(5);
+  const [placementTopCut, setPlacementTopCut] = useState(3);
+  const [placementParticipation, setPlacementParticipation] = useState(1);
 
   // DEPLOYMENT
   const [venue, setVenue] = useState("");
@@ -63,14 +70,9 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const { upload, uploading } = useImageUpload();
 
-  // FULL RULE ENGINE STATE
-  const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
-  const [winsToAdvance, setWinsToAdvance] = useState(1);
-  const [sessionsCount, setSessionsCount] = useState(1);
-  const [pointsPerSession, setPointsPerSession] = useState(0);
+  // FULL RULE ENGINE
   const [pointsThreshold, setPointsThreshold] = useState(0);
-  const [tieBreakerOrder, setTieBreakerOrder] = useState<string[]>([]);
-  const [progressionType, setProgressionType] = useState("");
+  const [startingHp, setStartingHp] = useState(0);
   const [gameName, setGameName] = useState("");
 
   useEffect(() => {
@@ -82,24 +84,22 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       setNameError(null);
       return;
     }
-
     setIsValidatingName(true);
     const timer = setTimeout(() => {
       const normalizedName = name.trim().toLowerCase();
       const isDuplicate = existingNames.some(n => n.toLowerCase() === normalizedName);
 
       if (name.length < 3) {
-        setNameError("IDENTIFIER TOO SHORT (MIN 3 CHARS)");
+        setNameError("Identifier too short (min 3)");
       } else if (name.length > 60) {
-        setNameError("IDENTIFIER TOO LONG (MAX 60 CHARS)");
+        setNameError("Identifier too long (max 60)");
       } else if (isDuplicate) {
-        setNameError("IDENTIFIER ALREADY REGISTERED");
+        setNameError("Identifier already registered");
       } else {
         setNameError(null);
       }
       setIsValidatingName(false);
     }, 400);
-
     return () => clearTimeout(timer);
   }, [name, existingNames]);
 
@@ -129,20 +129,27 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     setFormat(fmt.system);
     setBestOf(c.bestOf ?? 1);
     setAllowDraw(c.allowDraw ?? false);
-    setWinsToAdvance(c.winsToAdvance ?? 1);
-    setSessionsCount(c.sessionsCount ?? 1);
-    setPointsPerSession(c.pointsPerSession ?? 0);
     setPointsThreshold(c.pointsThreshold ?? 0);
+    setStartingHp(c.startingHp ?? 0);
     if (fmt.system === "SWISS") {
       setSwissRounds(c.swissRounds ?? 3);
       setSwissPointsWin(c.swissPointsForWin ?? 3);
       setSwissPointsDraw(c.swissPointsForDraw ?? 1);
       setSwissPointsLoss(c.swissPointsForLoss ?? 0);
     }
+    setPlacementChampion(c.placementPointsChampion ?? 10);
+    setPlacement2nd(c.placementPoints2nd ?? 7);
+    setPlacement3rd(c.placementPoints3rd ?? 5);
+    setPlacementTopCut(c.placementPointsTopCut ?? 3);
+    setPlacementParticipation(c.placementPointsParticipation ?? 1);
   };
 
+  useEffect(() => {
+    if (format !== "SWISS" && format !== "ROUND_ROBIN") {
+      setAllowDraw(false);
+    }
+  }, [format]);
 
-  // Validation Checkers
   const isIdentityValid = !!(name && !nameError && selectedFormatId && maxPlayers >= 2 && !isValidatingName);
   const isRulesValid = !!(bestOf >= 1);
   const isDeploymentValid = !!(startNow || date);
@@ -153,8 +160,6 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    
-    // Safety: prevent submission unless on the final step, already submitting, or haven't seen all steps
     if (activeStep !== "DEPLOYMENT" || isSubmitting || !allStepsVisited || showSuccess) return;
 
     setIsSubmitting(true);
@@ -162,6 +167,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
 
     const body = {
       name, 
+      description: description || undefined,
       formatId: selectedFormatId, 
       maxPlayers: Number(maxPlayers),
       prizePool: prizePool === "" ? null : Number(prizePool),
@@ -187,7 +193,6 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
           await upload(API_ENDPOINTS.IMAGES.UPLOAD_BANNER(tournamentId), bannerFile);
         }
 
-        // SHOW SUCCESS ANIMATION
         setShowSuccess(true);
         setTimeout(() => {
           onSuccess("Tournament Created Successfully");
@@ -203,445 +208,411 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     }
   };
 
-  const steps = [
-    { 
-      id: "IDENTITY", 
-      label: "01. IDENTITY", 
-      // Only validated if valid AND we've moved past it
-      valid: isIdentityValid && (activeStep === "RULES" || activeStep === "DEPLOYMENT")
-    },
-    { 
-      id: "RULES", 
-      label: "02. RULES", 
-      // Only validated if valid AND we've moved past it
-      valid: isRulesValid && activeStep === "DEPLOYMENT"
-    },
-    { 
-      id: "DEPLOYMENT", 
-      label: "03. SCHEDULE", 
-      // Validated if we are on it and it's valid
-      valid: isDeploymentValid && activeStep === "DEPLOYMENT"
-    },
-  ] as const;
-
-  return (
-    <div className="flex gap-24 min-h-[600px] -ml-2">
-      {/* AUTHENTIC PROCESS SIDEBAR */}
-      <aside className="w-48 flex flex-col pt-4 shrink-0">
-        <div className="relative flex flex-col gap-16">
-          {/* Connecting Track */}
-          <div className="absolute left-[7px] top-2 bottom-2 w-[1px] bg-white/5" />
-          
-          {steps.map((step) => {
-            return (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => setActiveStep(step.id)}
-                className="group relative flex items-start gap-6 text-left transition-all"
-              >
-                {/* Dot Indicator */}
-                <div className={`mt-1.5 w-4 h-4 rounded-full border-2 z-10 transition-all duration-500 shadow-lg ${
-                  step.valid 
-                    ? "bg-primary border-primary shadow-primary/20 scale-110" 
-                    : activeStep === step.id
-                      ? "bg-white border-white shadow-white/20 scale-110"
-                      : "bg-[#1B1B1B] border-white/10"
-                }`} />
-
-                <div className="flex flex-col gap-1">
-                  <span className={`text-[8px] font-black tracking-[0.4em] transition-all ${
-                    step.valid ? "text-primary" : "text-white/20"
-                  }`}>
-                    {step.valid ? "VALIDATED" : "PENDING"}
-                  </span>
-                  <span className={`text-xs font-bold uppercase tracking-widest transition-all ${
-                    activeStep === step.id ? "text-white" : "text-white/40 group-hover:text-white/60"
-                  }`}>
-                    {step.label.split(". ")[1]}
-                  </span>
-                </div>
-
-                {/* Active Highlight Glow */}
-                {activeStep === step.id && (
-                  <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-24 h-24 bg-primary/5 rounded-full blur-3xl -z-10" />
-                )}
-              </button>
-            );
-          })}
+  const renderIdentity = () => (
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-white border-b border-white/10 pb-2">Format Selection</h3>
+        
+        {/* Mobile Dropdown */}
+        <div className="sm:hidden">
+          <select 
+            className={inputCls}
+            value={selectedFormatId}
+            onChange={(e) => {
+              const fmt = formats.find(f => f.id === e.target.value);
+              if (fmt) applyFormat(fmt);
+            }}
+          >
+            <option value="" disabled className="bg-[#1B1B1B]">Select a format...</option>
+            {formats.map(fmt => (
+              <option key={fmt.id} value={fmt.id} className="bg-[#1B1B1B]">
+                {fmt.name} ({fmt.gameName || "General"})
+              </option>
+            ))}
+          </select>
         </div>
-      </aside>
 
-      {/* CONFIGURATION AREA */}
-      <div className="flex-1 flex flex-col gap-8 min-w-0">
-        {/* Main Operational Block */}
-        <div className="flex-1 bg-[#1B1B1B]/40 border border-white/5 p-12 rounded-[4px] relative overflow-hidden flex flex-col">
-          {/* Technical Corner Greebles */}
-          <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-white/10" />
-          <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-white/10" />
-          <div className="absolute bottom-0 left-0 w-4 h-4 border-b border-l border-white/10" />
-          <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-white/10" />
-
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
-            <div className="flex-1">
-              <AnimatePresence mode="wait">
-                {showSuccess ? (
-                  <motion.div 
-                    key="success"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0 z-50 bg-[#1B1B1B] flex flex-col items-center justify-center text-center p-12"
-                  >
-                    <motion.div 
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", damping: 15 }}
-                      className="relative"
-                    >
-                      <div className="w-24 h-24 border-4 border-primary rounded-full flex items-center justify-center mb-8 relative">
-                        <motion.div 
-                          initial={{ pathLength: 0 }}
-                          animate={{ pathLength: 1 }}
-                          className="text-primary text-4xl font-black"
-                        >
-                          ✓
-                        </motion.div>
-                        <div className="absolute inset-0 rounded-full border-4 border-primary animate-ping opacity-20" />
-                      </div>
-                    </motion.div>
-                    
-                    <h2 className="text-2xl font-black text-white uppercase tracking-[0.4em] mb-4">Tournament Initiated</h2>
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-[0.6em] animate-pulse">Syncing with deployment nodes...</p>
-                    
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                      <motion.div 
-                        initial={{ top: "-100%" }}
-                        animate={{ top: "100%" }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                        className="absolute left-0 right-0 h-[2px] bg-primary/20 shadow-[0_0_15px_rgba(82,185,70,0.5)]"
-                      />
-                    </div>
-                  </motion.div>
-                ) : activeStep === "IDENTITY" && (
-                  <motion.section 
-                    key="identity"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="space-y-12"
-                  >
-                    {/* Row 1: Select Format Template */}
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-4">
-                        <h3 className="text-[11px] font-bold text-white uppercase tracking-widest">Tournament Format Selection</h3>
-                        <div className="h-[1px] flex-1 bg-white/5" />
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {formats.map((fmt) => (
-                          <button
-                            key={fmt.id}
-                            type="button"
-                            onClick={() => applyFormat(fmt)}
-                            className={`p-6 border transition-all rounded-[4px] text-left relative overflow-hidden group ${
-                              selectedFormatId === fmt.id 
-                                ? "bg-primary/10 border-primary shadow-lg shadow-primary/5" 
-                                : "bg-[#1B1B1B]/40 border-white/5 hover:border-white/10"
-                            }`}
-                          >
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-[10px] font-black uppercase tracking-tighter ${
-                                selectedFormatId === fmt.id ? "text-primary" : "text-white"
-                              }`}>{fmt.name}</span>
-                              <span className="text-[8px] font-bold text-white/30 uppercase tracking-widest">{fmt.gameName || "GENERAL"}</span>
-                            </div>
-                            
-                            {selectedFormatId === fmt.id && (
-                              <div className="absolute top-0 right-0 p-2">
-                                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
- 
-                    {!selectedFormatId ? (
-                      <div className="h-48 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-[4px]">
-                        <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] animate-pulse text-center">
-                          Select a base format configuration<br/>to continue initialization sequence
-                        </div>
-                      </div>
-                    ) : (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-12 animate-in fade-in duration-700"
-                      >
-                         <div className="space-y-6">
-                            <div className="flex items-center gap-4">
-                              <h3 className="text-[11px] font-bold text-white uppercase tracking-widest">Event Specification</h3>
-                              <div className="h-[1px] flex-1 bg-white/5" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-6">
-                              <div className="space-y-2">
-                                <Field label="Tournament Title" required>
-                                  <input 
-                                    type="text" 
-                                    value={name} 
-                                    onChange={e => setName(e.target.value)} 
-                                    placeholder="PRO LEAGUE SEASON 1" 
-                                    className={`${inputCls} ${nameError ? "border-red-500/50" : ""}`} 
-                                    required 
-                                  />
-                                </Field>
-                                <AnimatePresence>
-                                  {nameError && (
-                                    <motion.div 
-                                      key="name-error"
-                                      initial={{ opacity: 0, height: 0 }}
-                                      animate={{ opacity: 1, height: "auto" }}
-                                      exit={{ opacity: 0, height: 0 }}
-                                      className="text-[9px] font-black text-red-500 uppercase tracking-widest pl-1"
-                                    >
-                                      {nameError}
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                              <Field label="Maximum Participants" required>
-                                <input type="number" value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))} className={inputCls} required />
-                              </Field>
-                             </div>
-
-                             <div className="pt-6 border-t border-white/5">
-                               <Field label="Tournament Banner">
-                                 <ImageUpload 
-                                   currentUrl={bannerPreview} 
-                                   onUpload={async (file) => {
-                                     setBannerFile(file);
-                                     setBannerPreview(URL.createObjectURL(file));
-                                   }}
-                                   onDelete={() => {
-                                     setBannerFile(null);
-                                     setBannerPreview(null);
-                                   }}
-                                   uploading={uploading}
-                                   aspectRatio="aspect-[21/9]"
-                                   label="SELECT BANNER IMAGE"
-                                 />
-                               </Field>
-                             </div>
-                          </div>
-                        </motion.div>
-                     )}
-                   </motion.section>
-                 )}
-
-              {activeStep === "RULES" && (
-                <motion.section
-                  key="rules"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-8"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1">
-                      <h3 className="text-[11px] font-bold text-white uppercase tracking-widest">Match &amp; Scoring Rules</h3>
-                      <div className="h-[1px] flex-1 bg-white/5" />
-                    </div>
-                    
-                    {/* Template Selector — available to all */}
-                    <div className="flex items-center gap-3">
-                      <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Active System:</span>
-                      <div className="bg-white/5 border border-white/10 text-[9px] font-black text-primary uppercase px-4 py-2 rounded-[4px] tracking-widest">
-                        {format.replace(/_/g, " ")}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-12 gap-y-8">
-                    <div className="space-y-6">
-                      <div className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em] mb-2">Match Structure</div>
-                      <div className="grid grid-cols-1 gap-6">
-                        <Field label="Series Format (Best of X)">
-                          <input type="number" value={bestOf} onChange={e => setBestOf(Number(e.target.value))} min={1} className={inputCls} />
-                        </Field>
-                        <Field label="Wins Required to Advance">
-                          <input type="number" value={winsToAdvance} onChange={e => setWinsToAdvance(Number(e.target.value))} min={1} className={inputCls} />
-                        </Field>
-                        <Field label="Allow Draws">
-                          <select value={allowDraw ? "YES" : "NO"} onChange={e => setAllowDraw(e.target.value === "YES")} className={inputCls}>
-                            <option value="NO" className="bg-[#1B1B1B] text-white">NO (FORCE WIN)</option>
-                            <option value="YES" className="bg-[#1B1B1B] text-white">YES (PERMIT DRAW)</option>
-                          </select>
-                        </Field>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      <div className="text-[9px] font-black text-white/10 uppercase tracking-[0.2em] mb-2">Scoring Parameters</div>
-                      <div className="grid grid-cols-1 gap-6">
-                        <Field label="Sessions per Match">
-                          <input type="number" value={sessionsCount} onChange={e => setSessionsCount(Number(e.target.value))} min={1} className={inputCls} />
-                        </Field>
-                        <Field label="Points per Session">
-                          <input type="number" value={pointsPerSession} onChange={e => setPointsPerSession(Number(e.target.value))} min={0} className={inputCls} />
-                        </Field>
-                        <Field label="Victory Threshold">
-                          <input type="number" value={pointsThreshold} onChange={e => setPointsThreshold(Number(e.target.value))} min={0} className={inputCls} />
-                        </Field>
-                      </div>
-                    </div>
-                  </div>
-
-                  {format === "SWISS" && (
-                    <div className="pt-8 border-t border-white/5 animate-in slide-in-from-bottom-2 duration-500">
-                      <div className="text-[9px] font-black text-primary/40 uppercase tracking-[0.2em] mb-6">Swiss System Configuration</div>
-                      <div className="grid grid-cols-4 gap-6">
-                        <Field label="Scheduled Rounds">
-                          <input type="number" value={swissRounds} onChange={e => setSwissRounds(Number(e.target.value))} className={inputCls} />
-                        </Field>
-                        <Field label="Points per Win">
-                          <input type="number" value={swissPointsWin} onChange={e => setSwissPointsWin(Number(e.target.value))} className={inputCls} />
-                        </Field>
-                        <Field label="Points per Draw">
-                          <input type="number" value={swissPointsDraw} onChange={e => setSwissPointsDraw(Number(e.target.value))} className={inputCls} />
-                        </Field>
-                        <Field label="Points per Loss">
-                          <input type="number" value={swissPointsLoss} onChange={e => setSwissPointsLoss(Number(e.target.value))} className={inputCls} />
-                        </Field>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Save Preset removed - moved to dedicated Admin page */}
-                </motion.section>
-              )}
-
-              {activeStep === "DEPLOYMENT" && (
-                <motion.section 
-                  key="deployment"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-8"
-                >
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-[11px] font-bold text-white uppercase tracking-widest">Schedule & Accessibility</h3>
-                    <div className="h-[1px] flex-1 bg-white/5" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <Field label="Venue">
-                      <input type="text" value={venue} onChange={e => setVenue(e.target.value)} placeholder="Physical / Online" className={inputCls} />
-                    </Field>
-                    <Field label="Activation Mode">
-                      <select value={startNow ? "IMMEDIATE" : "SCHEDULED"} onChange={e => setStartNow(e.target.value === "IMMEDIATE")} className={inputCls}>
-                        <option value="SCHEDULED" className="bg-[#1B1B1B] text-white">Scheduled Release</option>
-                        <option value="IMMEDIATE" className="bg-[#1B1B1B] text-white">Instant Activation</option>
-                      </select>
-                    </Field>
-                    {!startNow && (
-                      <>
-                        <Field label="Date">
-                          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
-                        </Field>
-                        <Field label="Time">
-                          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputCls} />
-                        </Field>
-                      </>
-                    )}
-                    <Field label="Privacy Level">
-                      <select value={isPrivate ? "PRIVATE" : "PUBLIC"} onChange={e => setIsPrivate(e.target.value === "PRIVATE")} className={inputCls}>
-                        <option value="PUBLIC" className="bg-[#1B1B1B]">Public Access</option>
-                        <option value="PRIVATE" className="bg-[#1B1B1B]">Private Invite</option>
-                      </select>
-                    </Field>
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* STEPPER ACTIONS */}
-          <div className="pt-10 flex items-center justify-between border-t border-white/5">
-            <button 
-              type="button" 
-              onClick={onDiscard} 
-              className="text-[10px] font-black text-white/20 hover:text-white uppercase tracking-[0.3em] transition-all"
+        {/* Desktop Grid */}
+        <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {formats.map((fmt) => (
+            <button
+              key={fmt.id}
+              type="button"
+              onClick={() => applyFormat(fmt)}
+              className={`p-4 border transition-colors rounded text-left ${
+                selectedFormatId === fmt.id 
+                  ? "bg-[#52B946]/10 border-[#52B946]" 
+                  : "bg-[#1B1B1B] border-white/10 hover:border-white/30"
+              }`}
             >
-              Discard Changes
+              <div className="flex flex-col">
+                <span className={`text-sm font-semibold ${selectedFormatId === fmt.id ? "text-[#52B946]" : "text-white"}`}>{fmt.name}</span>
+                <span className="text-xs text-[#888888] mt-1">{fmt.gameName || "General"}</span>
+              </div>
             </button>
-            
-            <div className="flex gap-4">
-              {activeStep !== "IDENTITY" && (
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    if (activeStep === "DEPLOYMENT") {
-                      setActiveStep("RULES");
-                    } else {
-                      setActiveStep("IDENTITY");
-                    }
-                  }}
-                  className="px-8 py-3 bg-white/5 text-white/40 font-bold text-[10px] uppercase tracking-widest rounded-[4px] hover:bg-white/10"
-                >
-                  Back
-                </button>
+          ))}
+        </div>
+        {!selectedFormatId && (
+          <div className="hidden sm:flex h-24 items-center justify-center border border-dashed border-white/20 rounded">
+            <span className="text-sm text-[#888888]">Select a format to continue</span>
+          </div>
+        )}
+      </div>
+
+      {selectedFormatId && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-white border-b border-white/10 pb-2">Event Specification</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Field label="Tournament Title" required>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="Pro League Season 1" 
+                  className={`${inputCls} ${nameError ? "border-[#FF4D4D]" : ""}`} 
+                  required 
+                />
+              </Field>
+              {nameError && <span className="text-xs text-[#FF4D4D]">{nameError}</span>}
+            </div>
+            <Field label="Maximum Participants" required>
+              <input type="number" value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))} className={inputCls} required />
+            </Field>
+          </div>
+          <div className="pt-2">
+            <Field label="Description">
+              <textarea 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+                placeholder="Optional tournament details or lore" 
+                className={`${inputCls} h-24 py-3 resize-none`} 
+              />
+            </Field>
+          </div>
+          <div className="pt-2">
+            <Field label="Tournament Banner">
+              <ImageUpload 
+                currentUrl={bannerPreview} 
+                onUpload={async (file) => {
+                  setBannerFile(file);
+                  setBannerPreview(URL.createObjectURL(file));
+                }}
+                onDelete={() => {
+                  setBannerFile(null);
+                  setBannerPreview(null);
+                }}
+                uploading={uploading}
+                aspectRatio="aspect-[21/9]"
+                label="Select Banner Image"
+              />
+            </Field>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderRules = () => (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+        <h3 className="text-sm font-semibold text-white">Match &amp; Scoring Rules</h3>
+        <span className="px-2 py-1 bg-[#1B1B1B] text-[#888888] text-xs font-semibold rounded capitalize">
+          {format.replace(/_/g, " ")}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <h4 className="text-xs font-semibold text-[#888888]">Scoring Parameters</h4>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={pointsThreshold > 0} 
+                  onChange={e => setPointsThreshold(e.target.checked ? 1 : 0)} 
+                  className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+                />
+                <span className="text-sm text-white">Enable Victory Threshold</span>
+              </label>
+              {pointsThreshold > 0 && (
+                <input type="number" value={pointsThreshold} onChange={e => setPointsThreshold(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
               )}
-              
-              {activeStep !== "DEPLOYMENT" ? (
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    const nextStep = activeStep === "IDENTITY" ? "RULES" : "DEPLOYMENT";
-                    setActiveStep(nextStep);
-                  }}
-                  disabled={
-                    (activeStep === "IDENTITY" && !isIdentityValid) ||
-                    (activeStep === "RULES" && !isRulesValid)
-                  }
-                  className="group relative px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale overflow-hidden"
-                >
-                  <motion.span 
-                    initial={false}
-                    animate={{ x: 0 }}
-                    whileTap={{ x: 5 }}
-                    className="relative z-10"
+            </div>
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={startingHp > 0} 
+                  onChange={e => setStartingHp(e.target.checked ? 100 : 0)} 
+                  className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+                />
+                <span className="text-sm text-white">HP-Based Match System</span>
+              </label>
+              {startingHp > 0 && (
+                <input type="number" value={startingHp} onChange={e => setStartingHp(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="text-xs font-semibold text-[#888888]">Match Structure</h4>
+          <div className="space-y-4">
+            <Field label="Best Of">
+              <input 
+                type="number" 
+                value={bestOf} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  if (val < 1) setBestOf(1);
+                  else if (val % 2 === 0) setBestOf(val + 1);
+                  else setBestOf(val);
+                }} 
+                min={1} 
+                step={2}
+                className={inputCls} 
+              />
+            </Field>
+            {(format === "SWISS" || format === "ROUND_ROBIN") && (
+              <Field label="Allow Draws">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllowDraw(false)}
+                    className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
+                      !allowDraw ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]" : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                    }`}
                   >
-                    Proceed
-                  </motion.span>
-                  <motion.div 
-                    className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-12" 
-                  />
-                </button>
-              ) : (
-                <div className="flex flex-col items-end gap-3">
-                  {!allStepsVisited && (
-                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest animate-pulse">
-                      Review all sections to finalize
-                    </span>
-                  )}
-                  <button 
-                    type="submit" 
-                    disabled={!isIdentityValid || !isRulesValid || !isDeploymentValid || uploading || !allStepsVisited}
-                    className="px-10 py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-[4px] hover:brightness-110 transition-all disabled:opacity-20 disabled:grayscale flex items-center gap-2"
+                    Force Win
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAllowDraw(true)}
+                    className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
+                      allowDraw ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]" : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                    }`}
                   >
-                    {uploading ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-black/30 border-t-black animate-spin rounded-full" />
-                        FINALIZING...
-                      </>
-                    ) : "Create Tournament"}
+                    Permit Draws
                   </button>
                 </div>
-              )}
-             </div>
-           </div>
-         </form>
+              </Field>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {format === "SWISS" && (
+        <div className="pt-6 border-t border-white/10">
+          <h4 className="text-xs font-semibold text-[#888888] mb-4">Swiss System Configuration</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Field label="Scheduled Rounds">
+              <input type="number" value={swissRounds} onChange={e => setSwissRounds(Number(e.target.value))} className={inputCls} />
+            </Field>
+            <Field label="Points / Win">
+              <input type="number" value={swissPointsWin} onChange={e => setSwissPointsWin(Number(e.target.value))} className={inputCls} />
+            </Field>
+            <Field label="Points / Draw">
+              <input type="number" value={swissPointsDraw} onChange={e => setSwissPointsDraw(Number(e.target.value))} className={inputCls} />
+            </Field>
+            <Field label="Points / Loss">
+              <input type="number" value={swissPointsLoss} onChange={e => setSwissPointsLoss(Number(e.target.value))} className={inputCls} />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      {/* Placement Points */}
+      <div className="pt-6 border-t border-white/10">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-xs font-semibold text-[#888888]">Placement Points</h4>
+          <span className="text-[10px] text-[#888888]/60 uppercase tracking-wider">Awarded at tournament completion</span>
+        </div>
+        <div className={`grid gap-4 ${format === "HYBRID" ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4"}`}>
+          <Field label="Champion">
+            <input type="number" value={placementChampion} onChange={e => setPlacementChampion(Number(e.target.value))} min={0} className={inputCls} />
+          </Field>
+          <Field label="1st Runner-Up">
+            <input type="number" value={placement2nd} onChange={e => setPlacement2nd(Number(e.target.value))} min={0} className={inputCls} />
+          </Field>
+          <Field label="2nd Runner-Up">
+            <input type="number" value={placement3rd} onChange={e => setPlacement3rd(Number(e.target.value))} min={0} className={inputCls} />
+          </Field>
+          {format === "HYBRID" && (
+            <Field label="Top Cut">
+              <input type="number" value={placementTopCut} onChange={e => setPlacementTopCut(Number(e.target.value))} min={0} className={inputCls} />
+            </Field>
+          )}
+          <Field label="Participation">
+            <input type="number" value={placementParticipation} onChange={e => setPlacementParticipation(Number(e.target.value))} min={0} className={inputCls} />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDeployment = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-white border-b border-white/10 pb-2">Schedule & Accessibility</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Venue">
+          <input type="text" value={venue} onChange={e => setVenue(e.target.value)} placeholder="Physical / Online" className={inputCls} />
+        </Field>
+        <Field label="Activation Mode">
+          <select value={startNow ? "IMMEDIATE" : "SCHEDULED"} onChange={e => setStartNow(e.target.value === "IMMEDIATE")} className={inputCls}>
+            <option value="SCHEDULED">Scheduled Release</option>
+            <option value="IMMEDIATE">Instant Activation</option>
+          </select>
+        </Field>
+        {!startNow && (
+          <>
+            <Field label="Date">
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="Time">
+              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className={inputCls} />
+            </Field>
+          </>
+        )}
+        <Field label="Privacy Level">
+          <select value={isPrivate ? "PRIVATE" : "PUBLIC"} onChange={e => setIsPrivate(e.target.value === "PRIVATE")} className={inputCls}>
+            <option value="PUBLIC">Public Access</option>
+            <option value="PRIVATE">Private Invite</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  );
+
+  const renderActions = () => (
+    <div className="pt-6 mt-6 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-white/10">
+      <button 
+        type="button" 
+        onClick={onDiscard} 
+        className="w-full md:w-auto px-4 py-2 text-sm font-semibold text-[#888888] hover:text-[#FF4D4D] transition-colors order-2 md:order-1"
+      >
+        Discard Changes
+      </button>
+      
+      <div className="flex w-full md:w-auto gap-2 order-1 md:order-2">
+        {activeStep !== "IDENTITY" && (
+          <button 
+            type="button" 
+            onClick={() => setActiveStep(activeStep === "DEPLOYMENT" ? "RULES" : "IDENTITY")}
+            className="flex-1 md:flex-none px-6 py-2.5 bg-[#1B1B1B] text-white font-semibold text-sm rounded hover:bg-white/10 transition-colors"
+          >
+            Back
+          </button>
+        )}
+        
+        {activeStep !== "DEPLOYMENT" ? (
+          <button 
+            type="button" 
+            onClick={() => setActiveStep(activeStep === "IDENTITY" ? "RULES" : "DEPLOYMENT")}
+            disabled={(activeStep === "IDENTITY" && !isIdentityValid) || (activeStep === "RULES" && !isRulesValid)}
+            className="flex-1 md:flex-none px-8 py-2.5 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale"
+          >
+            Proceed
+          </button>
+        ) : (
+          <div className="flex flex-col md:items-end w-full md:w-auto">
+            <button 
+              type="button" 
+              onClick={handleSubmit}
+              disabled={!isIdentityValid || !isRulesValid || !isDeploymentValid || uploading || !allStepsVisited}
+              className="w-full md:w-auto px-8 py-2.5 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+            >
+              {uploading || isSubmitting ? "Finalizing..." : "Create Tournament"}
+            </button>
+            {!allStepsVisited && (
+              <span className="text-xs text-[#FFCC00] mt-1 text-center w-full md:text-right">Review all sections first</span>
+            )}
+          </div>
+        )}
        </div>
-     </div>
-  </div>
+    </div>
+  );
+
+  const steps = [
+    { id: "IDENTITY", label: "01. Identity", valid: isIdentityValid },
+    { id: "RULES", label: "02. Rules", valid: isRulesValid },
+    { id: "DEPLOYMENT", label: "03. Schedule", valid: isDeploymentValid }
+  ] as const;
+
+  if (showSuccess) {
+    return (
+      <div className="bg-[#000000] border border-white/20 p-12 rounded flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 bg-[#52B946]/10 text-[#52B946] border border-[#52B946]/20 rounded-full flex items-center justify-center mb-6">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h2 className="text-xl font-semibold text-white mb-2">Tournament Initiated</h2>
+        <p className="text-sm text-[#888888]">Redirecting to dashboard...</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* MOBILE VIEW */}
+      <div className="md:hidden space-y-4">
+        <div className="flex bg-[#1B1B1B] border border-white/20 rounded overflow-hidden">
+          {steps.map((step) => (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => setActiveStep(step.id as any)}
+              className={`flex-1 py-3 text-xs font-semibold text-center border-r border-white/10 last:border-0 transition-colors ${
+                activeStep === step.id ? "bg-[#52B946]/10 text-[#52B946] border-b-2 border-b-[#52B946]" : "text-[#888888] hover:bg-white/5"
+              }`}
+            >
+              {step.label.split(". ")[1]}
+            </button>
+          ))}
+        </div>
+        
+        <div className="bg-[#000000] border border-white/20 p-4 rounded">
+          {activeStep === "IDENTITY" && renderIdentity()}
+          {activeStep === "RULES" && renderRules()}
+          {activeStep === "DEPLOYMENT" && renderDeployment()}
+          {renderActions()}
+        </div>
+      </div>
+
+      {/* DESKTOP VIEW */}
+      <div className="hidden md:flex gap-8">
+        <aside className="w-48 shrink-0 space-y-2">
+          {steps.map((step) => (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => setActiveStep(step.id as any)}
+              className={`w-full flex items-center gap-3 p-3 rounded text-left transition-colors ${
+                activeStep === step.id ? "bg-[#1B1B1B] border border-white/20" : "hover:bg-[#1B1B1B]/50 border border-transparent"
+              }`}
+            >
+              <div className={`w-3 h-3 rounded-full border transition-colors ${
+                step.valid && activeStep !== step.id ? "bg-[#52B946] border-[#52B946]" :
+                activeStep === step.id ? "bg-white border-white" : "border-[#888888]"
+              }`} />
+              <div className="flex flex-col">
+                <span className={`text-sm font-semibold transition-colors ${
+                  activeStep === step.id ? "text-white" : "text-[#888888]"
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+            </button>
+          ))}
+        </aside>
+
+        <div className="flex-1 bg-[#000000] border border-white/20 p-8 rounded min-w-0">
+          {activeStep === "IDENTITY" && renderIdentity()}
+          {activeStep === "RULES" && renderRules()}
+          {activeStep === "DEPLOYMENT" && renderDeployment()}
+          {renderActions()}
+        </div>
+      </div>
+    </>
   );
 }

@@ -13,6 +13,7 @@ interface DesktopViewProps {
     onOpenScoring: (match: Match, pos?: {x: number, y: number}) => void;
     addLog: (action: string, details?: string) => void;
     viewMode: "CARD" | "BRACKET";
+    currentUserId?: string | null;
 }
 
 export default function DesktopView({
@@ -22,7 +23,8 @@ export default function DesktopView({
     updating,
     onOpenScoring,
     addLog,
-    viewMode
+    viewMode,
+    currentUserId
 }: DesktopViewProps) {
     const fs = tournament?.format?.system;
     const isElimination = fs === "SINGLE_ELIMINATION" || fs === "DOUBLE_ELIMINATION" || fs === "HYBRID";
@@ -33,10 +35,11 @@ export default function DesktopView({
                 <EliminationLayout 
                     tournament={tournament}
                     leaderboard={leaderboard}
-                    isAdmin={isAdmin}
+                    isAdmin={false}
                     updating={updating}
                     onOpenScoring={onOpenScoring}
                     addLog={addLog}
+                    currentUserId={currentUserId}
                 />
             ) : (
                 <DesktopRoundTable 
@@ -46,6 +49,7 @@ export default function DesktopView({
                     updating={updating}
                     onOpenScoring={onOpenScoring}
                     addLog={addLog}
+                    currentUserId={currentUserId}
                 />
             )}
         </div>

@@ -19,11 +19,26 @@ function TournamentLobbyContent() {
   useEffect(() => {
     if (tournamentId) {
       fetchData();
+
+      // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
+      // Refresh every 2 minutes
+      const interval = setInterval(() => {
+        fetchData(true);
+      }, 120000);
+
+      return () => clearInterval(interval);
+      // END OF TEMPORARY POLLING BLOCK
     }
   }, [tournamentId]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (tournament?.name) {
+      document.title = `Joust | ${tournament.name}`;
+    }
+  }, [tournament?.name]);
+
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [meRes, tRes] = await Promise.all([
         authenticatedFetch(API_ENDPOINTS.AUTH.ME),
@@ -41,7 +56,7 @@ function TournamentLobbyContent() {
     } catch (error) {
       console.error("Lobby fetch failed:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -79,7 +94,7 @@ function TournamentLobbyContent() {
           transition={{ duration: 1.5, repeat: Infinity }}
           className="text-[10px] font-black text-primary uppercase tracking-[1em]"
         >
-          SYNCING_DATA
+          LOADING DATA
         </motion.div>
       </div>
     );
@@ -103,7 +118,7 @@ function TournamentLobbyContent() {
             animate={{ opacity: 1, x: 0 }}
             className="flex items-center gap-4 mb-8"
           >
-            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">TOURNAMENT_LOBBY</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">TOURNAMENT LOBBY</span>
             <div className="h-[1px] flex-1 bg-white/5" />
           </motion.div>
 
@@ -152,7 +167,7 @@ function TournamentLobbyContent() {
               
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <span className="text-[9px] font-black text-primary uppercase tracking-[0.4em]">YOUR_STATUS</span>
+                  <span className="text-[9px] font-black text-primary uppercase tracking-[0.4em]">YOUR STATUS</span>
                   <div className="text-4xl font-black uppercase italic tracking-tighter text-white truncate">
                     {user?.username || "Guest"}
                   </div>
@@ -172,31 +187,21 @@ function TournamentLobbyContent() {
             </motion.div>
 
             <div className="flex flex-col gap-4">
-              <Link 
-                href={`/tournaments/${tournamentId}`}
-                className="w-full py-6 bg-white text-black hover:bg-primary transition-colors text-[11px] font-black uppercase tracking-[0.3em] text-center"
-              >
-                VIEW TOURNAMENT
-              </Link>
-              
               {(tournament.status === "OPEN" || tournament.status === "ONGOING" || tournament.status === "COMPLETED") && (
                 <Link 
                   href={`/tournaments/${tournamentId}/bracket`}
                   className="w-full py-6 bg-primary text-black hover:bg-white transition-colors text-[11px] font-black uppercase tracking-[0.3em] text-center"
                 >
-                  {tournament.status === "ONGOING" ? "ENTER BRACKET" : "VIEW BRACKET"}
+                  {tournament.status === "ONGOING" ? "ENTER TOURNAMENT" : "VIEW TOURNAMENT"}
                 </Link>
               )}
 
-              {tournament.status === "OPEN" && (
-                <button 
-                  onClick={handleLeave}
-                  disabled={withdrawing}
-                  className="w-full py-6 border border-white/10 text-white/20 hover:text-red-500 hover:border-red-500/30 transition-all text-[11px] font-black uppercase tracking-[0.3em] text-center disabled:opacity-50"
-                >
-                  {withdrawing ? "WITHDRAWING..." : "WITHDRAW FROM TOURNAMENT"}
-                </button>
-              )}
+              <Link 
+                href={`/tournaments/${tournamentId}`}
+                className="w-full py-6 border border-white/20 text-white/50 hover:border-white hover:text-white transition-all text-[11px] font-black uppercase tracking-[0.3em] text-center"
+              >
+                VIEW DETAILS
+              </Link>
             </div>
           </div>
 
@@ -209,7 +214,7 @@ function TournamentLobbyContent() {
               className="bg-[#1B1B1B]/20 border border-white/5 p-8"
             >
               <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
-                 <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40">PARTICIPANT_ROSTER</h2>
+                 <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40">PARTICIPANT ROSTER</h2>
                  <div className="flex gap-2">
                    {[...Array(3)].map((_, i) => (
                      <div key={i} className="w-1.5 h-1.5 bg-primary/20" />
@@ -239,7 +244,7 @@ function TournamentLobbyContent() {
                             <span className={`text-sm font-black uppercase tracking-wider transition-colors ${p.userId === myId ? "text-primary" : "text-white"}`}>
                               {p.user.username}
                             </span>
-                            <span className="text-[8px] font-black text-white/10 uppercase tracking-widest group-hover:text-primary/40 transition-colors">ACTIVE_UNIT</span>
+                            <span className="text-[8px] font-black text-white/10 uppercase tracking-widest group-hover:text-primary/40 transition-colors">PARTICIPANT</span>
                           </div>
                        </div>
                        {p.userId === myId && (
@@ -258,7 +263,7 @@ function TournamentLobbyContent() {
                    {/* Empty Slots */}
                    {[...Array(Math.max(0, 4 - tournament.participants.length))].map((_, i) => (
                      <div key={`empty-${i}`} className="p-6 border border-dashed border-white/5 bg-transparent flex items-center justify-center opacity-20">
-                       <span className="text-[9px] font-black uppercase tracking-widest italic">WAITING_FOR_CONNECTION</span>
+                       <span className="text-[9px] font-black uppercase tracking-widest italic">WAITING FOR PLAYER</span>
                      </div>
                    ))}
                  </AnimatePresence>

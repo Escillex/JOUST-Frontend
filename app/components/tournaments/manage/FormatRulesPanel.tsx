@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Tournament, FormatConfig, TournamentTemplate } from "../../../tournaments/types";
 
-const inputCls = "w-full h-12 bg-background border border-foreground/10 px-4 text-xs text-foreground focus:outline-none focus:border-primary transition-all rounded-xl";
+const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded";
 
 interface Props {
   tournament: Tournament;
@@ -12,9 +12,6 @@ interface Props {
   onDiscard: () => void;
   onRuleChange: (key: string, value: any) => void;
   onSave: () => void;
-  templates?: TournamentTemplate[];
-  onApplyTemplate?: (template: TournamentTemplate) => void;
-  onSaveTemplate?: (name: string, description?: string) => void;
 }
 
 function isBooleanField(field: any) {
@@ -48,16 +45,10 @@ export default function FormatRulesPanel({
   onToggleEdit, 
   onDiscard, 
   onRuleChange, 
-  onSave,
-  templates = [],
-  onApplyTemplate,
-  onSaveTemplate
+  onSave
 }: Props) {
   const fields = formatDefinitions.find((f) => f.id === tournament.formatId)?.configFields ?? [];
   const hasFormat = !!tournament.formatId;
-  const [isSavingAsTemplate, setIsSavingAsTemplate] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState("");
-  const [newTemplateDesc, setNewTemplateDesc] = useState("");
 
   const handleChange = (field: any, rawValue: string | boolean) => {
     if (isBooleanField(field)) {
@@ -90,46 +81,32 @@ export default function FormatRulesPanel({
   };
 
   return (
-    <div className="bg-white/[0.02] backdrop-blur-md border border-white/[0.05] p-8 md:p-10 rounded-[2.5rem] shadow-2xl transition-all duration-500">
-      <div className="flex justify-between items-center mb-10 pb-6 border-b border-white/[0.05]">
+    <div className="bg-[#000000] border border-white/20 p-4 md:p-6 rounded">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/60 font-poppins">Match & Scoring Rules</h3>
+          <h3 className="text-sm font-semibold text-white">Match & Scoring Rules</h3>
           {!isEditing && (
-            <button onClick={onToggleEdit} className="text-primary hover:brightness-125 transition-all p-2 bg-primary/10 rounded-lg">
+            <button onClick={onToggleEdit} className="text-[#52B946] hover:text-white transition-colors p-1.5 bg-[#52B946]/10 rounded">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
             </button>
           )}
-          {isEditing && onApplyTemplate && (
-            <select 
-              onChange={(e) => {
-                const t = templates.find(tpl => tpl.id === e.target.value);
-                if (t) onApplyTemplate(t);
-              }}
-              className="bg-[#1B1B1B] border border-white/10 text-[9px] font-bold text-primary uppercase px-3 py-1 rounded-[4px] focus:outline-none focus:border-primary"
-            >
-              <option value="">Load Preset</option>
-              {templates.filter(t => t.format === tournament.formatId).map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          )}
         </div>
         {isEditing && (
-          <button onClick={onDiscard} className="text-[10px] font-black uppercase text-foreground/30 hover:text-foreground tracking-widest font-poppins transition-all">Discard</button>
+          <button onClick={onDiscard} className="text-xs font-semibold text-[#FF4D4D] hover:text-[#FF4D4D]/80 transition-colors">Discard</button>
         )}
       </div>
 
       {!hasFormat ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/5 rounded-[2rem] bg-white/[0.01]">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground/20 animate-pulse text-center">
-            Select Format Preset to<br/>Configure Rules Engine
+        <div className="flex flex-col items-center justify-center py-12 border border-dashed border-white/20 rounded bg-transparent">
+          <p className="text-sm text-[#888888] text-center">
+            Select a Format Preset to configure match rules.
           </p>
         </div>
       ) : isEditing ? (
-        <div className={`space-y-8 transition-all duration-700 opacity-100 translate-y-0`}>
-          <div className="grid grid-cols-1 gap-6">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {fields.map((field: any) => {
               const rawValue = (formatConfig as any)[field.key];
               const value = isArrayField(field)
@@ -139,12 +116,37 @@ export default function FormatRulesPanel({
                 : rawValue ?? "";
 
               return (
-                <div key={field.key} className="space-y-2">
-                  <label className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em] font-poppins ml-1">{field.label}</label>
-                  {isBooleanField(field) ? (
-                    <label className="flex items-center gap-4 cursor-pointer group">
-                      <div className={`w-6 h-6 rounded-lg border-2 border-white/10 flex items-center justify-center transition-all group-hover:border-primary ${Boolean(rawValue) ? "bg-primary border-primary shadow-lg shadow-primary/20" : ""}`}>
-                        {Boolean(rawValue) && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7"/></svg>}
+                <div key={field.key} className="space-y-1">
+                  <label className="text-xs font-semibold text-[#888888] block">{field.label}</label>
+                  {field.key === "allowDraw" ? (
+                    <div className="flex gap-2 w-full">
+                      <button
+                        type="button"
+                        onClick={() => handleChange(field, false)}
+                        className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
+                          !rawValue
+                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
+                            : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                        }`}
+                      >
+                        Force Win
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleChange(field, true)}
+                        className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
+                          rawValue
+                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
+                            : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                        }`}
+                      >
+                        Permit Draws
+                      </button>
+                    </div>
+                  ) : isBooleanField(field) ? (
+                    <label className="flex items-center gap-3 cursor-pointer group py-2">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${Boolean(rawValue) ? "bg-[#52B946] border-[#52B946]" : "border-white/20 group-hover:border-[#52B946]"}`}>
+                        {Boolean(rawValue) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                       </div>
                       <input
                         type="checkbox"
@@ -152,7 +154,7 @@ export default function FormatRulesPanel({
                         onChange={(e) => handleChange(field, e.target.checked)}
                         className="hidden"
                       />
-                      <span className="text-[10px] font-black text-foreground/40 uppercase tracking-widest transition-colors group-hover:text-foreground">{Boolean(rawValue) ? "Enabled" : "Disabled"}</span>
+                      <span className="text-sm text-[#E0E0E0]">{Boolean(rawValue) ? "Enabled" : "Disabled"}</span>
                     </label>
                   ) : (
                     <input
@@ -160,76 +162,75 @@ export default function FormatRulesPanel({
                       value={value}
                       onChange={(e) => handleChange(field, e.target.value)}
                       placeholder={field.defaultValue !== null ? String(field.defaultValue) : field.placeholder}
-                      className={`${inputCls} bg-transparent border-white/10 focus:border-primary/50`}
+                      className={inputCls}
                     />
                   )}
                 </div>
               );
             })}
           </div>
-          <div className="flex gap-4">
-            <button onClick={onSave} className="flex-1 h-14 bg-primary text-white font-black text-xs uppercase tracking-[0.3em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-primary/20">
-              Save Rules
-            </button>
-            {onSaveTemplate && (
-              <button 
-                onClick={() => setIsSavingAsTemplate(true)}
-                className="px-6 h-14 bg-white/5 border border-white/10 text-white/40 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-white/10 transition-all"
-              >
-                Save as Preset
-              </button>
+
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <div className="flex items-center space-x-3">
+              <input 
+                type="checkbox" 
+                id="enableHpSystem" 
+                checked={!!formatConfig?.startingHp} 
+                onChange={e => {
+                  const checked = e.target.checked;
+                  onRuleChange('startingHp', checked ? 100 : 0);
+                }} 
+                className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+              />
+              <label htmlFor="enableHpSystem" className="text-sm text-white cursor-pointer select-none">HP-Based Match System</label>
+            </div>
+            {!!formatConfig?.startingHp && (
+              <div className="space-y-1 max-w-xs pl-7">
+                <label className="text-xs font-semibold text-[#888888] block">Starting HP</label>
+                <input 
+                  type="number" 
+                  value={formatConfig.startingHp} 
+                  onChange={e => onRuleChange('startingHp', Math.max(1, Number(e.target.value)))} 
+                  min={1}
+                  className={inputCls} 
+                />
+              </div>
             )}
           </div>
 
-          {isSavingAsTemplate && (
-            <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl space-y-4 animate-in slide-in-from-top-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Save Preset</span>
-                <button onClick={() => setIsSavingAsTemplate(false)} className="text-foreground/30 hover:text-foreground">✕</button>
-              </div>
-              <div className="grid grid-cols-1 gap-4">
-                <input 
-                  type="text" 
-                  placeholder="Template Name" 
-                  value={newTemplateName}
-                  onChange={e => setNewTemplateName(e.target.value)}
-                  className="bg-[#1B1B1B]/40 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:border-primary"
-                />
-                <input 
-                  type="text" 
-                  placeholder="Description (Optional)" 
-                  value={newTemplateDesc}
-                  onChange={e => setNewTemplateDesc(e.target.value)}
-                  className="bg-[#1B1B1B]/40 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:border-primary"
-                />
-                <button 
-                  onClick={() => {
-                    onSaveTemplate?.(newTemplateName, newTemplateDesc);
-                    setIsSavingAsTemplate(false);
-                    setNewTemplateName("");
-                    setNewTemplateDesc("");
-                  }}
-                  className="w-full py-3 bg-primary text-black font-black text-[10px] uppercase tracking-widest rounded-xl"
-                >
-                  Confirm Save
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-white/10">
+            <button onClick={onSave} className="flex-1 h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors">
+              Save Rules
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-y-10 gap-x-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-4">
           {fields.map((field: any) => (
-            <div key={field.key} className="space-y-1.5">
-              <p className="text-[8px] font-black text-foreground/20 uppercase tracking-[0.2em] font-poppins">{field.label}</p>
-              <p className="text-[11px] font-black text-foreground uppercase tracking-tight">
+            <div key={field.key} className="space-y-1">
+              <p className="text-xs font-semibold text-[#888888]">{field.label}</p>
+              <p className="text-sm text-white">
                 {getDisplayValue(field, formatConfig)}
               </p>
             </div>
           ))}
           {fields.length === 0 && (
-            <p className="col-span-full text-[10px] text-foreground/20 font-black uppercase tracking-widest text-center py-4 italic">No specific config for this format</p>
+            <p className="col-span-full text-sm text-[#888888] italic">No specific config for this format</p>
           )}
+          <div className="col-span-full border-t border-white/10 pt-4 grid grid-cols-2 gap-y-4 gap-x-4">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-[#888888]">Tracking Mode</p>
+              <p className="text-sm text-white">
+                {(formatConfig as any).trackingMode ?? 'POINTS'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-[#888888]">Starting Value</p>
+              <p className="text-sm text-white">
+                {(formatConfig as any).defaultStartingValue ?? `Auto (${formatConfig?.bestOf ?? 1} wins)`}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

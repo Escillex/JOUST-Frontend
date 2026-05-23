@@ -14,6 +14,7 @@ interface MobileBracketTreeProps {
     addLog: (action: string, details?: string) => void;
     trackedUserId: string | null;
     setTrackedUserId: (id: string | null) => void;
+    currentUserId?: string | null;
 }
 
 export default function MobileBracketTree({
@@ -24,56 +25,137 @@ export default function MobileBracketTree({
     onOpenScoring,
     addLog,
     trackedUserId,
-    setTrackedUserId
+    setTrackedUserId,
+    currentUserId
 }: MobileBracketTreeProps) {
     const rounds = useMemo(() => {
         const r = tournament?.rounds || [];
-        return [...r].sort((a, b) => a.roundNumber - b.roundNumber);
+        return [...r].sort((a: Round, b: Round) => a.roundNumber - b.roundNumber);
     }, [tournament]);
+
+    const winnerRoundsCount = useMemo(() => {
+        return rounds.filter(r => r.roundNumber < 100).length;
+    }, [rounds]);
 
     const [activeRoundIdx, setActiveRoundIdx] = useState(0);
 
     const getRoundLabel = (round: Round) => {
         const num = round.roundNumber;
-        if (num >= 200) return "Finals";
+        if (num >= 200) return "Grand Finals";
         if (num >= 100) return `Losers R${num - 100}`;
-        if (num === 1) return "Round 1";
-        if (num === 2) return "Quarter-Finals";
-        if (num === 3) return "Semi-Finals";
+        
+        // Dynamic labels for Winner's bracket
+        if (num === winnerRoundsCount) return "Finals";
+        if (num === winnerRoundsCount - 1) return "Semi-Finals";
+        if (num === winnerRoundsCount - 2) return "Quarter-Finals";
+        
         return `Round ${num}`;
     };
 
     const currentRound = rounds[activeRoundIdx];
 
+    // Swipe Gesture State
+    const [touchStart, setTouchStart] = useState<number | null>(null);
+    const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        setTouchEnd(e.targetTouches[0].clientX);
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStart || !touchEnd) return;
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > 50;
+        const isRightSwipe = distance < -50;
+        
+        if (isLeftSwipe && activeRoundIdx < rounds.length - 1) {
+            setActiveRoundIdx(activeRoundIdx + 1);
+        } else if (isRightSwipe && activeRoundIdx > 0) {
+            setActiveRoundIdx(activeRoundIdx - 1);
+        }
+    };
+
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        setIsDragging(true);
+        setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
+        setScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
+    };
+
+    const handleMouseLeave = () => setIsDragging(false);
+    const handleMouseUp = () => setIsDragging(false);
+    
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging || !scrollContainerRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - scrollContainerRef.current.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const userInRound = (round: Round) => {
+        if (!currentUserId) return false;
+        return round.matches?.some((m: Match) => 
+            m.player1Id === currentUserId || 
+            m.player2Id === currentUserId || 
+            m.player1?.id === currentUserId || 
+            m.player2?.id === currentUserId
+        );
+    };
+
     return (
         <div className="h-full flex flex-col bg-[#1B1B1B] relative">
             {/* Round Navigation (UEFA Style) */}
             <div className="sticky top-0 z-50 bg-[#1B1B1B]/80 backdrop-blur-xl border-b border-white/5 px-4 pt-4 pb-2">
-                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                    {rounds.map((round: Round, idx: number) => (
-                        <button
-                            key={round.id}
-                            onClick={() => {
-                                setActiveRoundIdx(idx);
-                                addLog("NAV_COMMAND", `VIEWING ${getRoundLabel(round).toUpperCase()}`);
-                            }}
-                            className="flex flex-col items-center gap-2 min-w-[100px] shrink-0 group"
-                        >
-                            <span className={`text-[8px] font-black uppercase tracking-[0.3em] transition-all ${
-                                activeRoundIdx === idx ? "text-primary" : "text-white/20 group-hover:text-white/40"
-                            }`}>
-                                {getRoundLabel(round)}
-                            </span>
-                            <div className={`h-[2px] w-full rounded-full transition-all duration-500 ${
-                                activeRoundIdx === idx ? "bg-primary shadow-[0_0_10px_rgba(82,185,70,0.5)]" : "bg-white/5"
-                            }`} />
-                        </button>
-                    ))}
+                <div 
+                    ref={scrollContainerRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseLeave={handleMouseLeave}
+                    onMouseUp={handleMouseUp}
+                    onMouseMove={handleMouseMove}
+                    className={`flex gap-4 overflow-x-auto no-scrollbar pb-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} select-none`}
+                >
+                    {rounds.map((round: Round, idx: number) => {
+                        const isUserHere = userInRound(round);
+                        return (
+                            <button
+                                key={round.id}
+                                onClick={() => {
+                                    setActiveRoundIdx(idx);
+                                    addLog("NAV_COMMAND", `VIEWING ${getRoundLabel(round).toUpperCase()}`);
+                                }}
+                                className="flex flex-col items-center gap-2 min-w-[100px] shrink-0 group pointer-events-auto"
+                            >
+                                <span className={`text-[8px] font-black uppercase tracking-[0.3em] transition-all ${
+                                    activeRoundIdx === idx ? "text-primary drop-shadow-[0_0_5px_rgba(82,185,70,0.8)]" : (isUserHere ? "text-primary/70 drop-shadow-[0_0_5px_rgba(82,185,70,0.4)]" : "text-white/20 group-hover:text-white/40")
+                                }`}>
+                                    {getRoundLabel(round)}
+                                </span>
+                                <div className={`h-[2px] w-full rounded-full transition-all duration-500 ${
+                                    activeRoundIdx === idx ? "bg-primary shadow-[0_0_10px_rgba(82,185,70,0.8)]" : (isUserHere ? "bg-primary/50 shadow-[0_0_8px_rgba(82,185,70,0.4)]" : "bg-white/5")
+                                }`} />
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Matches Display */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8">
+            <div 
+                className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={currentRound?.id}
@@ -90,7 +172,7 @@ export default function MobileBracketTree({
                              </span>
                         </div>
 
-                        {currentRound?.matches.map((match: Match, idx: number) => (
+                        {[...(currentRound?.matches || [])].sort((a, b) => a.id.localeCompare(b.id)).map((match: Match, idx: number) => (
                             <div key={match.id} className="relative">
                                 {/* Connector Line (UEFA Style) */}
                                 {idx < currentRound.matches.length - 1 && (
@@ -98,8 +180,8 @@ export default function MobileBracketTree({
                                 )}
                                 
                                 <motion.div
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => onOpenScoring(match)}
+                                    whileTap={isAdmin ? { scale: 0.98 } : undefined}
+                                    onClick={() => isAdmin && onOpenScoring(match)}
                                 >
                                     <MatchCard 
                                         match={match} 
@@ -108,6 +190,7 @@ export default function MobileBracketTree({
                                         isUpdating={updating === match.id}
                                         leaderboard={leaderboard}
                                         trackedUserId={trackedUserId}
+                                        currentUserId={currentUserId}
                                     />
                                 </motion.div>
                             </div>
@@ -134,7 +217,7 @@ export default function MobileBracketTree({
                                 </span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[7px] font-black text-primary uppercase tracking-[0.3em] leading-none mb-1">Combatant Tracked</span>
+                                <span className="text-[7px] font-black text-primary uppercase tracking-[0.3em] leading-none mb-1">Participant Tracked</span>
                                 <span className="text-xs font-bold text-white tracking-tight">{leaderboard.find(u => u.userId === trackedUserId)?.username}</span>
                             </div>
                         </div>

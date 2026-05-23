@@ -2,12 +2,13 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
-import { Tournament, FormatConfig, TournamentTemplate } from "../../types";
+import { Tournament, FormatConfig } from "../../types";
 import ControlRoomHeader from "../../../components/tournaments/manage/ControlRoomHeader";
 import RosterPanel from "../../../components/tournaments/manage/RosterPanel";
 import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import DeploymentPanel from "../../../components/tournaments/manage/DeploymentPanel";
+import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
 
 const randomGuestName = () => `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -26,18 +27,30 @@ function ControlRoomContent() {
   const [formatConfig, setFormatConfig]     = useState<FormatConfig>({});
   const [formatDefinitions, setFormatDefinitions] = useState<any[]>([]);
   const [formats, setFormats] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<TournamentTemplate[]>([]);
-  const [editState, setEditState] = useState({ name: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false });
+  const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false });
 
   const [guestUsername, setGuestUsername]     = useState("");
   const [batchGuestCount, setBatchGuestCount] = useState<number | "">("");
   const [selectedUserId, setSelectedUserId]   = useState("");
+  const [batchLoading, setBatchLoading]       = useState(false);
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments/manage"); return; }
     fetchData();
     fetchFormatDefinitions();
+
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [tournamentId]);
+
+  useEffect(() => {
+    if (tournament?.name) {
+      document.title = `Joust | ${tournament.name}`;
+    }
+  }, [tournament?.name]);
 
   const fetchFormatDefinitions = async () => {
     const res = await authenticatedFetch(API_ENDPOINTS.FORMATS.DETAILS);
@@ -48,63 +61,123 @@ function ControlRoomContent() {
     const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE);
     if (res.ok) { const data = await safeJson(res); setFormats(data ?? []); }
   };
- 
-  const fetchTemplates = async () => {
-    // Note: In the new system, templates/presets ARE TournamentFormats.
-    // We'll just reuse the formats list or keep it separate if we have different "template" logic.
-    // For now, I'll keep the fetch but use PRESETS endpoint.
-    const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE);
-    if (res.ok) { const data = await safeJson(res); setTemplates(data ?? []); }
-  };
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
-      if (!meRes.ok) { router.push("/auth"); return; }
-      const me = await safeJson(meRes);
-      if (!me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER")) { router.push("/tournaments"); return; }
+      if (!silent) {
+        const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
+        if (!meRes.ok) { router.push("/auth"); return; }
+        const me = await safeJson(meRes);
+        if (!me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER")) { router.push("/tournaments"); return; }
 
-      const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
-      if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
+        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
+        if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
 
-      await Promise.all([fetchFormats(), fetchTemplates()]);
+        await fetchFormats();
+      }
 
       const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!));
       if (tRes.ok) {
         const t = await safeJson(tRes);
         setTournament(t);
-        setEditState({
-          name: t.name,
-          formatId: t.formatId || "",
-          maxPlayers: t.maxPlayers,
-          prizePool: t.prizePool || "",
-          isPrivate: t.isPrivate || false,
-        });
-        setFormatConfig(t.formatConfig || {});
-      } else { setMessage("Tournament not found"); }
-    } catch { setMessage("Failed to load data"); }
-    finally { setLoading(false); }
+        if (!silent) {
+          setEditState({
+            name: t.name,
+            description: t.description || "",
+            formatId: t.formatId || "",
+            maxPlayers: t.maxPlayers,
+            prizePool: t.prizePool || "",
+            isPrivate: t.isPrivate || false,
+          });
+          setFormatConfig(t.format?.config || t.formatConfig || {});
+        }
+      } else if (!silent) { setMessage("Tournament not found"); }
+    } catch { 
+      if (!silent) setMessage("Failed to load data"); 
+    }
+    finally { 
+      if (!silent) setLoading(false); 
+    }
   };
 
   const handleUpdateTournament = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const body: any = {
-      name: editState.name,
-      formatId: editState.formatId,
-      maxPlayers: Number(editState.maxPlayers),
-      prizePool: editState.prizePool === "" ? null : Number(editState.prizePool),
-      isPrivate: editState.isPrivate,
-      formatConfig,
-    };
+    setMessage("Syncing specifications...");
 
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) { setMessage("Tournament Specs Updated"); setIsEditing(false); setIsEditingRules(false); fetchData(); }
-    else { setMessage("Update failed"); }
+    try {
+      let finalFormatId = editState.formatId;
+
+      // Detect if the organizer has customized format rules (formatConfig)
+      const currentConfig = (tournament?.format && typeof tournament.format === "object") ? tournament.format.config : {};
+      const hasConfigChanges = JSON.stringify(formatConfig) !== JSON.stringify(currentConfig);
+
+      if (hasConfigChanges && tournament?.format && typeof tournament.format === "object") {
+        const formatObj = tournament.format;
+        if (!formatObj.isBuiltin) {
+          // Update custom format config directly
+          const presetRes = await authenticatedFetch(API_ENDPOINTS.PRESETS.DETAILS(formatObj.id), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ config: formatConfig }),
+          });
+          if (!presetRes.ok) {
+            const errData = await safeJson(presetRes);
+            throw new Error(errData?.message || "Failed to update custom format config");
+          }
+        } else {
+          // Built-in formats cannot be updated. Create a custom template format copy
+          const createPresetRes = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: `${editState.name || tournament.name} Custom Format`,
+              system: formatObj.system,
+              config: formatConfig,
+            }),
+          });
+
+          if (createPresetRes.ok) {
+            const newPreset = await safeJson(createPresetRes);
+            finalFormatId = newPreset.id;
+          } else {
+            const errData = await safeJson(createPresetRes);
+            if (createPresetRes.status === 403) {
+              throw new Error("Only administrators can save customized rules. Please select an existing format preset.");
+            } else {
+              throw new Error(errData?.message || "Failed to create custom rules preset");
+            }
+          }
+        }
+      }
+
+      const body: any = {
+        name: editState.name,
+        description: editState.description || undefined,
+        formatId: finalFormatId,
+        maxPlayers: Number(editState.maxPlayers),
+        prizePool: editState.prizePool === "" ? null : Number(editState.prizePool),
+        isPrivate: editState.isPrivate,
+      };
+
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setMessage("Tournament settings and rules successfully saved!");
+        setIsEditing(false);
+        setIsEditingRules(false);
+        fetchData();
+      } else {
+        const data = await safeJson(res);
+        setMessage(data?.message || "Update failed");
+      }
+    } catch (err: any) {
+      setMessage(err.message || "An error occurred during update");
+    }
   };
 
   const handleAddGuest = async () => {
@@ -123,14 +196,19 @@ function ControlRoomContent() {
     if (!tournament || !batchGuestCount || Number(batchGuestCount) <= 0) return;
     const countToAdd = Math.min(Number(batchGuestCount), tournament.maxPlayers - tournament.participants.length);
     if (countToAdd <= 0) { setMessage("Tournament at maximum capacity"); return; }
-    if (!confirm(`Initialize bulk deployment of ${countToAdd} guests?`)) return;
-    setLoading(true);
+    setBatchLoading(true);
+    setMessage(`Generating ${countToAdd} guest(s)...`);
+    let added = 0;
     for (let i = 0; i < countToAdd; i++) {
-      await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: randomGuestName() }),
       });
+      if (res.ok) added++;
     }
-    setBatchGuestCount(""); await fetchData();
+    setBatchLoading(false);
+    setBatchGuestCount("");
+    setMessage(`${added} guest(s) added successfully.`);
+    await fetchData();
   };
 
   const handleJoin = async (userId: string) => {
@@ -174,7 +252,6 @@ function ControlRoomContent() {
     }
   };
   const handleRemoveParticipant = async (userId: string) => {
-    if (!confirm("Remove this participant from the roster?")) return;
     const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEAVE(tournamentId!), {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -200,59 +277,37 @@ function ControlRoomContent() {
   };
 
   const handleStartTournament = async () => {
-    if (!confirm("Start tournament sequence?")) return;
     const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
     if (res.ok) { setMessage("Tournament started!"); fetchData(); }
-    else { setMessage("Activation failed"); }
+    else { const d = await safeJson(res); setMessage(d?.message || "Activation failed"); }
   };
 
-  const handleApplyTemplate = (template: TournamentTemplate) => {
-    setFormatConfig(template.config);
-  };
-
-  const handleSaveTemplate = async (name: string, description?: string) => {
-    const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
-    const me = await safeJson(meRes);
-    const userId = me?.sub || me?.id;
-
-    const body = {
-      name,
-      description,
-      formatId: tournament?.formatId,
-      config: formatConfig,
-      createdById: userId,
-    };
-
-    const res = await authenticatedFetch(API_ENDPOINTS.TEMPLATES.BASE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
-      setMessage("Configuration Archived");
-      fetchTemplates();
-    } else {
-      setMessage("Archival failed");
-    }
+  const handleSaveRules = async () => {
+    setLoading(true);
+    await handleUpdateTournament();
+    setLoading(false);
   };
 
   if (loading) return (
-    <div className="min-h-screen w-full bg-background flex items-center justify-center">
+    <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center font-sans">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse font-poppins">Syncing Terminal</p>
+        <div className="w-8 h-8 border-4 border-white/10 border-t-white/50 rounded-full animate-spin" />
+        <p className="text-sm text-white/50">Loading Dashboard...</p>
       </div>
     </div>
   );
 
   if (!tournament) return (
-    <div className="min-h-screen flex items-center justify-center text-white bg-background font-black uppercase tracking-widest">Tournament Offline</div>
+    <div className="min-h-screen flex items-center justify-center text-white/50 bg-[#1B1B1B] font-sans text-sm">Tournament Not Found</div>
   );
 
+  const system = typeof tournament.format === "string"
+    ? tournament.format
+    : tournament.format?.system;
+
   return (
-    <div className="min-h-screen w-full bg-background font-questrial overflow-x-hidden">
-      <div className="w-full px-4 md:px-12 py-12 max-w-[1600px] mx-auto">
+    <div className="min-h-screen w-full bg-[#1B1B1B] font-sans overflow-x-hidden text-[#E0E0E0]">
+      <div className="w-full px-4 md:px-8 py-8 max-w-[1600px] mx-auto">
         <ControlRoomHeader
           tournament={tournament}
           tournamentId={tournamentId!}
@@ -260,22 +315,23 @@ function ControlRoomContent() {
           onViewBracket={() => router.push(`/tournaments/${tournamentId}/bracket`)}
           onOpenTournament={handleOpenRegistration}
           onStartTournament={handleStartTournament}
+          onRefresh={fetchData}
         />
 
         {message && (
-          <div className="mb-12 p-4 bg-primary/10 border border-primary/20 rounded-2xl text-primary text-center font-black text-[10px] uppercase tracking-widest animate-in fade-in slide-in-from-top-2">
+          <div className="mb-6 p-3 bg-[#000000] border border-white/20 rounded-[4px] text-white text-center text-sm font-semibold animate-in fade-in slide-in-from-top-2">
             {message}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <RosterPanel 
             tournament={tournament} 
             onReorder={handleReorder} 
             onRemove={handleRemoveParticipant} 
           />
 
-          <div className="lg:col-span-4 space-y-8">
+          <div className="lg:col-span-4 space-y-6">
             <SpecsPanel
               tournament={tournament}
               tournamentId={tournamentId!}
@@ -296,13 +352,17 @@ function ControlRoomContent() {
               isEditing={isEditingRules}
               formatConfig={formatConfig}
               onToggleEdit={() => setIsEditingRules(true)}
-              onDiscard={() => { setIsEditingRules(false); setFormatConfig(tournament.formatConfig || {}); }}
-              onRuleChange={(key, value) => setFormatConfig((prev: any) => ({ ...prev, [key]: value }))}
-              onSave={handleUpdateTournament}
-              templates={templates}
-              onApplyTemplate={handleApplyTemplate}
-              onSaveTemplate={handleSaveTemplate}
+              onDiscard={() => { setIsEditingRules(false); setFormatConfig((tournament.format as any)?.config || tournament.formatConfig || {}); }}
+              onRuleChange={(k, v) => setFormatConfig(p => ({ ...p, [k]: v }))}
+              onSave={handleSaveRules}
             />
+            {tournament.status === "ONGOING" && (system === "SWISS" || system === "ROUND_ROBIN") && (
+              <RoundControlPanel
+                tournament={tournament}
+                fetchData={fetchData}
+                setMessage={setMessage}
+              />
+            )}
             <DeploymentPanel
               tournament={tournament}
               allUsers={allUsers}
@@ -315,6 +375,7 @@ function ControlRoomContent() {
               onAddGuest={handleAddGuest}
               onBatchAddGuests={handleBatchAddGuests}
               onInvitePlayer={() => selectedUserId && handleJoin(selectedUserId)}
+              batchLoading={batchLoading}
             />
           </div>
         </div>
@@ -326,10 +387,10 @@ function ControlRoomContent() {
 export default function ControlRoomPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen w-full bg-background flex items-center justify-center">
+      <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center font-sans">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse font-poppins">Syncing Terminal</p>
+          <div className="w-8 h-8 border-4 border-white/10 border-t-white/50 rounded-full animate-spin" />
+          <p className="text-sm text-white/50">Loading Dashboard...</p>
         </div>
       </div>
     }>

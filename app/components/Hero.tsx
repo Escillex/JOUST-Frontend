@@ -35,23 +35,31 @@ export default function Hero({
   description = "Experience the next level of hobby gaming. Professional tournaments, high-fidelity community, and the best gear, all in one place.",
   storeButtons = [
     { 
-      text: "Shopee", 
+      text: "", 
       href: "https://shopee.ph/hobbyplusshop", 
-      color: "#EE4D2D",
+      color: "#FFFFFF",
       icon: (
-        <svg fill="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-          <path d="M19 6.5h-1.28c-.47-2.31-2.49-4-4.88-4s-4.41 1.69-4.88 4H6.68c-.93 0-1.68.75-1.68 1.68V18c0 .93.75 1.68 1.68 1.68h10.64c.93 0 1.68-.75 1.68-1.68V8.18c0-.93-.75-1.68-1.68-1.68zM12.84 4.5c1.33 0 2.45.86 2.81 2H10.03c.36-1.14 1.48-2 2.81-2z" />
-        </svg>
+        <Image 
+          src="/shp.png" 
+          alt="Shopee Logo" 
+          width={80} 
+          height={32} 
+          className="object-contain w-full h-full" 
+        />
       )
     },
     { 
-      text: "Lazada", 
+      text: "", 
       href: "https://www.lazada.com.ph/shop/hobby-plus-shop", 
-      color: "#00008F",
+      color: "#FFFFFF",
       icon: (
-        <svg fill="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-          <path d="M12.12 3.32C11.58 3.58 11.14 4.1 10.86 4.78 10.46 5.76 10.28 7.32 10.28 8.44L10.28 9.32 9.4 9.32C8.38 9.32 6.8 9.5 5.82 9.88 5.14 10.16 4.62 10.6 4.36 11.14 4.1 11.68 4.1 12.32 4.36 12.86 4.62 13.4 5.14 13.84 5.82 14.12 6.8 14.5 8.38 14.68 9.4 14.68L10.28 14.68 10.28 15.56C10.28 16.68 10.46 18.24 10.86 19.22 11.14 19.9 11.58 20.42 12.12 20.68 12.66 20.94 13.3 20.94 13.84 20.68 14.38 20.42 14.82 19.9 15.1 19.22 15.5 18.24 15.56 16.68 15.68 15.56L15.68 14.68 16.56 14.68C17.68 14.68 19.24 14.5 20.22 14.12 20.9 13.84 21.42 10.6 20.22 9.88 19.24 9.5 17.68 9.32 16.56 9.32L15.68 9.32L15.68 8.44C15.68 7.32 15.5 5.76 15.12 4.78 14.84 4.1 14.4 3.58 13.86 3.32 13.32 3.06 12.66 3.06 12.12 3.32Z" />
-        </svg>
+        <Image 
+          src="/laz.png" 
+          alt="Lazada Logo" 
+          width={80} 
+          height={32} 
+          className="object-contain w-full h-full scale-[1.3] origin-center" 
+        />
       )
     }
   ]
@@ -68,6 +76,18 @@ export default function Hero({
 
   return (
     <section className="relative h-[85vh] md:h-[95vh] min-h-[600px] w-full overflow-hidden bg-[#1B1B1B] font-questrial selection:bg-primary selection:text-black">
+      {/* Eager preloader to prevent dynamic image flashing on throttled connections */}
+      <div className="hidden aria-hidden pointer-events-none absolute w-0 h-0 overflow-hidden" style={{ display: 'none' }}>
+        {slides.map((slide, idx) => (
+          <img 
+            key={idx}
+            src={slide.image.startsWith("http") || slide.image.startsWith("/") ? slide.image : `${API_URL}${slide.image}`}
+            alt=""
+            loading="eager"
+          />
+        ))}
+      </div>
+
       {/* Material Expressive Background Slideshow */}
       <div className="absolute inset-0 z-0">
         <AnimatePresence mode="wait">

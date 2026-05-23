@@ -42,7 +42,7 @@ export default function ManageTournaments() {
     if (!confirm("Finalize this tournament? All guest data will be scrubbed and status set to COMPLETED.")) return;
     const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
     if (res.ok) { 
-      setMessage("TOURNAMENT_FINALIZED"); 
+      setMessage("Tournament Finalized"); 
       await refresh(); 
       setTimeout(() => setMessage(""), 3000);
     }
@@ -52,42 +52,49 @@ export default function ManageTournaments() {
 
   if (loading || isAuthorized === null) {
     return (
-      <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center">
-        <div className="text-primary font-black uppercase tracking-[0.5em] animate-pulse">Syncing Organizer Clearance...</div>
+      <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center font-sans">
+        <div className="text-white/50 text-sm">Loading Organizer Dashboard...</div>
       </div>
     );
   }
 
   return (
     <ManagerLayout breadcrumbs={[{ label: "TOURNAMENTS" }]}>
-      <div className="space-y-10">
+      <div className="space-y-8 font-sans">
         {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-16">
-          <div className="flex items-center gap-6">
-            <span className="text-primary text-4xl font-black select-none tracking-tighter">//</span>
-            <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">
-              JOUST <span className="text-white/20">TOURNAMENT SYSTEM</span>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-semibold text-white">
+              Tournament Management
             </h1>
           </div>
           
-          <div className="flex gap-4">
-            <button 
-              className="px-10 py-4 bg-white/5 border border-white/10 text-white/40 font-black text-[11px] uppercase tracking-[0.3em] rounded-[4px] hover:bg-white/10 transition-all"
-              onClick={() => alert("Templates Slide-over coming soon...")}
+          <div className="flex gap-2 w-full md:w-auto">
+            <button
+              onClick={async () => {
+                setLoading(true);
+                await refresh();
+                setLoading(false);
+              }}
+              className="px-4 py-2.5 bg-[#1B1B1B] border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors flex items-center justify-center group"
+              title="Refresh Data"
             >
-              TEMPLATES
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             </button>
+
             <Link 
               href="/tournaments/create"
-              className="px-10 py-4 bg-primary text-black font-black text-[11px] uppercase tracking-[0.3em] rounded-[4px] hover:brightness-110 transition-all shadow-xl shadow-primary/20"
+              className="flex-1 md:flex-none px-6 py-2.5 bg-[#52B946] text-black font-semibold text-xs rounded hover:brightness-90 transition-colors text-center flex items-center justify-center whitespace-nowrap"
             >
-              CREATE NEW +
+              Create New +
             </Link>
           </div>
         </div>
 
         {message && (
-          <div className="p-4 bg-primary/10 border border-primary/20 rounded-[4px] text-primary text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">
+          <div className="p-3 bg-[#52B946]/10 border border-[#52B946]/20 rounded text-[#52B946] text-sm font-semibold">
             {message}
           </div>
         )}

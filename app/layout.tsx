@@ -16,6 +16,9 @@ const questrial = Questrial({
 export const metadata: Metadata = {
   title: "Hobby+",
   description: "Hobby Plus A place for all hobbioes",
+  icons: {
+    icon: "/h+small.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -27,6 +30,7 @@ import Navibar from "./components/Navibar";
 import { UserProvider } from "./components/UserProvider";
 import MobileTopBar from "./components/mobile/MobileTopBar";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
+import InitialAppLoader from "./components/InitialAppLoader";
 
 export default function RootLayout({
   children,
@@ -36,28 +40,30 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${questrial.variable} h-full antialiased`}
+      className={`${poppins.variable} ${questrial.variable} h-full w-full overflow-x-hidden antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
+      <body className="min-h-full w-full overflow-x-hidden flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
         <UserProvider>
-          {/* Desktop Navigation */}
-          <div className="hidden md:block sticky top-0 z-50">
-            <Navibar />
-          </div>
+          <InitialAppLoader>
+            {/* Desktop Navigation */}
+            <div className="hidden md:block sticky top-0 z-50">
+              <Navibar />
+            </div>
 
-          {/* Mobile Navigation */}
-          <div className="md:hidden">
-            <MobileTopBar />
-          </div>
+            {/* Mobile Navigation */}
+            <div className="md:hidden">
+              <MobileTopBar />
+            </div>
 
-          <main className="flex-grow pb-20 md:pb-0">
-            {children}
-          </main>
+            <main className="flex-grow pb-20 md:pb-0">
+              {children}
+            </main>
 
-          {/* Mobile Bottom Navigation */}
-          <div className="md:hidden">
-            <MobileBottomNav />
-          </div>
+            {/* Mobile Bottom Navigation */}
+            <div className="md:hidden">
+              <MobileBottomNav />
+            </div>
+          </InitialAppLoader>
         </UserProvider>
       </body>
     </html>

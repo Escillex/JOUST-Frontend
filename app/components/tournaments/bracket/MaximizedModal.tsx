@@ -20,7 +20,7 @@ export default function MaximizedModal({ panel, logs, leaderboard, onClose }: Pr
         <div className="p-12 pb-6 shrink-0">
           <span className="text-xs font-black text-primary uppercase tracking-[0.4em] font-poppins mb-2 block">Full Screen View</span>
           <h2 className="text-4xl md:text-6xl font-black text-foreground uppercase tracking-tighter font-poppins">
-            {panel === "TERMINAL" ? "Terminal Telemetry" : "Combat Standings"}
+            {panel === "TERMINAL" ? "Terminal Logs" : "Tournament Standings"}
           </h2>
         </div>
 
@@ -44,7 +44,7 @@ export default function MaximizedModal({ panel, logs, leaderboard, onClose }: Pr
                   <thead>
                     <tr className="text-[10px] font-black text-foreground/30 uppercase tracking-[0.4em]">
                       <th className="py-6 px-8 w-32">RANK</th>
-                      <th className="py-6 px-4">COMBATANT</th>
+                      <th className="py-6 px-4">PARTICIPANT</th>
                       <th className="py-6 px-8 text-center w-48">POINTS</th>
                       <th className="py-6 px-8 text-center w-48">W-D-L</th>
                       <th className="py-6 px-8 text-right w-48">WIN RATIO</th>

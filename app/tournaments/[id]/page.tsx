@@ -28,6 +28,12 @@ function TournamentViewContent() {
     }
   }, [tournamentId]);
 
+  useEffect(() => {
+    if (tournament?.name) {
+      document.title = `Joust | ${tournament.name}`;
+    }
+  }, [tournament?.name]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -183,7 +189,7 @@ function TournamentViewContent() {
                         <div className="bg-component-background p-6 border border-primary/40 w-64 shadow-[0_0_40px_rgba(82,185,70,0.2)]">
                           <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">FORMAT_DETAILS</p>
                           <p className="text-[11px] text-white/80 leading-relaxed font-light italic">
-                            {formatExplanations[typeof tournament.format === 'object' ? tournament.format?.system : ""] || "Standard tournament protocol."}
+                            {formatExplanations[typeof tournament.format === 'object' ? tournament.format?.system : ""] || "Standard tournament format."}
                           </p>
                         </div>
                       </div>
@@ -201,36 +207,60 @@ function TournamentViewContent() {
                       {tournament.name}
                     </h1>
                   </div>
-                  <p className="text-xl md:text-2xl text-white/60 leading-relaxed font-light italic">
+                  <p className="text-xl md:text-2xl text-white/60 leading-relaxed font-light italic whitespace-pre-wrap">
                     {tournament.description || "Join the sector's elite in this high-stakes engagement. Success requires absolute precision and strategic dominance."}
                   </p>
                 </div>
               </div>
 
               <div className="lg:col-span-5 flex flex-col gap-8">
-                <div className="h-48">
-                  {canJoin ? (
-                    <motion.button 
-                      onClick={handleJoin}
-                      disabled={joining}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full h-full border-2 border-primary bg-primary/5 text-primary font-black text-sm uppercase tracking-[0.6em] transition-all hover:bg-primary hover:text-black hover:shadow-[0_0_50px_rgba(82,185,70,0.3)] flex items-center justify-center group relative overflow-hidden"
+                <div className="h-48 flex flex-col gap-4">
+                  <div className="flex-1 relative">
+                    {canJoin ? (
+                      <motion.button 
+                        onClick={handleJoin}
+                        disabled={joining}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary font-black text-sm uppercase tracking-[0.6em] transition-all hover:bg-primary hover:text-black hover:shadow-[0_0_50px_rgba(82,185,70,0.3)] flex items-center justify-center group relative overflow-hidden"
+                      >
+                        <span className="relative z-10">{joining ? "JOINING..." : "JOIN TOURNAMENT"}</span>
+                        <div className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                      </motion.button>
+                    ) : !user && registrationOpen ? (
+                      <Link 
+                        href="/auth"
+                        className="w-full h-full border-2 border-white/20 bg-white/5 text-white text-center font-black text-sm uppercase tracking-[0.6em] transition-all hover:bg-white hover:text-black flex items-center justify-center italic"
+                      >
+                        SIGN IN TO REGISTER
+                      </Link>
+                    ) : isJoined ? (
+                      <Link 
+                        href={`/tournaments/${tournamentId}/lobby`}
+                        className="w-full h-full bg-white text-black text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary transition-all shadow-xl flex items-center justify-center italic"
+                      >
+                        ENTER TOURNAMENT
+                      </Link>
+                    ) : tournament.status === "ONGOING" ? (
+                      <Link 
+                        href={`/tournaments/${tournamentId}/bracket`}
+                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary hover:text-black transition-all shadow-[0_0_50px_rgba(82,185,70,0.15)] flex items-center justify-center italic"
+                      >
+                        SPECTATE
+                      </Link>
+                    ) : (
+                      <div className="w-full h-full border-2 border-component-border bg-component-background text-white/20 text-center font-black text-xs uppercase tracking-widest flex items-center justify-center">
+                        {tournament.status === "COMPLETED" ? "TOURNAMENT_FINISHED" : "REGISTRATION_CLOSED"}
+                      </div>
+                    )}
+                  </div>
+                  {(user as any)?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") && (
+                    <Link
+                      href={`/tournaments/${tournamentId}/manage`}
+                      className="h-12 w-full border border-primary/40 bg-primary/5 text-primary flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
                     >
-                      <span className="relative z-10">{joining ? "JOINING..." : "JOIN TOURNAMENT"}</span>
-                      <div className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    </motion.button>
-                  ) : isJoined ? (
-                    <Link 
-                      href={`/tournaments/${tournamentId}/lobby`}
-                      className="w-full h-full bg-white text-black text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary transition-all shadow-xl flex items-center justify-center italic"
-                    >
-                      GO TO TOURNAMENT
+                      MANAGE TOURNAMENT
                     </Link>
-                  ) : (
-                    <div className="w-full h-full border-2 border-component-border bg-component-background text-white/20 text-center font-black text-xs uppercase tracking-widest flex items-center justify-center">
-                      {tournament.status === "COMPLETED" ? "TOURNAMENT_FINISHED" : "REGISTRATION_CLOSED"}
-                    </div>
                   )}
                 </div>
 
@@ -250,6 +280,31 @@ function TournamentViewContent() {
                     { label: "Venue", value: tournament.venue || "Global Stadium" }
                   ]}
                 />
+
+                {/* Placement Points Module */}
+                {(() => {
+                  const cfg = (typeof tournament.format === 'object' ? tournament.format?.config : null) as any;
+                  if (!cfg) return null;
+                  const champion = cfg?.placementPointsChampion ?? 10;
+                  const second = cfg?.placementPoints2nd ?? 7;
+                  const third = cfg?.placementPoints3rd ?? 5;
+                  const topCut = cfg?.placementPointsTopCut ?? 3;
+                  const participation = cfg?.placementPointsParticipation ?? 1;
+                  const isHybrid = (typeof tournament.format === 'object' ? tournament.format?.system : null) === 'HYBRID';
+                  const rows = [
+                    { label: "Champion", value: `${champion} pts` },
+                    { label: "1st Runner-Up", value: `${second} pts` },
+                    { label: "2nd Runner-Up", value: `${third} pts` },
+                    ...(isHybrid ? [{ label: "Top Cut", value: `${topCut} pts` }] : []),
+                    { label: "Participation", value: `${participation} pts` },
+                  ];
+                  return (
+                    <ExpansionModule 
+                      label="Placement Points"
+                      data={rows}
+                    />
+                  );
+                })()}
               </div>
             </motion.div>
           )}

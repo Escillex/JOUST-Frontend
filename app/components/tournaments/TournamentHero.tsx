@@ -46,9 +46,9 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
             t.participants?.some(p => p.userId === userId)
         );
 
-        // 2. Available tournaments (OPEN/UPCOMING) that user is NOT in
+        // 2. Available tournaments (OPEN/UPCOMING/ONGOING) that user is NOT in
         const availableTournaments = tournaments.filter(t =>
-            (t.status === "OPEN" || t.status === "UPCOMING") &&
+            (t.status === "OPEN" || t.status === "UPCOMING" || t.status === "ONGOING") &&
             !t.participants?.some(p => p.userId === userId)
         );
 

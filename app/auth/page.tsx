@@ -18,6 +18,7 @@ export default function AuthPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [showSignupSuccess, setShowSignupSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,13 +37,21 @@ export default function AuthPage() {
       const data = await safeJson(response);
 
       if (response.ok) {
-        setMessage(`Success: ${mode === "login" ? "Signed in" : "Signed up"}`);
-        if (data?.token) {
-          localStorage.setItem("token", data.token);
-          // Update global auth state before redirecting
-          await refreshUser();
+        if (mode === "login") {
+          setMessage("Success: Signed in");
+          if (data?.token) {
+            localStorage.setItem("token", data.token);
+            await refreshUser();
+          }
+          setTimeout(() => router.push("/home"), 800);
+        } else {
+          setShowSignupSuccess(true);
+          setTimeout(() => {
+            setShowSignupSuccess(false);
+            setMode("login");
+            setMessage("");
+          }, 4000);
         }
-        setTimeout(() => router.push("/home"), 800);
       } else {
         setMessage(`Error: ${data?.message || "Authentication failed"}`);
       }
@@ -79,76 +88,104 @@ export default function AuthPage() {
         />
       </div>
 
-      <main className="flex-grow flex items-center justify-center p-6 z-10 my-12">
-        <StaggerContainer className="w-full max-w-[440px] relative">
+      <main className="min-h-screen flex items-center justify-center p-6 z-10 py-12">
+        <StaggerContainer className="w-full max-w-[540px] relative">
           {/* Structural Ghost Frame */}
           <div className="absolute inset-0 border-4 border-white/5 translate-x-3 translate-y-3 -z-10" />
 
           <FadeIn>
-            <div className="bg-component-background border-4 border-white p-8 md:p-10 relative shadow-[16px_16px_0px_0px_rgba(82,185,70,0.1)] overflow-hidden">
-              {/* Header - Compact */}
-              <div className="flex justify-center mb-10">
-                <Image
-                  src="/hpluslogo.png"
-                  alt="Logo"
-                  width={160}
-                  height={60}
-                  className="w-36 md:w-44 brightness-125"
-                  priority
-                />
-              </div>
+            <div className="bg-component-background border-4 border-white p-8 md:p-10 relative shadow-[16px_16px_0px_0px_rgba(82,185,70,0.1)] overflow-hidden min-h-[500px] flex flex-col justify-center">
+              {showSignupSuccess ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center justify-center text-center space-y-8"
+                >
+                  <div className="w-20 h-20 border-4 border-white/10 border-t-primary rounded-full animate-spin" />
+                  <div className="space-y-4">
+                    <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-[0.2em]">Registration<br/>Successful</h2>
+                    <p className="text-xs md:text-sm text-white/50 uppercase tracking-widest leading-relaxed">
+                      Please hold while we sync your clearance.<br/>
+                      You will be redirected to sign in momentarily.
+                    </p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => { setShowSignupSuccess(false); setMode("login"); setMessage(""); }} 
+                    className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary hover:text-white transition-colors underline"
+                  >
+                    Click here if you aren't redirected automatically
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="w-full"
+                >
+                  {/* Header - Compact */}
+                  <div className="flex justify-center mb-10">
+                    <Image
+                      src="/hpluslogo.png"
+                      alt="Logo"
+                      width={180}
+                      height={70}
+                      className="w-40 md:w-52 brightness-125"
+                      priority
+                    />
+                  </div>
 
-              {/* Mode Switcher - Compact */}
-              <div className="flex mb-10 border-b-4 border-component-border">
-                <button
-                  onClick={() => setMode("login")}
-                  className={`flex-1 py-3 font-black text-xs uppercase tracking-[0.3em] transition-all relative ${
-                    mode === "login" ? "text-primary" : "text-white/20 hover:text-white"
-                  }`}
-                >
-                  SIGN_IN
-                  {mode === "login" && (
-                    <motion.div layoutId="authUnderline" className="absolute bottom-[-4px] left-0 w-full h-1 bg-primary" />
-                  )}
-                </button>
-                <button
-                  onClick={() => setMode("signup")}
-                  className={`flex-1 py-3 font-black text-xs uppercase tracking-[0.3em] transition-all relative ${
-                    mode === "signup" ? "text-primary" : "text-white/20 hover:text-white"
-                  }`}
-                >
-                  SIGN_UP
-                  {mode === "signup" && (
-                    <motion.div layoutId="authUnderline" className="absolute bottom-[-4px] left-0 w-full h-1 bg-primary" />
-                  )}
-                </button>
-              </div>
+                  {/* Mode Switcher - Compact */}
+                  <div className="flex mb-10 border-b-4 border-component-border">
+                    <button
+                      onClick={() => setMode("login")}
+                      className={`flex-1 py-3 font-black text-sm uppercase tracking-[0.3em] transition-all relative ${
+                        mode === "login" ? "text-primary" : "text-white/20 hover:text-white"
+                      }`}
+                    >
+                      Sign In
+                      {mode === "login" && (
+                        <motion.div layoutId="authUnderline" className="absolute bottom-[-4px] left-0 w-full h-1 bg-primary" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setMode("signup")}
+                      className={`flex-1 py-3 font-black text-sm uppercase tracking-[0.3em] transition-all relative ${
+                        mode === "signup" ? "text-primary" : "text-white/20 hover:text-white"
+                      }`}
+                    >
+                      Sign Up
+                      {mode === "signup" && (
+                        <motion.div layoutId="authUnderline" className="absolute bottom-[-4px] left-0 w-full h-1 bg-primary" />
+                      )}
+                    </button>
+                  </div>
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="relative">
-                  <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[9px] font-black text-primary uppercase tracking-widest z-20">
-                    IDENTIFIER
+                  <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                    Email or Username
                   </span>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="USERNAME_OR_EMAIL"
-                    className="w-full h-14 bg-transparent border-4 border-white px-6 text-sm text-white placeholder:text-white/5 focus:outline-none focus:border-primary transition-all font-poppins"
+                    placeholder="Enter your email or username"
+                    className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
                     required
                   />
                 </div>
 
                 <div className="relative">
-                  <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[9px] font-black text-primary uppercase tracking-widest z-20">
-                    PASSWORD
+                  <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                    Password
                   </span>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full h-14 bg-transparent border-4 border-white px-6 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                    className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
                     required
                   />
                 </div>
@@ -159,20 +196,31 @@ export default function AuthPage() {
                       key="message"
                       initial={{ opacity: 0, x: -5 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className={`p-4 text-[9px] font-black uppercase tracking-widest border-l-4 ${
+                      className={`p-4 text-[10px] font-black uppercase tracking-widest border-l-4 ${
                         message.startsWith("Error") 
                           ? "border-red-500 bg-red-500/5 text-red-500" 
                           : "border-primary bg-primary/5 text-primary"
                       }`}
                     >
                       {message}
+                      {message.includes("successfully signed up") && (
+                        <div className="mt-2">
+                          <button 
+                            type="button" 
+                            onClick={() => { setMode("login"); setMessage(""); }} 
+                            className="underline text-white/50 hover:text-primary transition-colors cursor-pointer capitalize"
+                          >
+                            (Click this link if you aren't redirected)
+                          </button>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <button
                   type="submit"
-                  className="w-full h-16 bg-primary text-black font-black text-sm uppercase tracking-widest flex items-center justify-between px-8 hover:translate-x-1 transition-transform duration-300"
+                  className="w-full h-16 bg-primary text-black font-black text-base uppercase tracking-widest flex items-center justify-between px-8 hover:translate-x-1 transition-transform duration-300"
                 >
                   <span>{mode === "login" ? "Sign In" : "Sign Up"}</span>
                   <span>→</span>
@@ -187,6 +235,8 @@ export default function AuthPage() {
                   ← BACK TO HOME
                 </Link>
               </div>
+            </motion.div>
+            )}
             </div>
           </FadeIn>
         </StaggerContainer>

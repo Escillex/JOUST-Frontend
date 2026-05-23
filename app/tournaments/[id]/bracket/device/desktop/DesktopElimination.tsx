@@ -47,16 +47,16 @@ export default function DesktopElimination({
             {/* Header / Tracker Controls */}
             <div className="px-12 py-6 bg-[#1B1B1B]/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-6">
-                    <h2 className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Tactical Bracket</h2>
+                    <h2 className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Tournament Bracket</h2>
                     <div className="h-4 w-px bg-white/10" />
                     <select
                         value={trackedUserId || ""}
                         onChange={(e) => {
                             const id = e.target.value || null;
                             setTrackedUserId(id);
-                            if (id) {
+                             if (id) {
                                 const u = leaderboard.find(user => user.userId === id);
-                                addLog("TELEMETRY", `TRACKING UNIT: ${u?.username?.toUpperCase()}`);
+                                addLog("SYSTEM", `TRACKING USER: ${u?.username?.toUpperCase()}`);
                             }
                         }}
                         className="bg-transparent text-white/40 hover:text-primary text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer transition-all"
@@ -93,7 +93,7 @@ export default function DesktopElimination({
                                 <div className="h-px w-full bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
                             </div>
                             <div className="flex flex-col gap-8">
-                                {round.matches.map((match: Match) => (
+                                {[...round.matches].sort((a, b) => a.id.localeCompare(b.id)).map((match: Match) => (
                                     <motion.div
                                         key={match.id}
                                         whileHover={{ scale: 1.02 }}
@@ -121,7 +121,7 @@ export default function DesktopElimination({
                                 <div className="h-px w-full bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
                             </div>
                             <div className="flex flex-col gap-8">
-                                {round.matches.map((match: Match) => (
+                                {[...round.matches].sort((a, b) => a.id.localeCompare(b.id)).map((match: Match) => (
                                     <motion.div
                                         key={match.id}
                                         whileHover={{ scale: 1.02 }}
@@ -149,7 +149,7 @@ export default function DesktopElimination({
                                 <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                             </div>
                             <div className="flex flex-col gap-8">
-                                {round.matches.map((match: Match) => (
+                                {[...round.matches].sort((a, b) => a.id.localeCompare(b.id)).map((match: Match) => (
                                     <motion.div
                                         key={match.id}
                                         whileHover={{ scale: 1.02 }}

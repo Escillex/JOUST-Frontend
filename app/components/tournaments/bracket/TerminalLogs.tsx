@@ -18,7 +18,7 @@ export default function TerminalLogs({ logs, onMaximize }: Props) {
       </div>
       <div className="bg-background rounded-2xl p-6 h-64 overflow-y-auto no-scrollbar font-mono text-[11px] border border-foreground/5">
         {logs.length === 0 ? (
-          <p className="text-foreground/10 uppercase font-black tracking-widest">NO TELEMETRY RECEIVED</p>
+          <p className="text-foreground/10 uppercase font-black tracking-widest">NO LOGS RECEIVED</p>
         ) : (
           <div className="space-y-4">
             {logs.map(log => (

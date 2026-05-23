@@ -27,16 +27,21 @@ export default function PresetManager() {
   const [gameName, setGameName] = useState("");
 
   // Config fields
-  const [winsToAdvance, setWinsToAdvance] = useState(1);
   const [bestOf, setBestOf] = useState(1);
   const [allowDraw, setAllowDraw] = useState(false);
   const [swissRounds, setSwissRounds] = useState(3);
   const [swissPointsWin, setSwissPointsWin] = useState(3);
   const [swissPointsDraw, setSwissPointsDraw] = useState(1);
   const [swissPointsLoss, setSwissPointsLoss] = useState(0);
-  const [sessionsCount, setSessionsCount] = useState(1);
-  const [pointsPerSession, setPointsPerSession] = useState(0);
   const [pointsThreshold, setPointsThreshold] = useState(0);
+  const [startingHp, setStartingHp] = useState(0);
+
+  // Placement points
+  const [placementChampion, setPlacementChampion] = useState(10);
+  const [placement2nd, setPlacement2nd] = useState(7);
+  const [placement3rd, setPlacement3rd] = useState(5);
+  const [placementTopCut, setPlacementTopCut] = useState(3);
+  const [placementParticipation, setPlacementParticipation] = useState(1);
 
   useEffect(() => {
     fetchTemplates();
@@ -61,16 +66,19 @@ export default function PresetManager() {
     if (!name) return setError("Name is required");
     
     const config = {
-      winsToAdvance,
       bestOf,
       allowDraw,
       swissRounds: system === "SWISS" ? swissRounds : null,
       swissPointsForWin: swissPointsWin,
       swissPointsForDraw: swissPointsDraw,
       swissPointsForLoss: swissPointsLoss,
-      sessionsCount,
-      pointsPerSession,
       pointsThreshold,
+      startingHp,
+      placementPointsChampion: placementChampion,
+      placementPoints2nd: placement2nd,
+      placementPoints3rd: placement3rd,
+      placementPointsTopCut: placementTopCut,
+      placementPointsParticipation: placementParticipation,
     };
 
     try {
@@ -101,11 +109,17 @@ export default function PresetManager() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Decommission this preset?")) return;
+    setError("");
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(id), {
         method: "DELETE"
       });
-      if (res.ok) fetchTemplates();
+      if (res.ok) {
+        fetchTemplates();
+      } else {
+        const data = await safeJson(res);
+        setError(data?.message || "Failed to decommission preset");
+      }
     } catch (err) {
       setError("Failed to decommission preset");
     }
@@ -116,13 +130,20 @@ export default function PresetManager() {
     setDescription("");
     setSystem("SINGLE_ELIMINATION");
     setGameName("");
-    setWinsToAdvance(1);
     setBestOf(1);
     setAllowDraw(false);
+    setPointsThreshold(0);
+    setStartingHp(0);
+    setPlacementChampion(10);
+    setPlacement2nd(7);
+    setPlacement3rd(5);
+    setPlacementTopCut(3);
+    setPlacementParticipation(1);
     setError("");
   };
 
   const labelCls = "text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block";
+  const deeperLabelCls = "text-[10px] font-black text-white/20 uppercase tracking-widest mb-1 block";
   const inputCls = "w-full bg-[#1B1B1B] border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary transition-all cursor-pointer hover:bg-white/[0.02]";
 
   return (
@@ -175,41 +196,117 @@ export default function PresetManager() {
           </div>
 
           <div className={`space-y-8 transition-all duration-700 ${system === "HYBRID" ? "opacity-20 grayscale blur-sm pointer-events-none" : "opacity-100"}`}>
-            <div className="grid grid-cols-3 gap-12 pt-4 border-t border-white/5">
+            <div className="grid grid-cols-2 gap-12 pt-4 border-t border-white/5">
               <div className="space-y-4">
-                <div className="text-[9px] font-black text-white/10 uppercase tracking-widest border-b border-white/5 pb-2">Structure</div>
+                <div className="text-[9px] font-black text-white/[0.08] uppercase tracking-widest border-b border-white/5 pb-2">Structure</div>
                 <div>
-                  <label className={labelCls}>Best of X</label>
-                  <input type="number" value={bestOf} onChange={e => setBestOf(Number(e.target.value))} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Wins to Advance</label>
-                  <input type="number" value={winsToAdvance} onChange={e => setWinsToAdvance(Number(e.target.value))} className={inputCls} />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="text-[9px] font-black text-white/10 uppercase tracking-widest border-b border-white/5 pb-2">Scoring</div>
-                <div>
-                  <label className={labelCls}>Sessions</label>
-                  <input type="number" value={sessionsCount} onChange={e => setSessionsCount(Number(e.target.value))} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Points/Session</label>
-                  <input type="number" value={pointsPerSession} onChange={e => setPointsPerSession(Number(e.target.value))} className={inputCls} />
+                  <label className={deeperLabelCls}>Best Of</label>
+                  <input 
+                    type="number" 
+                    value={bestOf} 
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      if (val < 1) {
+                        setBestOf(1);
+                      } else if (val % 2 === 0) {
+                        setBestOf(val + 1);
+                      } else {
+                        setBestOf(val);
+                      }
+                    }} 
+                    min={1}
+                    step={2}
+                    className={inputCls} 
+                  />
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="text-[9px] font-black text-white/10 uppercase tracking-widest border-b border-white/5 pb-2">Advanced</div>
-                <div>
-                  <label className={labelCls}>Points Threshold</label>
-                  <input type="number" value={pointsThreshold} onChange={e => setPointsThreshold(Number(e.target.value))} className={inputCls} />
+                <div className="flex items-center space-x-2 pt-2">
+                  <input 
+                    type="checkbox" 
+                    id="enableThreshold" 
+                    checked={pointsThreshold > 0} 
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setPointsThreshold(1);
+                      } else {
+                        setPointsThreshold(0);
+                      }
+                    }} 
+                    className="mr-2 cursor-pointer accent-primary" 
+                  />
+                  <label htmlFor="enableThreshold" className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none">Points Threshold</label>
                 </div>
-                <div className="flex items-center pt-6">
-                  <input type="checkbox" id="allowDraw" checked={allowDraw} onChange={e => setAllowDraw(e.target.checked)} className="mr-2" />
-                  <label htmlFor="allowDraw" className="text-[10px] font-black text-white/60 uppercase tracking-widest">Allow Draws</label>
+                {pointsThreshold > 0 && (
+                  <div className="animate-in slide-in-from-top-1 duration-300">
+                    <input 
+                      type="number" 
+                      value={pointsThreshold} 
+                      onChange={e => setPointsThreshold(Math.max(1, Number(e.target.value)))} 
+                      min={1}
+                      className={inputCls} 
+                    />
+                  </div>
+                )}
+                <div className="flex items-center space-x-2 pt-2">
+                  <input 
+                    type="checkbox" 
+                    id="enableHpSystem" 
+                    checked={startingHp > 0} 
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setStartingHp(100);
+                      } else {
+                        setStartingHp(0);
+                      }
+                    }} 
+                    className="mr-2 cursor-pointer accent-primary" 
+                  />
+                  <label htmlFor="enableHpSystem" className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none">HP-Based Match</label>
                 </div>
+                {startingHp > 0 && (
+                  <div className="animate-in slide-in-from-top-1 duration-300">
+                    <input 
+                      type="number" 
+                      value={startingHp} 
+                      onChange={e => setStartingHp(Math.max(1, Number(e.target.value)))} 
+                      min={1}
+                      className={inputCls} 
+                    />
+                  </div>
+                )}
+
+                 {(system === "SWISS" || system === "ROUND_ROBIN") && (
+                  <div className="space-y-1.5 pt-2">
+                    <label className={deeperLabelCls}>Allow Draws</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAllowDraw(false)}
+                        className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                          !allowDraw
+                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
+                            : "bg-[#1B1B1B] border-white/10 text-white/40 hover:text-white"
+                        }`}
+                      >
+                        Force Win
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAllowDraw(true)}
+                        className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                          allowDraw
+                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
+                            : "bg-[#1B1B1B] border-white/10 text-white/40 hover:text-white"
+                        }`}
+                      >
+                        Permit Draws
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -220,19 +317,43 @@ export default function PresetManager() {
                   <input type="number" value={swissRounds} onChange={e => setSwissRounds(Number(e.target.value))} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Pts/Win</label>
+                  <label className={labelCls}>Points Per Win</label>
                   <input type="number" value={swissPointsWin} onChange={e => setSwissPointsWin(Number(e.target.value))} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Pts/Draw</label>
+                  <label className={labelCls}>Points Per Draw</label>
                   <input type="number" value={swissPointsDraw} onChange={e => setSwissPointsDraw(Number(e.target.value))} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Pts/Loss</label>
+                  <label className={labelCls}>Points Per Loss</label>
                   <input type="number" value={swissPointsLoss} onChange={e => setSwissPointsLoss(Number(e.target.value))} className={inputCls} />
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Placement Points */}
+          <div className="grid grid-cols-5 gap-4 pt-6 border-t border-white/5">
+            <div>
+              <label className={labelCls}>Champion</label>
+              <input type="number" value={placementChampion} onChange={e => setPlacementChampion(Number(e.target.value))} min={0} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>1st Runner-Up</label>
+              <input type="number" value={placement2nd} onChange={e => setPlacement2nd(Number(e.target.value))} min={0} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>2nd Runner-Up</label>
+              <input type="number" value={placement3rd} onChange={e => setPlacement3rd(Number(e.target.value))} min={0} className={inputCls} />
+            </div>
+            <div className={`${system !== 'HYBRID' ? 'opacity-30 pointer-events-none' : ''}`}>
+              <label className={labelCls}>Top Cut</label>
+              <input type="number" value={placementTopCut} onChange={e => setPlacementTopCut(Number(e.target.value))} min={0} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Participation</label>
+              <input type="number" value={placementParticipation} onChange={e => setPlacementParticipation(Number(e.target.value))} min={0} className={inputCls} />
+            </div>
           </div>
 
           <button 
@@ -254,15 +375,15 @@ export default function PresetManager() {
         {templates.map(tpl => (
           <div key={tpl.id} className="bg-[#1B1B1B] border border-white/5 p-6 group hover:border-white/20 transition-all flex flex-col justify-between min-h-[160px] relative overflow-hidden">
              {/* Diagonal accent */}
-             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 -rotate-45 translate-x-12 -translate-y-12" />
+             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 -rotate-45 translate-x-12 -translate-y-12 pointer-events-none" />
              
-             <div>
+             <div className="relative z-10">
                <div className="flex items-start justify-between mb-4">
                  <div>
                    <h4 className="text-xs font-black text-white uppercase tracking-widest">{tpl.name}</h4>
                    <span className="text-[8px] font-black text-primary/60 uppercase tracking-[0.2em]">{tpl.system.replace(/_/g, " ")}</span>
                  </div>
-                 <button onClick={() => handleDelete(tpl.id)} className="text-[10px] text-white/20 hover:text-red-500 transition-colors">✕</button>
+                  <button onClick={() => handleDelete(tpl.id)} className="text-[10px] text-white/40 hover:text-red-500 transition-colors relative z-20 p-2 -m-2">✕</button>
                </div>
                
                <p className="text-[9px] text-white/40 leading-relaxed italic mb-4 line-clamp-2">
@@ -276,8 +397,8 @@ export default function PresetManager() {
                     <span className="text-[8px] font-bold text-primary">{tpl.gameName || "GENERAL"}</span>
                   </div>
                  <div className="flex flex-col text-right">
-                   <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">BoX</span>
-                   <span className="text-[8px] font-bold text-white/60">Best of {tpl.config?.bestOf || 1}</span>
+                   <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Best Of</span>
+                   <span className="text-[8px] font-bold text-white/60">{tpl.config?.bestOf || 1} wins</span>
                  </div>
                </div>
           </div>

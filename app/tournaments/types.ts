@@ -1,4 +1,20 @@
 export type TournamentFormat = "SINGLE_ELIMINATION" | "DOUBLE_ELIMINATION" | "SWISS" | "ROUND_ROBIN" | "HYBRID";
+export type GameTrackingMode = 'HP' | 'POINTS';
+
+export interface MatchGameLog {
+  id: string;
+  matchId: string;
+  gameNumber: number;
+  mode: GameTrackingMode;
+  startingValue: number;
+  player1Value: number;
+  player2Value: number;
+  trackerActive: boolean;
+  winnerId: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 export type TournamentStatus = "UPCOMING" | "PENDING" | "OPEN" | "ONGOING" | "COMPLETED";
 
 export interface TournamentFormatModel {
@@ -14,6 +30,7 @@ export interface TournamentFormatModel {
 export interface Tournament {
   id: string;
   name: string;
+  description?: string | null;
   maxPlayers: number;
   prizePool: number | null;
   entranceFee: number | null;
@@ -43,18 +60,40 @@ export interface Tournament {
     };
   }[];
   rounds?: {
+    roundNumber: number;
     matches: {
-      winner?: {
-        username: string;
+      id: string;
+      player1Id?: string | null;
+      player2Id?: string | null;
+      player1?: {
+        id: string;
+        username?: string;
+        guestName?: string;
         isGuest?: boolean;
-      };
+      } | null;
+      player2?: {
+        id: string;
+        username?: string;
+        guestName?: string;
+        isGuest?: boolean;
+      } | null;
+      winnerId?: string | null;
+      winner?: {
+        id: string;
+        username?: string;
+        guestName?: string;
+        isGuest?: boolean;
+      } | null;
+      status: string;
+      isBye: boolean;
+      nextMatchId?: string | null;
+      loserNextMatchId?: string | null;
     }[];
   }[];
   formatConfig?: FormatConfig;
   // Fields for UI
   bannerUrl?: string | null;
   color?: string;
-  description?: string;
 }
 
 export interface FormatConfig {
@@ -64,12 +103,21 @@ export interface FormatConfig {
   swissPointsForDraw?: number;
   swissPointsForLoss?: number;
   pointsThreshold?: number;
-  sessionsCount?: number;
-  pointsPerSession?: number;
   bestOf?: number;
   allowDraw?: boolean;
   tieBreakerOrder?: string[];
   progressionType?: string;
+  // In-game tracker config
+  useTracker?: boolean;
+  trackingMode?: GameTrackingMode;
+  defaultStartingValue?: number | null;
+  startingHp?: number;
+  // Placement-based global points awarded at tournament completion
+  placementPointsChampion?: number;
+  placementPoints2nd?: number;
+  placementPoints3rd?: number;
+  placementPointsTopCut?: number;       // only relevant for HYBRID
+  placementPointsParticipation?: number;
 }
 
 export interface FormatDefinition {
