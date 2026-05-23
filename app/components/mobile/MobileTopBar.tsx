@@ -20,7 +20,7 @@ export default function MobileTopBar() {
             alt="Hobby+" 
             width={100} 
             height={32} 
-            className="w-24 h-8 object-contain"
+            className="object-contain"
             priority
           />
         </Link>

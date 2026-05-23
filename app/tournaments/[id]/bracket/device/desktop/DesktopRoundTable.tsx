@@ -34,6 +34,15 @@ export default function DesktopRoundTable({
     const [activeRound, setActiveRound] = useState<number>(initialRound);
     const [searchQuery, setSearchQuery] = useState("");
     const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
+    
+    const isDoubleElim = tournament?.format?.system === "DOUBLE_ELIMINATION";
+    const [bracketView, setBracketView] = useState<"WINNERS" | "LOSERS">("WINNERS");
+
+    const displayedRounds = React.useMemo(() => {
+        if (!isDoubleElim) return sortedRounds;
+        if (bracketView === "WINNERS") return sortedRounds.filter(r => r.roundNumber < 101 || r.roundNumber >= 200);
+        return sortedRounds.filter(r => r.roundNumber >= 101 && r.roundNumber < 200);
+    }, [sortedRounds, isDoubleElim, bracketView]);
 
     const currentRound: Round | undefined = sortedRounds.find(r => r.roundNumber === activeRound);
 
@@ -80,7 +89,33 @@ export default function DesktopRoundTable({
         <div className="h-full flex flex-col bg-neutral-950/20">
             {/* Phase Tabs - Floating at top */}
             <div className="flex gap-px overflow-x-auto no-scrollbar bg-white/5 border-b border-white/5">
-                {sortedRounds.map((round) => (
+                {isDoubleElim && (
+                    <div className="flex items-center px-4 border-r border-white/5 bg-black/20 shrink-0">
+                        <div className="flex items-center border border-white/10 rounded-lg p-0.5">
+                            <button
+                                onClick={() => {
+                                    setBracketView("WINNERS");
+                                    const first = sortedRounds.find(r => r.roundNumber < 101 || r.roundNumber >= 200);
+                                    if (first && bracketView !== "WINNERS") setActiveRound(first.roundNumber);
+                                }}
+                                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${bracketView === 'WINNERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            >
+                                WINNERS
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setBracketView("LOSERS");
+                                    const first = sortedRounds.find(r => r.roundNumber >= 101 && r.roundNumber < 200);
+                                    if (first && bracketView !== "LOSERS") setActiveRound(first.roundNumber);
+                                }}
+                                className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${bracketView === 'LOSERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            >
+                                LOSERS
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {displayedRounds.map((round) => (
                     <button
                         key={round.id}
                         onClick={() => {

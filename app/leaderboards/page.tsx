@@ -5,6 +5,7 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 import HomeFrame from "../components/HomeFrame";
 import UserRankCard from "../components/leaderboard/UserRankCard";
 import LeaderboardTable from "../components/leaderboard/LeaderboardTable";
+import MobileLeaderboard from "../components/leaderboard/MobileLeaderboard";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";
 
 interface GlobalLeaderboardEntry {
@@ -102,7 +103,16 @@ export default function LeaderboardsPage() {
                 <p className="text-white/20 text-xl font-black uppercase tracking-[0.3em]">NO RANKINGS FOUND</p>
               </div>
             ) : (
-              <LeaderboardTable entries={leaderboard} />
+              <>
+                {/* Mobile — compact card list */}
+                <div className="md:hidden">
+                  <MobileLeaderboard entries={leaderboard} loading={loading} />
+                </div>
+                {/* Desktop — full table */}
+                <div className="hidden md:block">
+                  <LeaderboardTable entries={leaderboard} />
+                </div>
+              </>
             )}
           </div>
         </FadeIn>

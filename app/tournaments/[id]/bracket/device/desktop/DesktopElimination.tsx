@@ -32,7 +32,7 @@ export default function DesktopElimination({
     const getRoundLabel = (round: Round) => {
         const num = round.roundNumber;
         if (num >= 200) return "Grand Finals";
-        if (num >= 100) return `Losers Round ${num - 100}`;
+        if (num >= 100) return `Round ${num - 100}`;
         if (num === 1) return "Round 1";
         if (num === 2) return "Quarter-Finals";
         if (num === 3) return "Semi-Finals";
@@ -198,9 +198,7 @@ export default function DesktopElimination({
                                 </p>
                             </div>
 
-                            {/* Decorative Tech Elements */}
-                            <div className="absolute top-4 left-4 text-[8px] font-black text-white/10 uppercase tracking-widest">ID: 0xCHAMP</div>
-                            <div className="absolute bottom-4 right-4 text-[8px] font-black text-white/10 uppercase tracking-widest">SECURED: {isCompleted ? 'YES' : 'NO'}</div>
+
                         </div>
                     </div>
                 </div>

@@ -128,18 +128,24 @@ function FlowControls({ focusedMatchId, nodes }: { focusedMatchId: string | null
     const { setCenter, fitView } = useReactFlow();
 
     useEffect(() => {
-        if (!focusedMatchId) {
-            fitView({ padding: 0.1, duration: 800 });
-            return;
-        }
-        
-        const targetNode = nodes.find(n => n.id === focusedMatchId);
-        
-        if (targetNode) {
-            // Offset to roughly center the match card
-            setCenter(targetNode.position.x + 160, targetNode.position.y + 60, { zoom: 1, duration: 800 });
-        }
-    }, [focusedMatchId, nodes, setCenter, fitView]);
+        // Delay viewport manipulation slightly to allow React Flow to measure DOM nodes.
+        // Without this, completed tournaments (which don't poll/re-render) will fitView on 0x0 nodes and turn blank.
+        const timer = setTimeout(() => {
+            if (!focusedMatchId) {
+                fitView({ padding: 0.1, duration: 800 });
+                return;
+            }
+            
+            const targetNode = nodes.find(n => n.id === focusedMatchId);
+            
+            if (targetNode) {
+                // Offset to roughly center the match card
+                setCenter(targetNode.position.x + 160, targetNode.position.y + 60, { zoom: 1, duration: 800 });
+            }
+        }, 50);
+
+        return () => clearTimeout(timer);
+    }, [focusedMatchId, nodes, fitView, setCenter]);
 
     return (
         <Panel position="bottom-left" className="z-50 m-6">
@@ -278,6 +284,23 @@ export default function EliminationLayout({
         return (p1Y + p2Y) / 2;
     }, []);
 
+    const getLosersMatchY = useCallback((rIdx: number, matchIdx: number): number => {
+        if (rIdx === 0) return matchIdx * BASE_MATCH_GAP;
+        const currentRound = losersRounds[rIdx];
+        const prevRound = losersRounds[rIdx - 1];
+        if (!currentRound || !prevRound) return matchIdx * BASE_MATCH_GAP;
+
+        if (currentRound.matches.length === prevRound.matches.length) {
+            // 1-to-1 linkage: Y is identical to the previous round's corresponding match
+            return getLosersMatchY(rIdx - 1, matchIdx);
+        } else {
+            // 2-to-1 linkage: Y is the average of the two incoming matches
+            const p1Y = getLosersMatchY(rIdx - 1, matchIdx * 2);
+            const p2Y = getLosersMatchY(rIdx - 1, matchIdx * 2 + 1);
+            return (p1Y + p2Y) / 2;
+        }
+    }, [losersRounds]);
+
     const { nodes, edges } = useMemo(() => {
         const nodes: FlowNode[] = [];
         const edges: Edge[] = [];
@@ -301,8 +324,8 @@ export default function EliminationLayout({
                 draggable: false, selectable: false
             });
 
-            // Sort by match.id for stable, never-changing card positions
-            const sortedMatches = [...round.matches].sort((a: Match, b: Match) => a.id.localeCompare(b.id));
+            // Sort by matchIndex for stable, correct vertical positions
+            const sortedMatches = [...round.matches].sort((a: Match, b: Match) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0));
             sortedMatches.forEach((match: Match, mIdx: number) => {
                 const y = getMatchY(rIdx, mIdx);
                 nodes.push({
@@ -325,8 +348,8 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         type: 'step',
                         style: isEdgeTracked 
-                            ? { stroke: '#52B946', strokeWidth: 3, filter: 'drop-shadow(0px 0px 4px rgba(82, 185, 70, 0.8))', zIndex: 10 } 
-                            : { stroke: 'rgba(82, 185, 70, 0.2)', strokeWidth: 2 }
+                            ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 } 
+                            : { stroke: 'rgba(82, 185, 70, 0.35)', strokeWidth: 1.5 }
                     });
                 }
             });
@@ -335,19 +358,20 @@ export default function EliminationLayout({
         // 2. Losers Bracket (Rendered below Winners)
         const losersVerticalOffset = (winnersRounds[0]?.matches?.length || 4) * BASE_MATCH_GAP + 400;
         losersRounds.forEach((round: Round, rIdx: number) => {
-            const losersRoundLabel = round.roundNumber >= 101 ? `LOSERS ROUND ${round.roundNumber - 100}` : `LOSERS ROUND ${rIdx + 1}`;
+            const losersRoundNum = round.roundNumber >= 101 ? round.roundNumber - 100 : rIdx + 1;
+            const losersRoundLabel = `ROUND ${losersRoundNum}`;
             nodes.push({
                 id: `header-round-${round.roundNumber}`,
                 type: 'header',
                 position: { x: rIdx * COLUMN_WIDTH, y: losersVerticalOffset - 100 },
-                data: { label: losersRoundLabel, sublabel: 'LOSERS BRACKET' },
+                data: { label: losersRoundLabel, sublabel: 'LOSERS' },
                 draggable: false, selectable: false
             });
 
-            // Sort by match.id for stable, never-changing card positions
-            const sortedLosersMatches = [...round.matches].sort((a: Match, b: Match) => a.id.localeCompare(b.id));
+            // Sort by matchIndex for stable, correct vertical positions
+            const sortedLosersMatches = [...round.matches].sort((a: Match, b: Match) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0));
             sortedLosersMatches.forEach((match: Match, mIdx: number) => {
-                const y = losersVerticalOffset + (mIdx * BASE_MATCH_GAP);
+                const y = losersVerticalOffset + getLosersMatchY(rIdx, mIdx);
                 nodes.push({
                     id: match.id,
                     type: 'match',
@@ -368,8 +392,8 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         type: 'step',
                         style: isEdgeTracked 
-                            ? { stroke: '#f59e0b', strokeWidth: 3, filter: 'drop-shadow(0px 0px 4px rgba(245, 158, 11, 0.8))', zIndex: 10 } 
-                            : { stroke: 'rgba(245, 158, 11, 0.2)', strokeWidth: 2 }
+                            ? { stroke: '#f59e0b', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(245, 158, 11, 0.6))', zIndex: 10 } 
+                            : { stroke: 'rgba(245, 158, 11, 0.4)', strokeWidth: 1.5 }
                     });
                 }
             });
@@ -409,8 +433,8 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         type: 'step',
                         style: isEdgeTracked 
-                            ? { stroke: '#ffffff', strokeWidth: 3, filter: 'drop-shadow(0px 0px 4px rgba(255, 255, 255, 0.8))', zIndex: 10 } 
-                            : { stroke: 'rgba(255, 255, 255, 0.4)', strokeWidth: 3 }
+                            ? { stroke: '#ffffff', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.6))', zIndex: 10 } 
+                            : { stroke: 'rgba(255, 255, 255, 0.3)', strokeWidth: 1.5 }
                     });
                 }
             });
@@ -454,8 +478,8 @@ export default function EliminationLayout({
                     target: 'champion-pedestal',
                     type: 'step',
                     style: isFinalEdgeTracked
-                        ? { stroke: '#52B946', strokeWidth: 4, strokeDasharray: '5 5', filter: 'drop-shadow(0px 0px 6px rgba(82, 185, 70, 0.9))', zIndex: 10 }
-                        : { stroke: 'rgba(82, 185, 70, 0.5)', strokeWidth: 4, strokeDasharray: '5 5' }
+                        ? { stroke: '#52B946', strokeWidth: 2.5, strokeDasharray: '6 4', filter: 'drop-shadow(0px 0px 5px rgba(82, 185, 70, 0.8))', zIndex: 10 }
+                        : { stroke: 'rgba(82, 185, 70, 0.45)', strokeWidth: 2, strokeDasharray: '6 4' }
                 });
             }
         }
@@ -468,7 +492,7 @@ export default function EliminationLayout({
         });
 
         return { nodes, edges: sortedEdges };
-    }, [winnersRounds, losersRounds, grandFinals, isAdmin, updating, leaderboard, trackedUserId, focusedMatchId, onOpenScoring, getMatchY, tournament?.winner]);
+    }, [winnersRounds, losersRounds, grandFinals, isAdmin, updating, leaderboard, trackedUserId, focusedMatchId, onOpenScoring, getMatchY, getLosersMatchY, tournament?.winner]);
 
     return (
         <div className="flex flex-col h-full bg-[#0a0a0a]">
@@ -477,7 +501,7 @@ export default function EliminationLayout({
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                          <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#52b946]" />
-                         <span className="text-[11px] font-bold text-white uppercase tracking-wider">Tournament Tree (React Flow Engine)</span>
+                         <span className="text-[11px] font-bold text-white uppercase tracking-wider">Tournament Tree (React Flow Engine) - NODES: {nodes.length}</span>
                     </div>
                     <div className="relative">
                         <select 

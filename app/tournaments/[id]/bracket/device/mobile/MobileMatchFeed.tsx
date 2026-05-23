@@ -39,10 +39,19 @@ export default function MobileMatchFeed({
         const num = round.roundNumber;
         const fs = tournament?.format?.system;
         if (num >= 200) return "Grand Finals";
-        if (num >= 101) return `Losers Round ${num - 100}`;
-        if (fs === "DOUBLE_ELIMINATION") return `Winners Round ${num}`;
+        if (num >= 101) return `Round ${num - 100}`;
+        if (fs === "DOUBLE_ELIMINATION") return `Round ${num}`;
         return `Round ${num}`;
     };
+
+    const isDoubleElim = tournament?.format?.system === "DOUBLE_ELIMINATION";
+    const [bracketView, setBracketView] = useState<"WINNERS" | "LOSERS">("WINNERS");
+
+    const displayedRounds = useMemo(() => {
+        if (!isDoubleElim) return sortedRounds;
+        if (bracketView === "WINNERS") return sortedRounds.filter(r => r.roundNumber < 101 || r.roundNumber >= 200);
+        return sortedRounds.filter(r => r.roundNumber >= 101 && r.roundNumber < 200);
+    }, [sortedRounds, isDoubleElim, bracketView]);
 
     const [searchQuery, setSearchQuery] = useState("");
     const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
@@ -143,22 +152,50 @@ export default function MobileMatchFeed({
                     </div>
                 )}
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                    {sortedRounds.map((round, idx) => (
+                {isDoubleElim && (
+                    <div className="flex items-center bg-black/20 border border-white/5 rounded-xl p-1 shrink-0 mb-1">
                         <button
-                            key={round.id}
-                            onClick={() => handlePhaseChange(idx)}
-                            className={`shrink-0 px-6 py-2.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activePhase === idx ? 'bg-primary text-white shadow-lg' : 'bg-foreground/5 text-foreground/20'}`}
+                            onClick={() => {
+                                setBracketView("WINNERS");
+                                const first = sortedRounds.find(r => r.roundNumber < 101 || r.roundNumber >= 200);
+                                if (first && bracketView !== "WINNERS") setActivePhase(sortedRounds.indexOf(first));
+                            }}
+                            className={`flex-1 px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bracketView === 'WINNERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
                         >
-                            {getRoundLabel(round)}
+                            Winners
                         </button>
-                    ))}
+                        <button
+                            onClick={() => {
+                                setBracketView("LOSERS");
+                                const first = sortedRounds.find(r => r.roundNumber >= 101 && r.roundNumber < 200);
+                                if (first && bracketView !== "LOSERS") setActivePhase(sortedRounds.indexOf(first));
+                            }}
+                            className={`flex-1 px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bracketView === 'LOSERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                        >
+                            Losers
+                        </button>
+                    </div>
+                )}
+
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                    {displayedRounds.map((round) => {
+                        const originalIdx = sortedRounds.indexOf(round);
+                        return (
+                            <button
+                                key={round.id}
+                                onClick={() => handlePhaseChange(originalIdx)}
+                                className={`shrink-0 px-6 py-2.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activePhase === originalIdx ? 'bg-primary text-white shadow-lg' : 'bg-foreground/5 text-foreground/20'}`}
+                            >
+                                {getRoundLabel(round)}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
             {/* Match List - Horizontal Scroll */}
-            <div className="flex flex-col gap-4 px-4 overflow-hidden">
-                <div className="flex items-center justify-between">
+            <div className="flex-1 flex flex-col gap-4 px-4 overflow-y-auto overflow-x-hidden">
+                <div className="flex items-center justify-between shrink-0">
                     <h2 className="text-[10px] font-black text-primary uppercase tracking-[0.4em] font-poppins">
                         {activeRound ? getRoundLabel(activeRound) : "No Data"}
                     </h2>
@@ -167,7 +204,7 @@ export default function MobileMatchFeed({
                     </span>
                 </div>
 
-                <div className="grid grid-flow-col grid-rows-2 gap-x-4 gap-y-6 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-8">
+                <div className="grid grid-flow-col grid-rows-2 gap-x-4 gap-y-6 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-8 pt-2 shrink-0 min-h-min">
                     {filteredMatches.map((match: Match, i: number) => (
                         <div key={match.id} id={`match-mobile-${match.id}`} className="shrink-0 w-[42vw] snap-start flex flex-col gap-2 [&>div]:w-full">
                             <div className="flex justify-between items-center px-1">

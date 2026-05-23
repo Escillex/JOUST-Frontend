@@ -18,6 +18,7 @@ export interface Match {
   nextMatchId?: string | null;
   player1Score?: number;
   player2Score?: number;
+  matchIndex?: number;
   gameLogs?: MatchGameLog[];
 }
 

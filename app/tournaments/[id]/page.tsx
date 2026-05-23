@@ -128,8 +128,7 @@ function TournamentViewContent() {
 
   const tabs = [
     { id: "DETAILS", label: "Overview" },
-    { id: "PLAYERS", label: `Players (${tournament.participants.length})` },
-    { id: "BRACKET", label: tournament.status === "COMPLETED" ? "Final Results" : "Bracket" }
+    { id: "PLAYERS", label: `Players (${tournament.participants.length})` }
   ];
 
   return (
@@ -208,7 +207,7 @@ function TournamentViewContent() {
                     </h1>
                   </div>
                   <p className="text-xl md:text-2xl text-white/60 leading-relaxed font-light italic whitespace-pre-wrap">
-                    {tournament.description || "Join the sector's elite in this high-stakes engagement. Success requires absolute precision and strategic dominance."}
+                    {tournament.description || "Join this competitive tournament event. Success requires careful planning and strong strategy."}
                   </p>
                 </div>
               </div>
@@ -248,9 +247,16 @@ function TournamentViewContent() {
                       >
                         SPECTATE
                       </Link>
+                    ) : tournament.status === "COMPLETED" ? (
+                      <Link 
+                        href={`/tournaments/${tournamentId}/bracket`}
+                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary hover:text-black transition-all shadow-[0_0_50px_rgba(82,185,70,0.15)] flex items-center justify-center italic"
+                      >
+                        FINAL RESULTS
+                      </Link>
                     ) : (
                       <div className="w-full h-full border-2 border-component-border bg-component-background text-white/20 text-center font-black text-xs uppercase tracking-widest flex items-center justify-center">
-                        {tournament.status === "COMPLETED" ? "TOURNAMENT_FINISHED" : "REGISTRATION_CLOSED"}
+                        REGISTRATION_CLOSED
                       </div>
                     )}
                   </div>
@@ -352,48 +358,7 @@ function TournamentViewContent() {
             </motion.div>
           )}
 
-          {activeTab === "BRACKET" && (
-            <motion.div 
-              key="bracket"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="min-h-[600px] flex flex-col bg-component-background p-4 rounded-xl"
-            >
-               {tournament.status === "ONGOING" || tournament.status === "COMPLETED" ? (
-                 <div className="flex-1 bg-component-background border border-component-border p-8 rounded-3xl">
-                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em] mb-12 text-center">Tournament Match History</p>
-                    <div className="flex flex-col items-center justify-center gap-8 py-20">
-                      <div className="w-16 h-16 rounded-full border-2 border-primary/20 flex items-center justify-center text-primary animate-pulse">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      </div>
-                      <div className="text-center space-y-4">
-                        <p className="text-xl font-black uppercase tracking-tighter text-white">Match History</p>
-                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] max-w-sm mx-auto">
-                          Detailed match history is available for active and completed tournaments.
-                        </p>
-                      </div>
-                      <Link 
-                        href={`/tournaments/${tournamentId}/bracket`}
-                        className="px-10 py-4 bg-primary text-black font-black text-[10px] uppercase tracking-[0.4em] italic shadow-2xl hover:scale-105 transition-all"
-                      >
-                        VIEW BRACKET
-                      </Link>
-                    </div>
-                 </div>
-               ) : (
-                 <div className="flex-1">
-                   <BracketPreview 
-                     tournament={tournament}
-                     isAdmin={false}
-                     tournamentId={tournamentId}
-                     onRefresh={() => {}}
-                     addLog={() => {}}
-                   />
-                 </div>
-               )}
-            </motion.div>
-          )}
+
         </AnimatePresence>
       </main>
     </div>

@@ -42,7 +42,7 @@ export default function MobileBracketTree({
     const getRoundLabel = (round: Round) => {
         const num = round.roundNumber;
         if (num >= 200) return "Grand Finals";
-        if (num >= 100) return `Losers R${num - 100}`;
+        if (num >= 100) return `Round ${num - 100}`;
         
         // Dynamic labels for Winner's bracket
         if (num === winnerRoundsCount) return "Finals";
@@ -131,7 +131,7 @@ export default function MobileBracketTree({
                                 key={round.id}
                                 onClick={() => {
                                     setActiveRoundIdx(idx);
-                                    addLog("NAV_COMMAND", `VIEWING ${getRoundLabel(round).toUpperCase()}`);
+                                    addLog("NAVIGATION", `VIEWING ${getRoundLabel(round).toUpperCase()}`);
                                 }}
                                 className="flex flex-col items-center gap-2 min-w-[100px] shrink-0 group pointer-events-auto"
                             >
