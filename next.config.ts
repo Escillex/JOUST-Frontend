@@ -33,7 +33,26 @@ const nextConfig: NextConfig = {
         source: "/api/backend/:path*",
         destination: `${backendUrl}/:path*`,
       },
+      {
+        source: "/uploads/:path*",
+        destination: `${backendUrl}/uploads/:path*`,
+      },
     ];
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "http",
+        hostname: hostIp,
+        port: String(backendPort),
+        pathname: "/uploads/**",
+      },
+      {
+        protocol: "https",
+        hostname: "joust.escillex.com",
+        pathname: "/api/backend/uploads/**",
+      },
+    ],
   },
 };
 
