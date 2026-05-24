@@ -85,11 +85,11 @@ export default function ProductCard({ product, index }: ProductCardProps) {
       </div>
 
       <div className="space-y-4 px-2">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex items-start justify-between gap-4">
           <h3 className="text-4xl font-black uppercase tracking-tighter text-white group-hover:text-primary transition-colors font-poppins leading-none">
             {product.name}
           </h3>
-          <span className="text-2xl font-black text-primary/60 font-poppins">{formatPrice(product.price)}</span>
+          <span className="text-2xl font-black text-primary/60 font-poppins shrink-0 mt-1">{formatPrice(product.price)}</span>
         </div>
         <p className="text-white/30 text-xs font-bold uppercase tracking-widest leading-relaxed font-poppins max-w-[90%]">
           {product.description}
