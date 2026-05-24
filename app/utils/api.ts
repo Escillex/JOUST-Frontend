@@ -76,6 +76,7 @@ export const API_ENDPOINTS = {
     DELETE_USER: (id: string) => `/auth/users/${id}`,
     UPDATE_PROFILE: (id: string) => `/auth/users/${id}/profile`,
     ADMIN_CREATE_USER: '/auth/users',
+    USER_MATCHES: (id: string) => `/users/${id}/matches`,
   },
   TOURNAMENTS: {
     BASE: '/tournaments',

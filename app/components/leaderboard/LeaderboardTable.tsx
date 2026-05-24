@@ -2,6 +2,9 @@
 import React from "react";
 import { motion } from "motion/react";
 import { BentoBox } from "../ui/Bento";
+import Image from "next/image";
+import Link from "next/link";
+import { API_URL } from "../../utils/api";
 
 interface LeaderboardEntry {
   rank: number;
@@ -15,6 +18,7 @@ interface LeaderboardEntry {
   matchWinPct: number;
   omw: number;
   oomw: number;
+  avatarUrl?: string | null;
 }
 
 interface LeaderboardTableProps {
@@ -60,14 +64,24 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                   <span className={`text-2xl font-black italic font-poppins tracking-tighter ${idx < 3 ? 'text-primary' : 'text-white/20'}`}>
                     #{String(idx + 1).padStart(2, '0')}
                   </span>
-                  <div className="w-10 h-10 bg-surface border border-white/10 flex items-center justify-center font-black text-xs text-primary">
-                    {entry.username?.[0]?.toUpperCase()}
+                  <div className="relative w-12 h-12 bg-surface border border-white/10 flex items-center justify-center font-black text-xs text-primary overflow-hidden shrink-0">
+                    {entry.avatarUrl ? (
+                      <Image 
+                        src={entry.avatarUrl.startsWith('http') ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`} 
+                        alt={entry.username} 
+                        fill 
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      entry.username?.[0]?.toUpperCase() || "U"
+                    )}
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-black uppercase tracking-tight text-white font-poppins italic group-hover:text-primary transition-colors">
+                  <div className="flex flex-col min-w-0">
+                    <Link href={`/profile/${entry.userId}`} className="text-sm font-black uppercase tracking-tight text-white font-poppins italic hover:text-primary transition-colors truncate">
                       {entry.username}
-                    </span>
-                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">
+                    </Link>
+                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest truncate">
                       ID // {entry.userId.slice(0, 6)}
                     </span>
                   </div>
@@ -139,14 +153,24 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                 </td>
                 <td className="py-8 px-10">
                   <div className="flex items-center gap-8">
-                    <div className="w-14 h-14 bg-surface border-2 border-white/10 group-hover:border-primary flex items-center justify-center font-black text-2xl text-primary transition-all">
-                      {entry.username?.[0]?.toUpperCase() || "U"}
+                    <div className="relative w-16 h-16 bg-surface border-2 border-white/10 group-hover:border-primary flex items-center justify-center font-black text-2xl text-primary transition-all overflow-hidden shrink-0">
+                      {entry.avatarUrl ? (
+                        <Image 
+                          src={entry.avatarUrl.startsWith('http') ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`} 
+                          alt={entry.username} 
+                          fill 
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        entry.username?.[0]?.toUpperCase() || "U"
+                      )}
                     </div>
-                    <div>
-                      <span className="text-2xl font-black uppercase tracking-tight text-white group-hover:text-primary transition-colors block font-poppins italic">
+                    <div className="min-w-0">
+                      <Link href={`/profile/${entry.userId}`} className="text-2xl font-black uppercase tracking-tight text-white hover:text-primary transition-colors block font-poppins italic truncate">
                         {entry.username}
-                      </span>
-                      <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-poppins">
+                      </Link>
+                      <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-poppins block truncate">
                         VERIFIED ID // {entry.userId.slice(0, 8)}
                       </span>
                     </div>

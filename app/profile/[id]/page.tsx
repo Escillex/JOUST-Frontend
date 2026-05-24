@@ -144,7 +144,7 @@ function ProfileContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <FadeIn>
-                <MatchHistory />
+                <MatchHistory userId={user.id} />
               </FadeIn>
 
               <FadeIn>
