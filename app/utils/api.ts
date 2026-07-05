@@ -95,6 +95,7 @@ export const API_ENDPOINTS = {
     CANCEL_CLEANUP: (id: string) => `/tournaments/${id}/cancel-cleanup`,
     RESOLVE_TIE: (id: string) => `/tournaments/${id}/resolve-tie`,
     GLOBAL_LEADERBOARD: '/tournaments/leaderboard/global',
+    LEADERBOARD_GAMES: '/tournaments/leaderboard/games',
     USER_STATS: (userId: string) => `/tournaments/users/${userId}/stats`,
   },
   FORMATS: {
@@ -120,6 +121,7 @@ export const API_ENDPOINTS = {
   DEV: {
     BATCH_GUESTS: (tournamentId: string) => `/dev/batch-guests/${tournamentId}`,
     GUEST_EXPIRY: '/dev/config/guest-expiry',
+    BACKFILL_GAME_STATS: '/dev/backfill-game-stats',
     DELETE_TOURNAMENT: (id: string) => `/dev/tournament/${id}`,
   },
   TEMPLATES: {

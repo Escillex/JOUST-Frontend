@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import { motion } from "motion/react";
-import { BentoBox } from "../ui/Bento";
 import Image from "next/image";
 import Link from "next/link";
 import { API_URL } from "../../utils/api";
@@ -26,9 +25,10 @@ interface LeaderboardTableProps {
   loading?: boolean;
   variant?: "default" | "bento";
   limit?: number;
+  gameLabel?: string;
 }
 
-export default function LeaderboardTable({ entries, loading, variant = "default", limit }: LeaderboardTableProps) {
+export default function LeaderboardTable({ entries, loading, variant = "default", limit, gameLabel }: LeaderboardTableProps) {
   const displayEntries = React.useMemo(() => 
     limit ? (entries || []).slice(0, limit) : (entries || []),
   [entries, limit]);
@@ -108,7 +108,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
             LEADERBOARD
           </h2>
           <p className="text-primary text-[10px] font-black uppercase tracking-[0.5em]">
-            TOP COMPETITORS // ALL REGIONS
+            TOP COMPETITORS // {gameLabel || "ALL GAMES"}
           </p>
         </div>
         <div className="flex flex-col items-end">

@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
 import { motion } from "motion/react";
+import Image from "next/image";
+import { API_URL } from "../../utils/api";
 
 interface LeaderboardEntry {
   rank: number;
@@ -14,21 +16,23 @@ interface LeaderboardEntry {
   matchWinPct: number;
   omw: number;
   oomw: number;
+  avatarUrl?: string | null;
 }
 
 interface Props {
   entries: LeaderboardEntry[];
   loading?: boolean;
+  gameLabel?: string;
 }
 
 const MEDAL_COLORS = ["text-yellow-400", "text-slate-300", "text-amber-600"];
 
-export default function MobileLeaderboard({ entries, loading }: Props) {
+export default function MobileLeaderboard({ entries, loading, gameLabel }: Props) {
   if (loading) {
     return (
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse" />
+          <div key={i} className="h-16 bg-white/5 rounded-sm animate-pulse" />
         ))}
       </div>
     );
@@ -38,9 +42,14 @@ export default function MobileLeaderboard({ entries, loading }: Props) {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-4">
-        <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white font-poppins">
-          Leaderboard
-        </h2>
+        <div>
+          <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white font-poppins">
+            Leaderboard
+          </h2>
+          <p className="text-[8px] font-black text-primary/70 uppercase tracking-[0.3em]">
+            {gameLabel || "ALL GAMES"}
+          </p>
+        </div>
         <span className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">
           {entries.length} Players
         </span>
@@ -55,7 +64,7 @@ export default function MobileLeaderboard({ entries, loading }: Props) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.04 }}
-            className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all ${
+            className={`flex items-center gap-4 px-4 py-3 rounded-sm border transition-all ${
               isTop3
                 ? "bg-primary/5 border-primary/20"
                 : "bg-white/[0.03] border-white/5"
@@ -68,11 +77,21 @@ export default function MobileLeaderboard({ entries, loading }: Props) {
 
             {/* Avatar */}
             <div
-              className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${
+              className={`relative w-9 h-9 rounded-sm flex items-center justify-center font-black text-sm shrink-0 overflow-hidden ${
                 isTop3 ? "bg-primary text-black" : "bg-white/5 text-white/40"
               }`}
             >
-              {entry.username?.[0]?.toUpperCase()}
+              {entry.avatarUrl ? (
+                <Image
+                  src={entry.avatarUrl.startsWith("http") ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`}
+                  alt={entry.username}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                entry.username?.[0]?.toUpperCase()
+              )}
             </div>
 
             {/* Name + sub */}

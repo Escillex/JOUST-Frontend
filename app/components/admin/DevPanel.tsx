@@ -42,6 +42,24 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
   };
 
   const [expiryDays, setExpiryDays] = useState(30);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillResult, setBackfillResult] = useState("");
+
+  const handleBackfillGameStats = async () => {
+    setBackfillLoading(true);
+    setBackfillResult("");
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.DEV.BACKFILL_GAME_STATS, {
+        method: "POST",
+      });
+      const data = await res.json();
+      setBackfillResult(data?.message || (res.ok ? "Rebuild complete." : "Rebuild failed."));
+    } catch {
+      setBackfillResult("Network error during rebuild.");
+    } finally {
+      setBackfillLoading(false);
+    }
+  };
 
   const handleUpdateExpiry = async () => {
     setLoading(true);
@@ -158,6 +176,20 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               </button>
             </div>
             <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">Default: 30 days. Resets on server restart.</p>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Per-Game Leaderboard Stats</label>
+            <button
+              onClick={handleBackfillGameStats}
+              disabled={backfillLoading}
+              className="w-full px-8 py-3 bg-neutral-950 border border-primary/40 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-background disabled:opacity-50 transition-all active:scale-95"
+            >
+              {backfillLoading ? "Rebuilding..." : "Rebuild From History"}
+            </button>
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              {backfillResult || "Recomputes game-specific standings from all past tournaments."}
+            </p>
           </div>
         </div>
       </div>

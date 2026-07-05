@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 import { TournamentFormat } from "../../tournaments/types";
 
@@ -25,6 +25,10 @@ export default function PresetManager() {
   const [description, setDescription] = useState("");
   const [system, setSystem] = useState<TournamentFormat>("SINGLE_ELIMINATION");
   const [gameName, setGameName] = useState("");
+  const [isNewGame, setIsNewGame] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingGameId, setEditingGameId] = useState<string | null>(null);
+  const [editGameValue, setEditGameValue] = useState("");
 
   // Config fields
   const [bestOf, setBestOf] = useState(1);
@@ -103,13 +107,13 @@ export default function PresetManager() {
         setError(data?.message || "Creation failed");
       }
     } catch (err) {
-      setError("Network error during preset deployment");
+      setError("Network error while saving preset");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Decommission this preset?")) return;
     setError("");
+    setDeletingId(id);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(id), {
         method: "DELETE"
@@ -118,10 +122,32 @@ export default function PresetManager() {
         fetchTemplates();
       } else {
         const data = await safeJson(res);
-        setError(data?.message || "Failed to decommission preset");
+        setError(data?.message || "Failed to delete preset");
       }
     } catch (err) {
-      setError("Failed to decommission preset");
+      setError("Failed to delete preset");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleUpdateGame = async (id: string) => {
+    setError("");
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DETAILS(id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameName: editGameValue || null }),
+      });
+      if (res.ok) {
+        setEditingGameId(null);
+        fetchTemplates();
+      } else {
+        const data = await safeJson(res);
+        setError(data?.message || "Failed to update game designation");
+      }
+    } catch (err) {
+      setError("Network error while updating game designation");
     }
   };
 
@@ -130,6 +156,7 @@ export default function PresetManager() {
     setDescription("");
     setSystem("SINGLE_ELIMINATION");
     setGameName("");
+    setIsNewGame(false);
     setBestOf(1);
     setAllowDraw(false);
     setPointsThreshold(0);
@@ -141,6 +168,14 @@ export default function PresetManager() {
     setPlacementParticipation(1);
     setError("");
   };
+
+  const gameOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(templates.map(t => t.gameName).filter((g): g is string => !!g))
+      ).sort(),
+    [templates]
+  );
 
   const labelCls = "text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block";
   const deeperLabelCls = "text-[10px] font-black text-white/20 uppercase tracking-widest mb-1 block";
@@ -180,13 +215,46 @@ export default function PresetManager() {
             </div>
             <div>
               <label className={labelCls}>Game Designation</label>
-              <input 
-                type="text" 
-                value={gameName} 
-                onChange={e => setGameName(e.target.value.toUpperCase())} 
-                placeholder="e.g. BEYBLADE" 
-                className={inputCls} 
-              />
+              {isNewGame || gameOptions.length === 0 ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gameName}
+                    onChange={e => setGameName(e.target.value.toUpperCase())}
+                    placeholder="e.g. BEYBLADE"
+                    className={inputCls}
+                    autoFocus={isNewGame}
+                  />
+                  {gameOptions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setIsNewGame(false); setGameName(""); }}
+                      className="px-3 border border-white/10 text-[9px] font-black text-white/40 uppercase tracking-widest hover:border-white/30 hover:text-white transition-all shrink-0"
+                    >
+                      LIST
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <select
+                  value={gameName}
+                  onChange={e => {
+                    if (e.target.value === "__NEW__") {
+                      setIsNewGame(true);
+                      setGameName("");
+                    } else {
+                      setGameName(e.target.value);
+                    }
+                  }}
+                  className={inputCls}
+                >
+                  <option value="" className="bg-[#1B1B1B] text-white">None (General)</option>
+                  {gameOptions.map(g => (
+                    <option key={g} value={g} className="bg-[#1B1B1B] text-white">{g}</option>
+                  ))}
+                  <option value="__NEW__" className="bg-[#1B1B1B] text-primary">+ Define new game…</option>
+                </select>
+              )}
             </div>
           </div>
 
@@ -383,7 +451,7 @@ export default function PresetManager() {
                    <h4 className="text-xs font-black text-white uppercase tracking-widest">{tpl.name}</h4>
                    <span className="text-[8px] font-black text-primary/60 uppercase tracking-[0.2em]">{tpl.system.replace(/_/g, " ")}</span>
                  </div>
-                  <button onClick={() => handleDelete(tpl.id)} className="text-[10px] text-white/40 hover:text-red-500 transition-colors relative z-20 p-2 -m-2">✕</button>
+                  <button onClick={() => handleDelete(tpl.id)} disabled={deletingId === tpl.id} className="text-[10px] text-white/40 hover:text-red-500 transition-colors relative z-20 p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none">{deletingId === tpl.id ? "…" : "✕"}</button>
                </div>
                
                <p className="text-[9px] text-white/40 leading-relaxed italic mb-4 line-clamp-2">
@@ -392,9 +460,37 @@ export default function PresetManager() {
              </div>
 
              <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col relative z-20">
                     <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Designation</span>
-                    <span className="text-[8px] font-bold text-primary">{tpl.gameName || "GENERAL"}</span>
+                    {editingGameId === tpl.id ? (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          autoFocus
+                          value={editGameValue}
+                          onChange={e => setEditGameValue(e.target.value.toUpperCase())}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleUpdateGame(tpl.id);
+                            if (e.key === "Escape") setEditingGameId(null);
+                          }}
+                          placeholder="GENERAL"
+                          list="preset-game-options"
+                          className="w-24 bg-[#1B1B1B] border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
+                        />
+                        <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] text-primary hover:text-white px-1">✓</button>
+                        <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/40 hover:text-white px-1">✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditingGameId(tpl.id); setEditGameValue(tpl.gameName || ""); }}
+                        title="Edit game designation"
+                        className="text-[8px] font-bold text-primary text-left hover:underline decoration-primary/40 underline-offset-2"
+                      >
+                        {tpl.gameName || "GENERAL"} <span className="text-white/30">✎</span>
+                      </button>
+                    )}
+                    <datalist id="preset-game-options">
+                      {gameOptions.map(g => <option key={g} value={g} />)}
+                    </datalist>
                   </div>
                  <div className="flex flex-col text-right">
                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Best Of</span>
