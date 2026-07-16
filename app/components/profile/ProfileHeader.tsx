@@ -15,7 +15,7 @@ interface UserProfile {
 
 import Image from "next/image";
 import Link from "next/link";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 
 interface ProfileHeaderProps {
   user: UserProfile;
@@ -33,7 +33,7 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
       `}>
         {user.avatarUrl ? (
           <Image 
-            src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_URL}${user.avatarUrl}`} 
+            src={resolveImageUrl(user.avatarUrl)}
             alt={user.username} 
             fill 
             className="object-cover"

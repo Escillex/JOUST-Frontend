@@ -9,7 +9,7 @@ import HomeDashboard from "../components/HomeDashboard";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, loading: userLoading, refreshUser } = useUser();
+  const { user, loading: userLoading, logout } = useUser();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ wins: 0, losses: 0, rank: 0, points: 0 });
@@ -55,16 +55,9 @@ export default function HomePage() {
     }
   }, [user, userLoading]);
 
-  const handleLogout = async () => {
-    try {
-      await authenticatedFetch(API_ENDPOINTS.AUTH.SIGNOUT);
-      localStorage.removeItem("token");
-      await refreshUser();
-      router.push("/");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
-  };
+  // Sign-out logic now lives in one place: UserProvider.logout.
+  // This page previously had its own copy of the same steps.
+  const handleLogout = logout;
 
   useEffect(() => {
     if (!userLoading && !user) {

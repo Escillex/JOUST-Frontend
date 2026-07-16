@@ -2,6 +2,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { usePolling } from "../../../utils/usePolling";
+import { getRawTournamentConfig } from "../../../utils/formatConfig";
 import { Tournament, FormatConfig } from "../../types";
 import ControlRoomHeader from "../../../components/tournaments/manage/ControlRoomHeader";
 import RosterPanel from "../../../components/tournaments/manage/RosterPanel";
@@ -33,18 +35,27 @@ function ControlRoomContent() {
   const [batchGuestCount, setBatchGuestCount] = useState<number | "">("");
   const [selectedUserId, setSelectedUserId]   = useState("");
   const [batchLoading, setBatchLoading]       = useState(false);
+  const [isStarting, setIsStarting]           = useState(false);
+  const [isAddingGuest, setIsAddingGuest]     = useState(false);
+  const [isInviting, setIsInviting]           = useState(false);
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments/manage"); return; }
     fetchData();
     fetchFormatDefinitions();
-
-    const interval = setInterval(() => {
-      fetchData(true);
-    }, 10000);
-
-    return () => clearInterval(interval);
   }, [tournamentId]);
+
+  // temporary polling block
+  // Background refresh through the shared usePolling hook: it pauses
+  // while the tab is hidden and stops entirely once the tournament is
+  // COMPLETED (a finished tournament's data no longer changes, so
+  // polling it was wasted traffic).
+  usePolling(
+    () => fetchData(true),
+    10000,
+    !!tournament && tournament.status !== "COMPLETED",
+  );
+  // end of temporary polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -53,7 +64,7 @@ function ControlRoomContent() {
   }, [tournament?.name]);
 
   const fetchFormatDefinitions = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.FORMATS.DETAILS);
+    const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE);
     if (res.ok) { const data = await safeJson(res); setFormatDefinitions(data?.formats ?? []); }
   };
 
@@ -90,7 +101,7 @@ function ControlRoomContent() {
             prizePool: t.prizePool || "",
             isPrivate: t.isPrivate || false,
           });
-          setFormatConfig(t.format?.config || t.formatConfig || {});
+          setFormatConfig(getRawTournamentConfig(t));
         }
       } else if (!silent) { setMessage("Tournament not found"); }
     } catch { 
@@ -103,62 +114,28 @@ function ControlRoomContent() {
 
   const handleUpdateTournament = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    setMessage("Syncing specifications...");
+    setMessage("Saving changes...");
 
     try {
-      let finalFormatId = editState.formatId;
-
-      // Detect if the organizer has customized format rules (formatConfig)
-      const currentConfig = (tournament?.format && typeof tournament.format === "object") ? tournament.format.config : {};
+      // Rule edits are stored on the tournament itself, never on the shared preset
+      const currentConfig = getRawTournamentConfig(tournament);
       const hasConfigChanges = JSON.stringify(formatConfig) !== JSON.stringify(currentConfig);
-
-      if (hasConfigChanges && tournament?.format && typeof tournament.format === "object") {
-        const formatObj = tournament.format;
-        if (!formatObj.isBuiltin) {
-          // Update custom format config directly
-          const presetRes = await authenticatedFetch(API_ENDPOINTS.PRESETS.DETAILS(formatObj.id), {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ config: formatConfig }),
-          });
-          if (!presetRes.ok) {
-            const errData = await safeJson(presetRes);
-            throw new Error(errData?.message || "Failed to update custom format config");
-          }
-        } else {
-          // Built-in formats cannot be updated. Create a custom template format copy
-          const createPresetRes = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: `${editState.name || tournament.name} Custom Format`,
-              system: formatObj.system,
-              config: formatConfig,
-            }),
-          });
-
-          if (createPresetRes.ok) {
-            const newPreset = await safeJson(createPresetRes);
-            finalFormatId = newPreset.id;
-          } else {
-            const errData = await safeJson(createPresetRes);
-            if (createPresetRes.status === 403) {
-              throw new Error("Only administrators can save customized rules. Please select an existing format preset.");
-            } else {
-              throw new Error(errData?.message || "Failed to create custom rules preset");
-            }
-          }
-        }
-      }
+      const formatChanged = !!editState.formatId && editState.formatId !== tournament?.formatId;
 
       const body: any = {
         name: editState.name,
         description: editState.description || undefined,
-        formatId: finalFormatId,
+        formatId: editState.formatId,
         maxPlayers: Number(editState.maxPlayers),
         prizePool: editState.prizePool === "" ? null : Number(editState.prizePool),
         isPrivate: editState.isPrivate,
       };
+      if (hasConfigChanges) {
+        body.config = formatConfig;
+      } else if (formatChanged) {
+        // Switching presets without editing rules: clear the override so the new preset applies
+        body.config = null;
+      }
 
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!), {
         method: "PATCH",
@@ -181,15 +158,21 @@ function ControlRoomContent() {
   };
 
   const handleAddGuest = async () => {
+    if (isAddingGuest) return;
     if (!guestUsername || !tournament || tournament.participants.length >= tournament.maxPlayers) {
       setMessage("Tournament at maximum capacity"); return;
     }
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }),
-    });
-    const data = await safeJson(res);
-    if (res.ok) { setMessage("Guest Registered"); setGuestUsername(""); fetchData(); }
-    else { setMessage(data?.message || "Guest failed"); }
+    setIsAddingGuest(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) { setMessage("Guest Registered"); setGuestUsername(""); fetchData(); }
+      else { setMessage(data?.message || "Guest failed"); }
+    } finally {
+      setIsAddingGuest(false);
+    }
   };
 
   const handleBatchAddGuests = async () => {
@@ -212,12 +195,18 @@ function ControlRoomContent() {
   };
 
   const handleJoin = async (userId: string) => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId!), {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
-    });
-    const data = await safeJson(res);
-    if (res.ok) { setMessage("Participant Registered"); fetchData(); }
-    else { setMessage(data?.message || "Registration failed"); }
+    if (isInviting) return;
+    setIsInviting(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId!), {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) { setMessage("Participant Registered"); fetchData(); }
+      else { setMessage(data?.message || "Registration failed"); }
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   const handleReorder = async (activeUserId: string, newIndex: number) => {
@@ -277,9 +266,15 @@ function ControlRoomContent() {
   };
 
   const handleStartTournament = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
-    if (res.ok) { setMessage("Tournament started!"); fetchData(); }
-    else { const d = await safeJson(res); setMessage(d?.message || "Activation failed"); }
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
+      if (res.ok) { setMessage("Tournament started!"); fetchData(); }
+      else { const d = await safeJson(res); setMessage(d?.message || "Failed to start tournament"); }
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleSaveRules = async () => {
@@ -352,7 +347,7 @@ function ControlRoomContent() {
               isEditing={isEditingRules}
               formatConfig={formatConfig}
               onToggleEdit={() => setIsEditingRules(true)}
-              onDiscard={() => { setIsEditingRules(false); setFormatConfig((tournament.format as any)?.config || tournament.formatConfig || {}); }}
+              onDiscard={() => { setIsEditingRules(false); setFormatConfig(getRawTournamentConfig(tournament)); }}
               onRuleChange={(k, v) => setFormatConfig(p => ({ ...p, [k]: v }))}
               onSave={handleSaveRules}
             />

@@ -257,7 +257,8 @@ export default function ScoringDrawer({
                     ) : null
                   )}
 
-                  {!seriesComplete && formatConfig?.allowDraw && (
+                  {/* Backend rejects a winnerless submit for series (bestOf > 1) and threshold-based matches */}
+                  {!seriesComplete && formatConfig?.allowDraw && bestOf <= 1 && !(formatConfig?.pointsThreshold && formatConfig.pointsThreshold > 0) && (
                     <div className="pt-4 border-t border-white/5">
                       <button
                         onClick={() => onScore(null)}

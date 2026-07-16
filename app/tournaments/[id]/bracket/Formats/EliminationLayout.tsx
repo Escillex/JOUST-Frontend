@@ -38,12 +38,9 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
 }>>) => {
     return (
         <div className="relative group">
-            {/* Input Handles (Incoming from previous round) */}
-            <Handle 
-                type="target" 
-                position={Position.Left} 
-                className="!opacity-0 !w-0 !h-0" 
-            />
+            {/* Input handles (incoming from the previous round, either side) */}
+            <Handle id="tl" type="target" position={Position.Left} className="!opacity-0 !w-0 !h-0" />
+            <Handle id="tr" type="target" position={Position.Right} className="!opacity-0 !w-0 !h-0" />
             
             <div onClick={(e) => {
                 e.stopPropagation();
@@ -63,12 +60,10 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
                 />
             </div>
 
-            {/* Output Handle (Outgoing to next round) */}
-            <Handle 
-                type="source" 
-                position={Position.Right} 
-                className="!opacity-0 !w-0 !h-0"
-            />
+            {/* Output handles (outgoing to the next round or the champion pedestal) */}
+            <Handle id="sr" type="source" position={Position.Right} className="!opacity-0 !w-0 !h-0" />
+            <Handle id="sl" type="source" position={Position.Left} className="!opacity-0 !w-0 !h-0" />
+            <Handle id="sb" type="source" position={Position.Bottom} className="!opacity-0 !w-0 !h-0" />
         </div>
     );
 };
@@ -76,7 +71,8 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
 // Custom Champion Node
 const ChampionNode = ({ data }: NodeProps<FlowNode<{ label: string; hasChampion?: boolean }>>) => (
     <div className="flex flex-col items-center">
-        <Handle type="target" position={Position.Left} className="!opacity-0" />
+        <Handle id="cl" type="target" position={Position.Left} className="!opacity-0" />
+        <Handle id="ct" type="target" position={Position.Top} className="!opacity-0" />
         <div className={`w-72 p-12 flex flex-col items-center justify-center gap-6 rounded-sm border transition-all duration-500 bg-black ${
             data.hasChampion 
                 ? 'border-primary shadow-[0_0_30px_rgba(82,185,70,0.25)]' 
@@ -314,6 +310,179 @@ export default function EliminationLayout({
             });
         });
 
+        const isEdgeTracked = (match: Match, targetMatch: Match | undefined): boolean =>
+            !!(trackedUserId &&
+                (match.player1?.id === trackedUserId || match.player2?.id === trackedUserId) &&
+                targetMatch && (targetMatch.player1?.id === trackedUserId || targetMatch.player2?.id === trackedUserId));
+
+        // A bracket qualifies for the symmetric two-sided layout when it is a pure
+        // knockout tree: no losers bracket, no grand finals, exactly one final match,
+        // and every earlier match linked to a known next match.
+        const finalRound = winnersRounds[winnersRounds.length - 1];
+        const isMirrored =
+            losersRounds.length === 0 &&
+            grandFinals.length === 0 &&
+            winnersRounds.length > 0 &&
+            finalRound?.matches?.length === 1 &&
+            winnersRounds
+                .slice(0, -1)
+                .every((r: Round) => r.matches.every((m: Match) => m.nextMatchId && matchMap.has(m.nextMatchId)));
+
+        if (isMirrored) {
+            // ── Symmetric knockout layout: both halves converge on a central final ──
+            const totalRounds = winnersRounds.length;
+            const lastColumn = 2 * (totalRounds - 1);
+            const centerX = (totalRounds - 1) * COLUMN_WIDTH;
+            const finalMatch: Match = finalRound.matches[0];
+
+            // Matches feeding into each match, ordered by matchIndex
+            const feederMap = new Map<string, Match[]>();
+            winnersRounds.forEach((round: Round) => {
+                round.matches.forEach((m: Match) => {
+                    if (m.nextMatchId && m.id !== finalMatch.id) {
+                        const list = feederMap.get(m.nextMatchId) || [];
+                        list.push(m);
+                        feederMap.set(m.nextMatchId, list);
+                    }
+                });
+            });
+            feederMap.forEach((list) => list.sort((a, b) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0)));
+
+            // Assign each match to the left or right half by walking back from the final
+            type BracketSide = 'L' | 'R' | 'C';
+            const sideMap = new Map<string, BracketSide>();
+            sideMap.set(finalMatch.id, 'C');
+            const assignSide = (m: Match, s: 'L' | 'R') => {
+                sideMap.set(m.id, s);
+                (feederMap.get(m.id) || []).forEach((f) => assignSide(f, s));
+            };
+            const finalFeeders = feederMap.get(finalMatch.id) || [];
+            if (finalFeeders[0]) assignSide(finalFeeders[0], 'L');
+            if (finalFeeders[1]) assignSide(finalFeeders[1], 'R');
+
+            const columnX = (rIdx: number, s: BracketSide) =>
+                s === 'C' ? centerX : s === 'R' ? (lastColumn - rIdx) * COLUMN_WIDTH : rIdx * COLUMN_WIDTH;
+
+            // Vertical positions: opening matches stack downward within their half,
+            // later matches sit at the midpoint of the matches feeding them.
+            const matchYMap = new Map<string, number>();
+            const leafSlots: Record<BracketSide, number> = { L: 0, R: 0, C: 0 };
+            winnersRounds.forEach((round: Round) => {
+                const sortedMatches = [...round.matches].sort((a: Match, b: Match) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0));
+                sortedMatches.forEach((m: Match) => {
+                    const feederYs = (feederMap.get(m.id) || [])
+                        .filter((f) => matchYMap.has(f.id))
+                        .map((f) => matchYMap.get(f.id) as number);
+                    if (feederYs.length > 0) {
+                        matchYMap.set(m.id, feederYs.reduce((sum, y) => sum + y, 0) / feederYs.length);
+                    } else {
+                        const s = sideMap.get(m.id) || 'L';
+                        leafSlots[s] += 1;
+                        matchYMap.set(m.id, leafSlots[s] * BASE_MATCH_GAP);
+                    }
+                });
+            });
+
+            // Stage name per column (shown mirrored on both sides)
+            const stageLabel = (rIdx: number, round: Round): string => {
+                const fromEnd = totalRounds - 1 - rIdx;
+                if (fromEnd === 1) return 'SEMI-FINALS';
+                if (fromEnd === 2) return 'QUARTER-FINALS';
+                if (round.matches.length === Math.pow(2, fromEnd)) return `ROUND OF ${Math.pow(2, fromEnd + 1)}`;
+                return `ROUND ${round.roundNumber}`;
+            };
+
+            winnersRounds.forEach((round: Round, rIdx: number) => {
+                const isFinalRound = rIdx === totalRounds - 1;
+                const sortedMatches = [...round.matches].sort((a: Match, b: Match) => (a.matchIndex ?? 0) - (b.matchIndex ?? 0));
+
+                if (isFinalRound) {
+                    nodes.push({
+                        id: `header-round-${round.roundNumber}`,
+                        type: 'championHeader',
+                        position: { x: centerX, y: 50 },
+                        data: { label: 'FINAL' },
+                        draggable: false, selectable: false
+                    });
+                } else {
+                    const sidesInRound = new Set(sortedMatches.map((m) => sideMap.get(m.id) || 'L'));
+                    (['L', 'R'] as const).forEach((s) => {
+                        if (!sidesInRound.has(s)) return;
+                        nodes.push({
+                            id: `header-round-${round.roundNumber}-${s}`,
+                            type: 'header',
+                            position: { x: columnX(rIdx, s), y: 50 },
+                            data: { label: stageLabel(rIdx, round), sublabel: `ROUND ${round.roundNumber}` },
+                            draggable: false, selectable: false
+                        });
+                    });
+                }
+
+                sortedMatches.forEach((match: Match) => {
+                    const s = sideMap.get(match.id) || 'L';
+                    nodes.push({
+                        id: match.id,
+                        type: 'match',
+                        position: { x: columnX(rIdx, s), y: matchYMap.get(match.id) ?? BASE_MATCH_GAP },
+                        data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, onOpenScoring },
+                        draggable: false
+                    });
+
+                    if (match.nextMatchId) {
+                        const tracked = isEdgeTracked(match, matchMap.get(match.nextMatchId));
+                        edges.push({
+                            id: `edge-${match.id}-${match.nextMatchId}`,
+                            source: match.id,
+                            target: match.nextMatchId,
+                            sourceHandle: s === 'R' ? 'sl' : 'sr',
+                            targetHandle: s === 'R' ? 'tr' : 'tl',
+                            type: 'step',
+                            style: tracked
+                                ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 }
+                                : { stroke: 'rgba(82, 185, 70, 0.35)', strokeWidth: 1.5 }
+                        });
+                    }
+                });
+            });
+
+            // Champion pedestal sits centered beneath the final
+            const finalY = matchYMap.get(finalMatch.id) ?? BASE_MATCH_GAP;
+            nodes.push({
+                id: 'champion-pedestal',
+                type: 'champion',
+                position: { x: centerX, y: finalY + 220 },
+                data: {
+                    label: tournament?.winner?.username || tournament?.winner?.guestName || 'TBD',
+                    hasChampion: !!tournament?.winner
+                },
+                draggable: false
+            });
+
+            const isFinalEdgeTracked = trackedUserId &&
+                (finalMatch.player1?.id === trackedUserId || finalMatch.player2?.id === trackedUserId) &&
+                tournament?.winner?.id === trackedUserId;
+
+            edges.push({
+                id: `edge-final-champion`,
+                source: finalMatch.id,
+                sourceHandle: 'sb',
+                target: 'champion-pedestal',
+                targetHandle: 'ct',
+                type: 'step',
+                style: isFinalEdgeTracked
+                    ? { stroke: '#52B946', strokeWidth: 2.5, strokeDasharray: '6 4', filter: 'drop-shadow(0px 0px 5px rgba(82, 185, 70, 0.8))', zIndex: 10 }
+                    : { stroke: 'rgba(82, 185, 70, 0.45)', strokeWidth: 2, strokeDasharray: '6 4' }
+            });
+
+            const sortedEdges = [...edges].sort((a, b) => {
+                const aIsTracked = a.style?.filter ? 1 : 0;
+                const bIsTracked = b.style?.filter ? 1 : 0;
+                return aIsTracked - bIsTracked;
+            });
+
+            return { nodes, edges: sortedEdges };
+        }
+
         // 1. Winners Bracket
         winnersRounds.forEach((round: Round, rIdx: number) => {
             nodes.push({
@@ -337,18 +506,17 @@ export default function EliminationLayout({
                 });
 
                 if (match.nextMatchId) {
-                    const targetMatch = matchMap.get(match.nextMatchId);
-                    const isEdgeTracked = trackedUserId && 
-                        (match.player1?.id === trackedUserId || match.player2?.id === trackedUserId) &&
-                        targetMatch && (targetMatch.player1?.id === trackedUserId || targetMatch.player2?.id === trackedUserId);
+                    const tracked = isEdgeTracked(match, matchMap.get(match.nextMatchId));
 
                     edges.push({
                         id: `edge-${match.id}-${match.nextMatchId}`,
                         source: match.id,
                         target: match.nextMatchId,
+                        sourceHandle: 'sr',
+                        targetHandle: 'tl',
                         type: 'step',
-                        style: isEdgeTracked 
-                            ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 } 
+                        style: tracked
+                            ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 }
                             : { stroke: 'rgba(82, 185, 70, 0.35)', strokeWidth: 1.5 }
                     });
                 }
@@ -381,18 +549,17 @@ export default function EliminationLayout({
                 });
 
                 if (match.nextMatchId) {
-                    const targetMatch = matchMap.get(match.nextMatchId);
-                    const isEdgeTracked = trackedUserId && 
-                        (match.player1?.id === trackedUserId || match.player2?.id === trackedUserId) &&
-                        targetMatch && (targetMatch.player1?.id === trackedUserId || targetMatch.player2?.id === trackedUserId);
+                    const tracked = isEdgeTracked(match, matchMap.get(match.nextMatchId));
 
                     edges.push({
                         id: `edge-${match.id}-${match.nextMatchId}`,
                         source: match.id,
                         target: match.nextMatchId,
+                        sourceHandle: 'sr',
+                        targetHandle: 'tl',
                         type: 'step',
-                        style: isEdgeTracked 
-                            ? { stroke: '#f59e0b', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(245, 158, 11, 0.6))', zIndex: 10 } 
+                        style: tracked
+                            ? { stroke: '#f59e0b', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(245, 158, 11, 0.6))', zIndex: 10 }
                             : { stroke: 'rgba(245, 158, 11, 0.4)', strokeWidth: 1.5 }
                     });
                 }
@@ -422,18 +589,17 @@ export default function EliminationLayout({
                 });
 
                 if (match.nextMatchId) {
-                    const targetMatch = matchMap.get(match.nextMatchId);
-                    const isEdgeTracked = trackedUserId && 
-                        (match.player1?.id === trackedUserId || match.player2?.id === trackedUserId) &&
-                        targetMatch && (targetMatch.player1?.id === trackedUserId || targetMatch.player2?.id === trackedUserId);
+                    const tracked = isEdgeTracked(match, matchMap.get(match.nextMatchId));
 
                     edges.push({
                         id: `edge-${match.id}-${match.nextMatchId}`,
                         source: match.id,
                         target: match.nextMatchId,
+                        sourceHandle: 'sr',
+                        targetHandle: 'tl',
                         type: 'step',
-                        style: isEdgeTracked 
-                            ? { stroke: '#ffffff', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.6))', zIndex: 10 } 
+                        style: tracked
+                            ? { stroke: '#ffffff', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.6))', zIndex: 10 }
                             : { stroke: 'rgba(255, 255, 255, 0.3)', strokeWidth: 1.5 }
                     });
                 }
@@ -475,7 +641,9 @@ export default function EliminationLayout({
                 edges.push({
                     id: `edge-final-champion`,
                     source: finalMatch.id,
+                    sourceHandle: 'sr',
                     target: 'champion-pedestal',
+                    targetHandle: 'cl',
                     type: 'step',
                     style: isFinalEdgeTracked
                         ? { stroke: '#52B946', strokeWidth: 2.5, strokeDasharray: '6 4', filter: 'drop-shadow(0px 0px 5px rgba(82, 185, 70, 0.8))', zIndex: 10 }
@@ -501,7 +669,7 @@ export default function EliminationLayout({
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-3">
                          <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#52b946]" />
-                         <span className="text-[11px] font-bold text-white uppercase tracking-wider">Tournament Tree (React Flow Engine) - NODES: {nodes.length}</span>
+                         <span className="text-[11px] font-bold text-white uppercase tracking-wider">Tournament Bracket — {nodes.filter(n => n.type === 'match').length} Matches</span>
                     </div>
                     <div className="relative">
                         <select 

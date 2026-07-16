@@ -15,7 +15,7 @@ const questrial = Questrial({
 
 export const metadata: Metadata = {
   title: "Hobby+",
-  description: "Hobby Plus A place for all hobbioes",
+  description: "Hobby Plus — a place for all hobbies",
   icons: {
     icon: "/h+small.png",
   },
@@ -28,9 +28,11 @@ export const viewport: Viewport = {
 
 import Navibar from "./components/Navibar";
 import { UserProvider } from "./components/UserProvider";
+import { ToastProvider } from "./components/ui/Toast";
 import MobileTopBar from "./components/mobile/MobileTopBar";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 import InitialAppLoader from "./components/InitialAppLoader";
+import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
 
 export default function RootLayout({
   children,
@@ -43,7 +45,11 @@ export default function RootLayout({
       className={`${poppins.variable} ${questrial.variable} h-full w-full overflow-x-hidden antialiased`}
     >
       <body className="min-h-full w-full overflow-x-hidden flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
+        {/* Enables on-device caching of build files and images
+            (production only) and makes the site installable. */}
+        <ServiceWorkerRegister />
         <UserProvider>
+          <ToastProvider>
           <InitialAppLoader>
             {/* Desktop Navigation */}
             <div className="hidden md:block sticky top-0 z-50">
@@ -64,6 +70,7 @@ export default function RootLayout({
               <MobileBottomNav />
             </div>
           </InitialAppLoader>
+          </ToastProvider>
         </UserProvider>
       </body>
     </html>

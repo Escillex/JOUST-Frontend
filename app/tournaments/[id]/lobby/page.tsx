@@ -3,11 +3,14 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { usePolling } from "../../../utils/usePolling";
+import { useToast } from "../../../components/ui/Toast";
 import { Tournament } from "../../types";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 
 function TournamentLobbyContent() {
+  const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
   const tournamentId = params.id as string;
@@ -17,19 +20,19 @@ function TournamentLobbyContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (tournamentId) {
-      fetchData();
-
-      // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
-      // Refresh every 2 minutes
-      const interval = setInterval(() => {
-        fetchData(true);
-      }, 120000);
-
-      return () => clearInterval(interval);
-      // END OF TEMPORARY POLLING BLOCK
-    }
+    if (tournamentId) fetchData();
   }, [tournamentId]);
+
+  // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
+  // Refresh every 2 minutes through the shared usePolling hook: it
+  // pauses while the tab is hidden and stops once the tournament is
+  // COMPLETED, because finished tournaments no longer change.
+  usePolling(
+    () => fetchData(true),
+    120000,
+    !!tournamentId && tournament?.status !== "COMPLETED",
+  );
+  // END OF TEMPORARY POLLING BLOCK
 
   useEffect(() => {
     if (tournament?.name) {
@@ -62,9 +65,11 @@ function TournamentLobbyContent() {
 
   const [withdrawing, setWithdrawing] = useState(false);
 
+  // No confirm() popup (project rule): the action runs directly and the
+  // button shows a "withdrawing" state while the request is in flight.
   const handleLeave = async () => {
-    if (!myId || !confirm("ARE YOU SURE YOU WANT TO WITHDRAW FROM THIS TOURNAMENT?")) return;
-    
+    if (!myId || withdrawing) return;
+
     setWithdrawing(true);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEAVE(tournamentId), {
@@ -77,10 +82,11 @@ function TournamentLobbyContent() {
         router.push(`/tournaments/${tournamentId}`);
       } else {
         const error = await safeJson(res);
-        alert(error?.message || "Failed to leave tournament");
+        toast(error?.message || "Failed to leave the tournament", "error");
       }
     } catch (err) {
       console.error("Leave failed:", err);
+      toast("Could not reach the server", "error");
     } finally {
       setWithdrawing(false);
     }

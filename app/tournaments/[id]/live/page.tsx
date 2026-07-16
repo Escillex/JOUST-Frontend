@@ -1,10 +1,12 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Tournament } from '../../../tournaments/types';
 import { MatchGameLog } from '../../../tournaments/types';
 import { Round } from '../../../tournaments/[id]/bracket/types';
-import { API_ENDPOINTS, safeJson } from '../../../utils/api';
+import { authenticatedFetch, API_ENDPOINTS, safeJson } from '../../../utils/api';
+import { usePolling } from '../../../utils/usePolling';
+import { getTournamentConfig } from '../../../utils/formatConfig';
 import LiveMatchGrid from '../../../components/tournaments/live/LiveMatchGrid';
 import TVOverlay from '../../../components/tournaments/live/TVOverlay';
 import Link from 'next/link';
@@ -12,16 +14,9 @@ import Link from 'next/link';
 const POLL_INTERVAL = 4000;
 
 function getWinsNeeded(tournament: Tournament): number {
-  const config = (tournament.format as any)?.config ?? tournament.formatConfig ?? {};
-  const bestOf = config?.bestOf ?? config?.phase1?.bestOf ?? 1;
+  const config = getTournamentConfig(tournament);
+  const bestOf = config?.bestOf ?? 1;
   return Math.ceil(bestOf / 2);
-}
-
-function buildApiUrl(path: string) {
-  const base = (process.env.NEXT_PUBLIC_API_URL?.startsWith('http')
-    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-    : '/api/backend');
-  return `${base}${path}`;
 }
 
 export default function LivePage() {
@@ -37,18 +32,20 @@ export default function LivePage() {
   const [logs, setLogs] = useState<Record<string, MatchGameLog[]>>({});
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
       // 1. Fetch tournament
-      const tRes = await fetch(buildApiUrl(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId)));
+      // This page used its own copy of the base-URL logic. It now uses
+      // the shared authenticatedFetch, which builds the URL the same way
+      // for the whole app (these endpoints also work while signed out).
+      const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId));
       if (!tRes.ok) return;
       const t: Tournament = await tRes.json();
       setTournament(t);
 
       // 2. Fetch rounds
-      const rRes = await fetch(buildApiUrl(`/tournaments/${tournamentId}/rounds`));
+      const rRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.ROUNDS(tournamentId));
       const roundData: Round[] = rRes.ok ? await rRes.json() : [];
       setRounds(roundData);
 
@@ -60,7 +57,7 @@ export default function LivePage() {
       const logEntries = await Promise.all(
         ongoingMatches.map(async m => {
           try {
-            const lRes = await fetch(buildApiUrl(API_ENDPOINTS.MATCHES.TRACKER_GET(m.id)));
+            const lRes = await authenticatedFetch(API_ENDPOINTS.MATCHES.TRACKER_GET(m.id));
             const logData: MatchGameLog[] = lRes.ok ? await lRes.json() : [];
             return [m.id, Array.isArray(logData) ? logData : []] as const;
           } catch {
@@ -78,11 +75,13 @@ export default function LivePage() {
     }
   }, [tournamentId]);
 
-  useEffect(() => {
-    fetchAll();
-    intervalRef.current = setInterval(fetchAll, POLL_INTERVAL);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchAll]);
+  // temporary polling block
+  // The shared usePolling hook pauses while the tab is hidden, and the
+  // "enabled" flag stops polling once the tournament is COMPLETED —
+  // before this change, this page kept requesting a finished tournament
+  // forever.
+  usePolling(fetchAll, POLL_INTERVAL, tournament?.status !== 'COMPLETED');
+  // end of temporary polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -290,7 +289,7 @@ export default function LivePage() {
                 {matchLogs.length > 0 ? `GAME ${matchLogs.length + 1} — AWAITING START` : 'STANDBY MODE'}
               </span>
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/15">
-                ORGANIZER HAS NOT YET DEPLOYED TRACKER UNIT
+                The organizer has not started live tracking for this match yet
               </span>
             </div>
           )}

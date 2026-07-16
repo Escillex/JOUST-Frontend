@@ -44,14 +44,17 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
       
       <div className="relative bg-[#1B1B1B] border border-white/10 w-full max-w-[440px] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden rounded-sm">
         <div className="p-6 border-b border-white/5 bg-[#1B1B1B]">
-          <h3 className="text-lg font-semibold text-white tracking-tight">Convert Guest Identity</h3>
-          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">Status Elevation Service</p>
+          {/* Reworded: this modal used sci-fi style wording ("Status
+              Elevation Service"). Project rule: admin screens use plain,
+              professional language. */}
+          <h3 className="text-lg font-semibold text-white tracking-tight">Convert Guest to Account</h3>
+          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">Guest Account Conversion</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="p-4 bg-white/5 border border-white/5 rounded-sm">
             <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] leading-relaxed">
-              Elevating <span className="text-primary font-bold">{guest.username}</span> to a permanent registered account. 
+              Converting <span className="text-primary font-bold">{guest.username}</span> to a permanent registered account.
               This will preserve all match history and statistics.
             </p>
           </div>
@@ -74,12 +77,12 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
-                placeholder="identity@domain.com"
+                placeholder="user@example.com"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Access Password</label>
+              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Password</label>
               <input
                 type="password" required
                 value={formData.password}
@@ -96,7 +99,7 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
               disabled={isSubmitting}
               className="flex-1 h-10 bg-primary text-black text-[11px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 rounded-sm"
             >
-              {isSubmitting ? "Syncing..." : "Confirm Conversion"}
+              {isSubmitting ? "Converting..." : "Convert Guest"}
             </button>
             <button
               type="button"

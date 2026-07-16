@@ -29,6 +29,20 @@ const nextConfig: NextConfig = {
       ],
     },
   },
+  async headers() {
+    return [
+      {
+        // The service worker file itself must never be cached by the
+        // browser: if it were, users could keep running an old caching
+        // logic long after a new one was deployed.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

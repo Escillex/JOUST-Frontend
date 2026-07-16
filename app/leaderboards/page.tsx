@@ -143,7 +143,7 @@ export default function LeaderboardsPage() {
             ) : leaderboard.length === 0 ? (
               <div className="p-24 border-4 border-white/10 bg-[#1B1B1B] text-center font-poppins italic">
                 <p className="text-white/20 text-xl font-black uppercase tracking-[0.3em]">
-                  {selectedGame ? `NO RANKINGS FOUND FOR ${selectedGame}` : "NO RANKINGS FOUND"}
+                  {selectedGame ? `No leaderboard entries for ${selectedGame} yet` : "No leaderboard entries yet"}
                 </p>
               </div>
             ) : (

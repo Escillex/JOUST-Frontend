@@ -34,10 +34,14 @@ export default function MobileView({
         <div className="h-full w-full overflow-hidden relative">
             {isElimination && viewMode === "BRACKET" ? (
                 <div className="h-full w-full">
-                    <EliminationLayout 
+                    <EliminationLayout
                         tournament={tournament}
                         leaderboard={leaderboard}
-                        isAdmin={isAdmin}
+                        // Scoring is a card-view-only feature (decided
+                        // 2026-07-15). The bracket tree is for viewing,
+                        // so it never shows SCORE buttons, even for
+                        // admins.
+                        isAdmin={false}
                         updating={updating}
                         onOpenScoring={onOpenScoring}
                         addLog={addLog}

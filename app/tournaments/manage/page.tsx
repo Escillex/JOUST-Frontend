@@ -38,13 +38,23 @@ export default function ManageTournaments() {
     checkAuth();
   }, []);
 
+  const [completingId, setCompletingId] = useState<string | null>(null);
+
   const handleComplete = async (id: string) => {
-    if (!confirm("Finalize this tournament? All guest data will be scrubbed and status set to COMPLETED.")) return;
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
-    if (res.ok) { 
-      setMessage("Tournament Finalized"); 
-      await refresh(); 
+    if (completingId) return;
+    setCompletingId(id);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
+      if (res.ok) {
+        setMessage("Tournament finalized");
+      } else {
+        const data = await safeJson(res);
+        setMessage(data?.message || "Failed to finalize tournament");
+      }
+      await refresh();
       setTimeout(() => setMessage(""), 3000);
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -99,9 +109,10 @@ export default function ManageTournaments() {
           </div>
         )}
 
-        <ManagerTournamentTable 
-          tournaments={tournaments} 
-          onComplete={handleComplete} 
+        <ManagerTournamentTable
+          tournaments={tournaments}
+          onComplete={handleComplete}
+          completingId={completingId}
         />
       </div>
     </ManagerLayout>

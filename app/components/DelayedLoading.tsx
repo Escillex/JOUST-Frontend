@@ -25,7 +25,7 @@ export default function DelayedLoading() {
           
           <div className="absolute -bottom-12 whitespace-nowrap">
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-foreground/40 animate-pulse">
-              Establishing Connection...
+              Loading...
             </p>
           </div>
         </div>

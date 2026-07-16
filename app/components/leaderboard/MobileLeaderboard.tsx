@@ -2,7 +2,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 
 interface LeaderboardEntry {
   rank: number;
@@ -56,8 +56,13 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
       </div>
 
       {entries.map((entry, idx) => {
-        const isTop3 = idx < 3;
-        const medalColor = MEDAL_COLORS[idx] ?? "text-white/20";
+        // Top-3 styling and the rank number both follow the rank sent
+        // by the server, not the row position. When players are tied
+        // the server gives them the same rank, and counting rows would
+        // hide that tie.
+        const rank = entry.rank ?? idx + 1;
+        const isTop3 = rank <= 3;
+        const medalColor = MEDAL_COLORS[rank - 1] ?? "text-white/20";
         return (
           <motion.div
             key={entry.userId}
@@ -72,7 +77,7 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
           >
             {/* Rank */}
             <span className={`text-xl font-black italic font-poppins w-10 shrink-0 ${isTop3 ? medalColor : "text-white/20"}`}>
-              #{String(idx + 1).padStart(2, "0")}
+              #{String(rank).padStart(2, "0")}
             </span>
 
             {/* Avatar */}
@@ -83,7 +88,7 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
             >
               {entry.avatarUrl ? (
                 <Image
-                  src={entry.avatarUrl.startsWith("http") ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`}
+                  src={resolveImageUrl(entry.avatarUrl)}
                   alt={entry.username}
                   fill
                   className="object-cover"

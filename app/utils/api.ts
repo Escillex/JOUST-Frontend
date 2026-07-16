@@ -22,6 +22,38 @@ export async function safeJson(res: Response) {
   return null;
 }
 
+// Turns an image path from the backend (for example "/uploads/avatars/x.webp")
+// into a URL the browser can load. Before this helper existed, the same
+// "does it start with http?" check was copy-pasted in about 17 places.
+// Rules:
+// - full URLs (http...), in-memory previews (blob:) and inline images (data:)
+//   are already usable, return them unchanged
+// - backend uploads ("/uploads/...") need the API base URL in front
+// - anything else (like "/placeholder.jpg") is a file from this app's own
+//   public folder, return it unchanged
+export function resolveImageUrl(url?: string | null, fallback = ""): string {
+  if (!url) return fallback;
+  if (url.startsWith("http") || url.startsWith("blob:") || url.startsWith("data:")) return url;
+  if (url.startsWith("/uploads")) return `${API_URL}${url}`;
+  if (url.startsWith("/")) return url;
+  return `${API_URL}${url}`;
+}
+
+// Called when any request comes back as 401 (not signed in / session
+// expired). The stored token is useless at that point, so remove it and
+// tell the rest of the app (UserProvider listens for this event) so the
+// UI stops showing the user as signed in. JWT sessions last 1 hour, and
+// before this nothing reacted when they expired.
+export const SESSION_EXPIRED_EVENT = "auth:session-expired";
+
+function handleUnauthorized() {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem("token")) {
+    localStorage.removeItem("token");
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+}
+
 export async function authenticatedFetch(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   
@@ -43,6 +75,11 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
       headers,
       credentials: 'include',
     });
+    // A 401 means the session is no longer valid, so clean up the stale
+    // token once, centrally, instead of every page handling it itself.
+    if (response.status === 401) {
+      handleUnauthorized();
+    }
     return response;
   } catch (error) {
     console.error("Critical Fetch Error:", {
@@ -77,6 +114,10 @@ export const API_ENDPOINTS = {
     UPDATE_PROFILE: (id: string) => `/auth/users/${id}/profile`,
     ADMIN_CREATE_USER: '/auth/users',
     USER_MATCHES: (id: string) => `/users/${id}/matches`,
+    // Lightweight stats for one user. Unlike the leaderboard endpoints,
+    // this returns 404 only when the user really does not exist, so it
+    // can be used to check that a user account is real.
+    USER_BASIC_STATS: (id: string) => `/users/${id}/stats`,
   },
   TOURNAMENTS: {
     BASE: '/tournaments',
@@ -89,6 +130,7 @@ export const API_ENDPOINTS = {
     UPDATE_SEED: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/seed`,
     LEADERBOARD: (id: string) => `/tournaments/${id}/leaderboard`,
     GET_ONE: (id: string) => `/tournaments/${id}`,
+    ROUNDS: (id: string) => `/tournaments/${id}/rounds`,
     UPDATE_STATUS: (id: string) => `/tournaments/${id}/status`,
     GENERATE_BRACKET: (id: string) => `/tournaments/${id}/generate-bracket`,
     INVITE: (token: string) => `/tournaments/invite/${token}`,
@@ -98,10 +140,9 @@ export const API_ENDPOINTS = {
     LEADERBOARD_GAMES: '/tournaments/leaderboard/games',
     USER_STATS: (userId: string) => `/tournaments/users/${userId}/stats`,
   },
-  FORMATS: {
-    DETAILS: '/tournament-formats',
-    DETAILS_BY_ID: (id: string) => `/tournament-formats/${id}`,
-  },
+  // The old FORMATS group duplicated PRESETS (both pointed at
+  // /tournament-formats). It was merged into PRESETS so the same route
+  // is not defined twice with two different names.
   PRESETS: {
     BASE: '/tournament-formats',
     DETAILS: (id: string) => `/tournament-formats/${id}`,

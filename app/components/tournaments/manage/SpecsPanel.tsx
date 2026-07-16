@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
+import { getTournamentConfig } from "../../../utils/formatConfig";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
@@ -66,17 +67,25 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
     else { setMessage("Failed to halt cleanup."); }
   };
 
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
+
   const handleStatusChange = async (target: string) => {
+    if (isChangingStatus) return;
     const current = tournament.status;
     if (current === "UPCOMING" && target === "OPEN") {
       onOpenRegistration();
     } else if (current === "OPEN" && target === "ONGOING") {
       onStartTournament();
     } else if (current === "ONGOING" && target === "COMPLETED") {
-      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(tournamentId!), { method: "PATCH" });
-      const data = await safeJson(res);
-      if (res.ok) { setMessage("Tournament completed!"); fetchData(); }
-      else { setMessage(data?.message || "Failed"); }
+      setIsChangingStatus(true);
+      try {
+        const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(tournamentId!), { method: "PATCH" });
+        const data = await safeJson(res);
+        if (res.ok) { setMessage("Tournament completed!"); fetchData(); }
+        else { setMessage(data?.message || "Failed to complete tournament"); }
+      } finally {
+        setIsChangingStatus(false);
+      }
     } else {
       setMessage("Cannot reverse tournament status");
     }
@@ -167,7 +176,8 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
               <select
                 value={tournament.status}
                 onChange={e => handleStatusChange(e.target.value)}
-                className={inputCls}
+                disabled={isChangingStatus}
+                className={`${inputCls} disabled:opacity-50`}
               >
                 {stages.map(s => {
                   const currentIdx = stages.indexOf(tournament.status);
@@ -204,8 +214,8 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
           {/* Placement Points Table */}
           {(() => {
-            const cfg = (typeof tournament.format === 'object' ? tournament.format?.config : null) as any;
-            if (!cfg) return null;
+            if (!tournament.config && typeof tournament.format !== 'object') return null;
+            const cfg = getTournamentConfig(tournament) as any;
             const champion = cfg?.placementPointsChampion ?? 10;
             const second = cfg?.placementPoints2nd ?? 7;
             const third = cfg?.placementPoints3rd ?? 5;

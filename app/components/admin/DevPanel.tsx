@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { API_ENDPOINTS, authenticatedFetch } from "../../utils/api";
+import { useToast } from "../ui/Toast";
 
 interface Tournament {
   id: string;
@@ -14,9 +15,15 @@ interface Props {
 }
 
 export default function DevPanel({ tournaments, onRefresh }: Props) {
+  // Feedback now goes through toasts instead of alert() popups.
+  // alert() blocks the whole page and is not allowed in this project.
+  const { toast } = useToast();
   const [selectedTournament, setSelectedTournament] = useState("");
   const [guestCount, setGuestCount] = useState(10);
   const [loading, setLoading] = useState(false);
+  // Tracks which tournament row is being deleted, so its button can
+  // show progress and repeated clicks are ignored.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleBatchAdd = async () => {
     if (!selectedTournament) return;
@@ -28,14 +35,14 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         body: JSON.stringify({ count: guestCount }),
       });
       if (res.ok) {
-        alert(`Successfully added ${guestCount} guests.`);
+        toast(`Added ${guestCount} guests`, "success");
         onRefresh();
       } else {
         const err = await res.json();
-        alert(`Error: ${err.message}`);
+        toast(err.message || "Failed to add guests", "error");
       }
-    } catch (e) {
-      alert("Failed to connect to dev server");
+    } catch {
+      toast("Could not reach the server", "error");
     } finally {
       setLoading(false);
     }
@@ -70,36 +77,38 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         body: JSON.stringify({ days: expiryDays }),
       });
       if (res.ok) {
-        alert(`Guest expiration period updated to ${expiryDays} days.`);
+        toast(`Guest expiration period updated to ${expiryDays} days`, "success");
       } else {
         const err = await res.json();
-        alert(`Error: ${err.message}`);
+        toast(err.message || "Failed to update expiration period", "error");
       }
-    } catch (e) {
-      alert("Failed to connect to dev server");
+    } catch {
+      toast("Could not reach the server", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // No confirm() popup (project rule). The button shows a per-row
+  // "Deleting..." state instead, and the result is reported by a toast.
   const handleDeleteTournament = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to PERMANENTLY DELETE tournament "${name}"? This cannot be undone.`)) return;
-    setLoading(true);
+    if (deletingId) return;
+    setDeletingId(id);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.DEV.DELETE_TOURNAMENT(id), {
         method: "DELETE"
       });
       if (res.ok) {
-        alert("Tournament deleted.");
+        toast(`Tournament "${name}" deleted`, "success");
         onRefresh();
       } else {
         const err = await res.json();
-        alert(`Error: ${err.message}`);
+        toast(err.message || "Failed to delete tournament", "error");
       }
-    } catch (e) {
-      alert("Failed to connect to dev server");
+    } catch {
+      toast("Could not reach the server", "error");
     } finally {
-      setLoading(false);
+      setDeletingId(null);
     }
   };
 
@@ -217,11 +226,12 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
                     <span className="text-[9px] px-2 py-0.5 bg-neutral-800 text-neutral-400 uppercase tracking-widest">{t.status}</span>
                   </td>
                   <td className="py-4 px-2 text-right">
-                    <button 
+                    <button
                       onClick={() => handleDeleteTournament(t.id, t.name)}
-                      className="text-[10px] font-black uppercase tracking-widest text-red-500 opacity-0 group-hover/row:opacity-100 hover:bg-red-500 hover:text-white border border-red-500/30 px-4 py-1.5 transition-all"
+                      disabled={!!deletingId}
+                      className="text-[10px] font-black uppercase tracking-widest text-red-500 opacity-0 group-hover/row:opacity-100 hover:bg-red-500 hover:text-white border border-red-500/30 px-4 py-1.5 transition-all disabled:opacity-40"
                     >
-                      Delete
+                      {deletingId === t.id ? "Deleting..." : "Delete"}
                     </button>
                   </td>
                 </tr>

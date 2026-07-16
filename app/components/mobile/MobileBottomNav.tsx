@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "../UserProvider";
-import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
 
 /**
  * MobileBottomNav - Persistent bottom navigation for mobile viewports.
@@ -13,18 +12,14 @@ import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, refreshUser } = useUser();
+  const { user, logout } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Sign-out logic now lives in one place (UserProvider.logout), so this
+  // component only closes its own menu and delegates the rest.
   const handleSignOut = async () => {
-    try {
-      await authenticatedFetch(API_ENDPOINTS.AUTH.SIGNOUT);
-    } finally {
-      localStorage.removeItem("token");
-      await refreshUser();
-      setIsMenuOpen(false);
-      router.push("/");
-    }
+    setIsMenuOpen(false);
+    await logout();
   };
 
   // 1. Guest Viewport: Floating Login Button on the Right for specific pages
@@ -136,7 +131,9 @@ export default function MobileBottomNav() {
         } pb-safe-area-inset-bottom`}
       >
         <div className="flex justify-between items-center pb-4 border-b border-foreground/10 mb-6">
-          <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] font-poppins">SYSTEM DIRECTORY</span>
+          {/* Reworded from "SYSTEM DIRECTORY" to plain language
+              (project language rule). */}
+          <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] font-poppins">Menu</span>
           <button
             onClick={() => setIsMenuOpen(false)}
             className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center text-foreground/40 hover:text-white transition-all text-xs font-black"
@@ -147,8 +144,10 @@ export default function MobileBottomNav() {
 
         <div className="flex flex-col gap-2">
           {/* Profile Link */}
+          {/* The signed-in user object can carry the ID as "sub" (from
+              the login token) or as "id", so check both — project rule. */}
           <Link
-            href={`/profile/${user.id}`}
+            href={`/profile/${user.sub || user.id}`}
             onClick={() => setIsMenuOpen(false)}
             className={`flex items-center gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-widest border transition-all rounded-xl font-poppins ${
               pathname.startsWith("/profile")
@@ -197,7 +196,7 @@ export default function MobileBottomNav() {
                 <path d="M9 3v18" />
                 <path d="m14 9 3 3-3 3" />
               </svg>
-              ORGANIZER CONTROL PANEL
+              Organizer Portal
             </Link>
           )}
 

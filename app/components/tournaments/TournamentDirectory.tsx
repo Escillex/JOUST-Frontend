@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Tournament } from "../../tournaments/types";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 
 type SortField = "name" | "date" | "status" | "prizePool";
 type SortOrder = "asc" | "desc";
@@ -130,10 +130,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                         <div className={`h-40 w-full overflow-hidden border-b-2 transition-colors bg-component-background relative ${t.status === 'COMPLETED' ? 'border-component-border' : 'border-component-border group-hover:border-primary'
                                             }`}>
                                             <img
-                                                src={t.bannerUrl
-                                                    ? (t.bannerUrl.startsWith("http") ? t.bannerUrl : `${API_URL}${t.bannerUrl}`)
-                                                    : "/placeholder.jpg"
-                                                }
+                                                src={resolveImageUrl(t.bannerUrl, "/placeholder.jpg")}
                                                 alt={t.name}
                                                 className={`w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700 ${t.status === 'COMPLETED' ? 'grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100' : ''
                                                     }`}

@@ -52,9 +52,19 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
 
   if (!isOpen) return null;
 
-  const selectRole = (role: string) => {
-    setFormData(prev => ({ ...prev, roles: [role] }));
-    setIsDropdownOpen(false);
+  // Toggle a role on or off instead of replacing the whole list.
+  // The old code sent roles: [role], which silently removed every
+  // other role from users who had more than one (for example a user
+  // who was both ORGANIZER and ADMIN would lose one of them on save).
+  // A user must always keep at least one role, so removing the last
+  // one falls back to PLAYER.
+  const toggleRole = (role: string) => {
+    setFormData(prev => {
+      const roles = prev.roles.includes(role)
+        ? prev.roles.filter(r => r !== role)
+        : [...prev.roles, role];
+      return { ...prev, roles: roles.length > 0 ? roles : ["PLAYER"] };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,7 +97,10 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
           <h3 className="text-lg font-semibold text-white tracking-tight">
             {user ? "Edit User Account" : "Create New User"}
           </h3>
-          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">Identity Configuration Service</p>
+          {/* Reworded: subtitle and placeholders below used sci-fi style
+              wording ("Identity Configuration Service", "Identity Label").
+              Project rule: admin screens use plain, professional language. */}
+          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">User Account Settings</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -99,7 +112,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
                 className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
-                placeholder="Identity Label"
+                placeholder="Username"
               />
             </div>
 
@@ -110,12 +123,12 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
                 className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
-                placeholder="system@domain.com"
+                placeholder="user@example.com"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Access Role</label>
+              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Roles</label>
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
@@ -124,8 +137,10 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                     isDropdownOpen ? 'border-primary' : 'border-white/10 hover:border-white/20'
                   } rounded-sm`}
                 >
+                  {/* Show every selected role, not just the first one,
+                      so the admin can see the full list at a glance. */}
                   <span className="text-xs text-white uppercase font-medium">
-                    {formData.roles[0] || "Select Permissions"}
+                    {formData.roles.length > 0 ? formData.roles.join(", ") : "Select roles"}
                   </span>
                   <svg className={`w-3 h-3 text-white/20 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7"/>
@@ -134,11 +149,13 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
 
                 {isDropdownOpen && (
                   <div className="absolute top-full left-0 w-full mt-1 bg-[#1B1B1B] border border-white/10 shadow-2xl z-20">
+                    {/* Clicking a role toggles it; the dropdown stays open
+                        so several roles can be picked in one go. */}
                     {AVAILABLE_ROLES.map(role => (
                       <button
                         key={role}
                         type="button"
-                        onClick={() => selectRole(role)}
+                        onClick={() => toggleRole(role)}
                         className={`w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-widest border-b border-white/5 last:border-b-0 transition-colors ${
                           formData.roles.includes(role) ? 'bg-primary text-black' : 'text-white/60 hover:bg-white/5 hover:text-white'
                         }`}
@@ -153,7 +170,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">
-                {user ? "Modify Password (Optional)" : "Security Password"}
+                {user ? "New Password (Optional)" : "Password"}
               </label>
               <input
                 type="password"
@@ -172,7 +189,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
               disabled={isSubmitting}
               className="flex-1 h-10 bg-primary text-black text-[11px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 rounded-sm"
             >
-              {isSubmitting ? "Processing..." : (user ? "Save Changes" : "Confirm Creation")}
+              {isSubmitting ? "Saving..." : (user ? "Save Changes" : "Create User")}
             </button>
             <button
               type="button"

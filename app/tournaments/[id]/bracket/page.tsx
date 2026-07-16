@@ -3,7 +3,9 @@ import React, { useState, useEffect, Suspense, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { usePolling } from "../../../utils/usePolling";
 import { Match, LeaderboardEntry } from "./types";
+import { getTournamentConfig } from "../../../utils/formatConfig";
 import DesktopView from "./device/DesktopView";
 import MobileView from "./device/MobileView";
 import ScoringDrawer from "../../../components/tournaments/bracket/ScoringDrawer";
@@ -46,6 +48,8 @@ function BracketViewContent() {
   const [allUsers, setAllUsers]         = useState<any[]>([]);
   const [guestUsername, setGuestUsername]     = useState("");
   const [selectedUserId, setSelectedUserId]   = useState("");
+  const [isStarting, setIsStarting]           = useState(false);
+  const [isRegistering, setIsRegistering]     = useState(false);
   const [scoringMatch, setScoringMatch]       = useState<Match | null>(null);
   const [maximizedPanel, setMaximizedPanel]   = useState<"TERMINAL" | "STANDINGS" | null>(null);
   const [isMobile, setIsMobile]               = useState(false);
@@ -66,29 +70,37 @@ function BracketViewContent() {
   }, []);
 
   // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
-  useEffect(() => {
-    if (!tournament || tournament.status !== "ONGOING") return;
-    const ongoingMatches = tournament.rounds?.flatMap((r: any) => r.matches)?.filter((m: any) => m.status === "ONGOING") || [];
-    if (ongoingMatches.length === 0) return;
+  // Rewritten to use the shared usePolling hook. The old version listed
+  // seven state values as effect dependencies, so the 4-second timer was
+  // destroyed and recreated on almost every render. usePolling reads the
+  // latest state through a ref instead, so the timer is created once.
+  // It also pauses while the browser tab is hidden.
+  const hasOngoingMatches =
+    tournament?.status === "ONGOING" &&
+    (tournament.rounds?.flatMap((r: any) => r.matches)?.some((m: any) => m.status === "ONGOING") ?? false);
 
-    const interval = setInterval(async () => {
+  usePolling(
+    async () => {
+      if (!tournament) return;
+      const ongoingMatches = tournament.rounds?.flatMap((r: any) => r.matches)?.filter((m: any) => m.status === "ONGOING") || [];
       const myId = currentUser?.sub || currentUser?.id;
       const isGlobalAdmin = activeAdmin;
       
-      const matchesToPoll = isGlobalAdmin 
-        ? ongoingMatches 
+      const matchesToPoll = isGlobalAdmin
+        ? ongoingMatches
         : ongoingMatches.filter((m: Match) => m.player1?.id === myId || m.player2?.id === myId || m.player1Id === myId || m.player2Id === myId);
 
       for (const match of matchesToPoll) {
+        // Skip the match currently open in the scoring drawer: its
+        // TrackerPanel already polls the same endpoint, and polling it
+        // twice would double the requests for no benefit.
         if (scoringMatch?.id === match.id || dismissedPopups.has(match.id)) continue;
         if (activePlayerMatchPopup?.id === match.id || activeAdminMatchNotification?.id === match.id) continue;
         
         try {
-          const res = await fetch(
-            (process.env.NEXT_PUBLIC_API_URL?.startsWith("http")
-              ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
-              : "/api/backend") + API_ENDPOINTS.MATCHES.TRACKER_GET(match.id)
-          );
+          // Uses the shared authenticatedFetch instead of a local copy of
+          // the base-URL logic, so URL handling stays in one place.
+          const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.TRACKER_GET(match.id));
           if (res.ok) {
             const logs = await res.json();
             if (Array.isArray(logs)) {
@@ -103,7 +115,7 @@ function BracketViewContent() {
               const activeLog = logs.find((l: any) => l.trackerActive);
               if (activeLog) {
                 if (isGlobalAdmin) {
-                  const formatConfig = tournament?.format?.config || tournament?.formatConfig;
+                  const formatConfig = getTournamentConfig(tournament);
                   const hpThresholdMet = activeLog.mode === 'HP' && (activeLog.player1Value === 0 || activeLog.player2Value === 0);
                   const pointsThresholdMet = activeLog.mode === 'POINTS' && formatConfig?.pointsThreshold && (activeLog.player1Value >= formatConfig.pointsThreshold || activeLog.player2Value >= formatConfig.pointsThreshold);
                   
@@ -118,26 +130,31 @@ function BracketViewContent() {
           }
         } catch { /* silent poll fail */ }
       }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [tournament, activeAdmin, currentUser, scoringMatch, dismissedPopups, activePlayerMatchPopup, activeAdminMatchNotification]);
+    },
+    4000,
+    hasOngoingMatches,
+  );
   // END OF TEMPORARY POLLING BLOCK
 
   // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
-  // General auto-refresh for the bracket
-  useEffect(() => {
-    if (!tournamentId || (tournament?.status !== "ONGOING" && tournament?.status !== "OPEN")) return;
-    const generalInterval = setInterval(() => {
-      fetchTournamentData();
-    }, 15000);
-    return () => clearInterval(generalInterval);
-  }, [tournamentId, tournament?.status]);
+  // General auto-refresh for the bracket. Runs "silent" so it does not
+  // flash the loading state, and only refreshes the tournament and
+  // leaderboard. The old version re-fetched the signed-in user and the
+  // full registered-user list on every 15-second tick, even though
+  // neither changes while looking at a bracket.
+  usePolling(
+    () => fetchTournamentData(true),
+    15000,
+    !!tournamentId && (tournament?.status === "ONGOING" || tournament?.status === "OPEN"),
+  );
   // END OF TEMPORARY POLLING BLOCK
 
   useEffect(() => {
-    if (tournamentId) fetchTournamentData();
-    else router.push("/tournaments");
+    if (!tournamentId) { router.push("/tournaments"); return; }
+    // The signed-in user and the user list are loaded once here, not on
+    // every refresh tick.
+    fetchIdentity();
+    fetchTournamentData();
   }, [tournamentId]);
 
   useEffect(() => {
@@ -149,28 +166,37 @@ function BracketViewContent() {
   const addLog = (action: string, details?: string) =>
     setLogs(prev => [{ id: Math.random().toString(36).slice(7), timestamp: new Date().toLocaleTimeString(), action, details }, ...prev]);
 
-  const fetchTournamentData = async () => {
-    setLoading(true);
+  // Loads who is signed in (and, for organizers, the user list used by
+  // the registration panel). Split out of fetchTournamentData so it runs
+  // once on page load instead of on every refresh tick.
+  const fetchIdentity = async () => {
     try {
       const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
-      if (meRes.ok) {
-        const me = await safeJson(meRes);
-        setCurrentUser(me);
-        const auth = me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
-        setIsAdmin(auth);
-        if (auth) {
-          setIsEditMode(editParam !== "false");
-          const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
-          if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
-        } else {
-          setIsEditMode(false);
-        }
+      if (!meRes.ok) return;
+      const me = await safeJson(meRes);
+      setCurrentUser(me);
+      const auth = me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
+      setIsAdmin(auth);
+      if (auth) {
+        setIsEditMode(editParam !== "false");
+        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
+        if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
+      } else {
+        setIsEditMode(false);
       }
+    } catch { /* identity load failure is non-fatal; page still renders */ }
+  };
+
+  // "silent" refreshes (the 15-second poll) skip the loading state so
+  // the page does not flicker while the user is looking at it.
+  const fetchTournamentData = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
       const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!));
       if (tRes.ok) {
         const t = await safeJson(tRes);
         setTournament(t);
-        addLog("TOURNAMENT DATA READY", `${t.name.toUpperCase()} STATUS: ${t.status}`);
+        if (!silent) addLog("TOURNAMENT DATA READY", `${t.name.toUpperCase()} STATUS: ${t.status}`);
         
         // Auto-switch to CARD view for Swiss/Round Robin
         const formatSystem = typeof t.format === 'string' ? t.format : t.format?.system;
@@ -188,29 +214,47 @@ function BracketViewContent() {
       const lRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEADERBOARD(tournamentId!));
       if (lRes.ok) setLeaderboard(await safeJson(lRes) ?? []);
     } catch { addLog("ERROR", "SERVER CONNECTION FAILED"); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   };
 
   const handleStartTournament = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
-    const data = await safeJson(res);
-    if (res.ok) { addLog("TOURNAMENT STARTED", "MATCHES INITIALIZED"); fetchTournamentData(); }
-    else { addLog("ERROR", data?.message || "START FAILED"); }
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
+      const data = await safeJson(res);
+      if (res.ok) { addLog("TOURNAMENT STARTED", "MATCHES INITIALIZED"); fetchTournamentData(); }
+      else { addLog("ERROR", data?.message || "START FAILED"); }
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleJoin = async (userId: string) => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId!), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
-    const data = await safeJson(res);
-    if (res.ok) { addLog("REGISTRATION", "PARTICIPANT REGISTERED"); fetchTournamentData(); return true; }
-    addLog("ERROR", data?.message || "SERVER REJECTED"); return false;
+    if (isRegistering) return false;
+    setIsRegistering(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId!), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
+      const data = await safeJson(res);
+      if (res.ok) { addLog("REGISTRATION", "PARTICIPANT REGISTERED"); fetchTournamentData(); return true; }
+      addLog("ERROR", data?.message || "SERVER REJECTED"); return false;
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   const handleAddGuest = async () => {
+    if (isRegistering) return;
     if (!guestUsername || tournament?.participants.length >= tournament?.maxPlayers) { addLog("ERROR", "MAX CAPACITY REACHED"); return; }
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }) });
-    const data = await safeJson(res);
-    if (res.ok) { addLog("REGISTRATION", "GUEST UNIT DEPLOYED"); setGuestUsername(""); fetchTournamentData(); }
-    else { addLog("ERROR", data?.message || "DEPLOYMENT FAILED"); }
+    setIsRegistering(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }) });
+      const data = await safeJson(res);
+      if (res.ok) { addLog("REGISTRATION", "GUEST ADDED"); setGuestUsername(""); fetchTournamentData(); }
+      else { addLog("ERROR", data?.message || "GUEST REGISTRATION FAILED"); }
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
 
@@ -339,8 +383,8 @@ function BracketViewContent() {
             )}
 
             {activeAdmin && tournament?.status === "OPEN" && (
-              <button onClick={handleStartTournament} className="px-8 py-3 bg-primary text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-primary/20 font-poppins">
-                Start Tournament
+              <button onClick={handleStartTournament} disabled={isStarting} className="px-8 py-3 bg-primary text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-primary/20 font-poppins disabled:opacity-50 disabled:pointer-events-none">
+                {isStarting ? "Starting..." : "Start Tournament"}
               </button>
             )}
           </div>
@@ -541,7 +585,7 @@ function BracketViewContent() {
 
       <ScoringDrawer 
         match={scoringMatch} 
-        formatConfig={tournament?.format?.config || tournament?.formatConfig}
+        formatConfig={getTournamentConfig(tournament)}
         isAdmin={activeAdmin}
         currentUserId={currentUser?.sub || currentUser?.id}
         tournamentId={tournamentId}

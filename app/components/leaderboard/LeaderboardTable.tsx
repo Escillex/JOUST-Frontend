@@ -3,7 +3,7 @@ import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 
 interface LeaderboardEntry {
   rank: number;
@@ -61,13 +61,16 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                 className="p-5 flex items-center justify-between group hover:bg-white/[0.03] transition-colors"
               >
                 <div className="flex items-center gap-4">
-                  <span className={`text-2xl font-black italic font-poppins tracking-tighter ${idx < 3 ? 'text-primary' : 'text-white/20'}`}>
-                    #{String(idx + 1).padStart(2, '0')}
+                  {/* Show the rank number sent by the server, not the row
+                      position. When players are tied, the server gives them
+                      the same rank, and counting rows would hide that. */}
+                  <span className={`text-2xl font-black italic font-poppins tracking-tighter ${entry.rank <= 3 ? 'text-primary' : 'text-white/20'}`}>
+                    #{String(entry.rank ?? idx + 1).padStart(2, '0')}
                   </span>
                   <div className="relative w-12 h-12 bg-surface border border-white/10 flex items-center justify-center font-black text-xs text-primary overflow-hidden shrink-0">
                     {entry.avatarUrl ? (
                       <Image 
-                        src={entry.avatarUrl.startsWith('http') ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`} 
+                        src={resolveImageUrl(entry.avatarUrl)}
                         alt={entry.username} 
                         fill 
                         className="object-cover"
@@ -127,12 +130,9 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic">COMPETITOR</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">POINTS</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">W / L / D</th>
-              <th 
-                className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center cursor-help"
-                title="OMW (Opponent Match Win Rate) / OOMW (Opponent's Opponent Match Win Rate)"
-              >
-                OMW / OOMW
-              </th>
+              {/* The OMW / OOMW column was removed: the backend never
+                  calculates those tiebreaker values (it always sends 0),
+                  so the column showed numbers that were not real. */}
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-right">WIN RATE</th>
             </tr>
           </thead>
@@ -147,8 +147,10 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                 className="group hover:bg-primary/5 transition-colors bg-[#1B1B1B]"
               >
                 <td className="py-8 px-10">
-                  <span className={`text-5xl font-black tracking-tighter font-poppins italic ${idx < 3 ? 'text-primary' : 'text-white/10'}`}>
-                    #{String(idx + 1).padStart(2, '0')}
+                  {/* Server rank instead of row position — see comment on
+                      the compact layout above. Tied players share a rank. */}
+                  <span className={`text-5xl font-black tracking-tighter font-poppins italic ${entry.rank <= 3 ? 'text-primary' : 'text-white/10'}`}>
+                    #{String(entry.rank ?? idx + 1).padStart(2, '0')}
                   </span>
                 </td>
                 <td className="py-8 px-10">
@@ -156,7 +158,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     <div className="relative w-16 h-16 bg-surface border-2 border-white/10 group-hover:border-primary flex items-center justify-center font-black text-2xl text-primary transition-all overflow-hidden shrink-0">
                       {entry.avatarUrl ? (
                         <Image 
-                          src={entry.avatarUrl.startsWith('http') ? entry.avatarUrl : `${API_URL}${entry.avatarUrl}`} 
+                          src={resolveImageUrl(entry.avatarUrl)}
                           alt={entry.username} 
                           fill 
                           className="object-cover"
@@ -190,14 +192,8 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     <span className="text-sm font-black text-white/40">{entry.draws}</span>
                   </div>
                 </td>
-                <td className="py-8 px-10 text-center">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xl font-black text-white tracking-tighter">{(entry.omw * 100).toFixed(1)}%</span>
-                    <span className="text-[10px] font-black text-white/20 tracking-widest uppercase">{(entry.oomw * 100).toFixed(1)}%</span>
-                  </div>
-                </td>
                 <td className="py-8 px-10 text-right">
-                  <span className={`text-4xl font-black font-poppins italic ${idx < 3 ? "text-primary" : "text-white"}`}>
+                  <span className={`text-4xl font-black font-poppins italic ${entry.rank <= 3 ? "text-primary" : "text-white"}`}>
                     {(entry.matchWinPct * 100).toFixed(0)}%
                   </span>
                 </td>

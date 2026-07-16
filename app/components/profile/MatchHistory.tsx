@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import * as m from "motion/react";
 import { BentoBox } from "../ui/Bento";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, API_URL } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl } from "../../utils/api";
 
 interface Activity {
   id: string;
@@ -122,7 +122,7 @@ export default function MatchHistory({ activities: initialActivities = [], varia
                         <div className="relative w-10 h-10 bg-background border border-white/10 flex items-center justify-center font-black text-xs text-primary overflow-hidden shrink-0">
                           {activity.player1.avatarUrl ? (
                             <Image 
-                              src={activity.player1.avatarUrl.startsWith('http') ? activity.player1.avatarUrl : `${API_URL}${activity.player1.avatarUrl}`} 
+                              src={resolveImageUrl(activity.player1.avatarUrl)}
                               alt={activity.player1.name} 
                               fill 
                               className="object-cover"
@@ -182,7 +182,7 @@ export default function MatchHistory({ activities: initialActivities = [], varia
                         <div className="relative w-10 h-10 bg-background border border-white/10 flex items-center justify-center font-black text-xs text-primary overflow-hidden shrink-0">
                           {activity.player2.avatarUrl ? (
                             <Image 
-                              src={activity.player2.avatarUrl.startsWith('http') ? activity.player2.avatarUrl : `${API_URL}${activity.player2.avatarUrl}`} 
+                              src={resolveImageUrl(activity.player2.avatarUrl)}
                               alt={activity.player2.name} 
                               fill 
                               className="object-cover"

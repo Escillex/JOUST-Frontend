@@ -47,6 +47,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [swissPointsWin, setSwissPointsWin] = useState(3);
   const [swissPointsDraw, setSwissPointsDraw] = useState(1);
   const [swissPointsLoss, setSwissPointsLoss] = useState(0);
+  const [topCutSize, setTopCutSize] = useState(8);
 
   // Placement points (awarded globally at tournament completion)
   const [placementChampion, setPlacementChampion] = useState(10);
@@ -125,18 +126,21 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const applyFormat = (fmt: TournamentFormatModel) => {
     setSelectedFormatId(fmt.id);
     setGameName(fmt.gameName || "");
-    const c = fmt.config;
+    const raw = (fmt.config ?? {}) as Record<string, any>;
+    // HYBRID presets nest the scoring rules under phase1 (mirrors backend resolveConfig)
+    const c = raw.phase1 ?? raw;
     setFormat(fmt.system);
     setBestOf(c.bestOf ?? 1);
     setAllowDraw(c.allowDraw ?? false);
     setPointsThreshold(c.pointsThreshold ?? 0);
     setStartingHp(c.startingHp ?? 0);
-    if (fmt.system === "SWISS") {
+    if (fmt.system === "SWISS" || fmt.system === "HYBRID") {
       setSwissRounds(c.swissRounds ?? 3);
       setSwissPointsWin(c.swissPointsForWin ?? 3);
       setSwissPointsDraw(c.swissPointsForDraw ?? 1);
       setSwissPointsLoss(c.swissPointsForLoss ?? 0);
     }
+    setTopCutSize(raw.phase2?.topCutSize ?? 8);
     setPlacementChampion(c.placementPointsChampion ?? 10);
     setPlacement2nd(c.placementPoints2nd ?? 7);
     setPlacement3rd(c.placementPoints3rd ?? 5);
@@ -165,17 +169,41 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     setIsSubmitting(true);
     const finalDate = date ? (startTime ? `${date}T${startTime}` : `${date}T00:00:00`) : null;
 
+    // Full rules snapshot — stored as the tournament's own config override
+    const rules: Record<string, any> = {
+      bestOf,
+      allowDraw,
+      pointsThreshold,
+      startingHp,
+      placementPointsChampion: placementChampion,
+      placementPoints2nd: placement2nd,
+      placementPoints3rd: placement3rd,
+      placementPointsTopCut: placementTopCut,
+      placementPointsParticipation: placementParticipation,
+    };
+    if (format === "SWISS" || format === "HYBRID") {
+      rules.swissRounds = swissRounds;
+      rules.swissPointsForWin = swissPointsWin;
+      rules.swissPointsForDraw = swissPointsDraw;
+      rules.swissPointsForLoss = swissPointsLoss;
+    }
+    const config =
+      format === "HYBRID"
+        ? { phase1: rules, phase2: { topCutSize } }
+        : rules;
+
     const body = {
-      name, 
+      name,
       description: description || undefined,
-      formatId: selectedFormatId, 
+      formatId: selectedFormatId,
       maxPlayers: Number(maxPlayers),
       prizePool: prizePool === "" ? null : Number(prizePool),
-      venue, 
-      date: finalDate, 
-      isPrivate, 
+      venue,
+      date: finalDate,
+      isPrivate,
       startNow,
       createdById: userId,
+      config,
     };
 
     try {
@@ -403,10 +431,12 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         </div>
       </div>
 
-      {format === "SWISS" && (
+      {(format === "SWISS" || format === "HYBRID") && (
         <div className="pt-6 border-t border-white/10">
-          <h4 className="text-xs font-semibold text-[#888888] mb-4">Swiss System Configuration</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <h4 className="text-xs font-semibold text-[#888888] mb-4">
+            {format === "HYBRID" ? "Swiss Phase Configuration" : "Swiss System Configuration"}
+          </h4>
+          <div className={`grid grid-cols-2 gap-4 ${format === "HYBRID" ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
             <Field label="Scheduled Rounds">
               <input type="number" value={swissRounds} onChange={e => setSwissRounds(Number(e.target.value))} className={inputCls} />
             </Field>
@@ -419,6 +449,11 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             <Field label="Points / Loss">
               <input type="number" value={swissPointsLoss} onChange={e => setSwissPointsLoss(Number(e.target.value))} className={inputCls} />
             </Field>
+            {format === "HYBRID" && (
+              <Field label="Top Cut Size">
+                <input type="number" value={topCutSize} onChange={e => setTopCutSize(Math.max(2, Number(e.target.value)))} min={2} className={inputCls} />
+              </Field>
+            )}
           </div>
         </div>
       )}

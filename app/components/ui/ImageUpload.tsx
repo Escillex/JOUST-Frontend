@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 import CropModal from "./CropModal";
 
 interface ImageUploadProps {
@@ -33,10 +33,10 @@ export default function ImageUpload({
   const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   // Resolve display URL — prefix API base for relative server paths
+  // resolveImageUrl also keeps "blob:" preview URLs unchanged, which
+  // this component relies on while a new image is being uploaded.
   const displayUrl = currentUrl
-    ? (currentUrl.startsWith("http") || currentUrl.startsWith("blob:"))
-      ? currentUrl
-      : `${API_URL}${currentUrl}`
+    ? resolveImageUrl(currentUrl)
     : "/placeholder.jpg";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

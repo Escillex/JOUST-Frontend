@@ -84,7 +84,7 @@ export default function InitialAppLoader({ children }: { children: React.ReactNo
               }
             `}</style>
             <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-primary/80 animate-pulse font-poppins">
-              INITIALIZING_SYSTEM
+              Loading Hobby+
             </p>
           </div>
         </div>

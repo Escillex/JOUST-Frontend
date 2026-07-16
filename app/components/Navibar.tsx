@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { authenticatedFetch, API_ENDPOINTS, API_URL } from "../utils/api";
+import { resolveImageUrl } from "../utils/api";
 import { useUser } from "./UserProvider";
 
 /**
@@ -14,7 +14,7 @@ import { useUser } from "./UserProvider";
 export default function Navibar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, refreshUser } = useUser();
+  const { user, loading, logout } = useUser();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -29,15 +29,11 @@ export default function Navibar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sign-out logic now lives in one place (UserProvider.logout), so this
+  // component only closes its own menu and delegates the rest.
   const handleSignOut = async () => {
-    try {
-      await authenticatedFetch(API_ENDPOINTS.AUTH.SIGNOUT);
-    } finally {
-      localStorage.removeItem("token");
-      await refreshUser();
-      setIsProfileMenuOpen(false);
-      router.push("/");
-    }
+    setIsProfileMenuOpen(false);
+    await logout();
   };
 
   const navLinks = [];
@@ -129,7 +125,7 @@ export default function Navibar() {
                   >
                     {user?.avatarUrl ? (
                       <Image 
-                        src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_URL}${user.avatarUrl}`} 
+                        src={resolveImageUrl(user.avatarUrl)}
                         alt={user.username || "User"} 
                         fill 
                         className="object-cover"
@@ -146,7 +142,7 @@ export default function Navibar() {
                     <div className="w-12 h-12 border border-primary/20 relative overflow-hidden flex-shrink-0">
                       {user.avatarUrl ? (
                         <Image 
-                          src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_URL}${user.avatarUrl}`} 
+                          src={resolveImageUrl(user.avatarUrl)}
                           alt={user.username || "User"} 
                           fill 
                           className="object-cover"

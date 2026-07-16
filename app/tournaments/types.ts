@@ -47,6 +47,8 @@ export interface Tournament {
   };
   formatId: string;
   format: string | TournamentFormatModel;
+  /** Per-tournament rules override; when set, fully replaces the format preset's config */
+  config?: FormatConfig | null;
   participants: {
     id: string;
     userId: string;

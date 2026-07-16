@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Tournament } from "../tournaments/types";
 import HomeFrame from "./HomeFrame";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, API_URL } from "../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl } from "../utils/api";
 
 interface TournamentPreviewProps {
   tournaments: Tournament[];
@@ -79,7 +79,7 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
           >
             <Link href={`/tournaments/${featured.id}`} className="block relative w-full h-[380px] md:h-auto md:aspect-[16/9] bg-zinc-900 border-4 border-white hover:border-primary hover:shadow-[16px_16px_0px_0px_#52B946] transition-all duration-300 overflow-hidden">
               <img 
-                src={featured.bannerUrl ? (featured.bannerUrl.startsWith("http") ? featured.bannerUrl : `${API_URL}${featured.bannerUrl}`) : "/placeholder.jpg"}
+                src={resolveImageUrl(featured.bannerUrl, "/placeholder.jpg")}
                 alt={featured.name}
                 className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 z-0"
               />

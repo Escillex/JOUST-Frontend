@@ -2,14 +2,17 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, API_URL } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl } from "../../utils/api";
 import { Tournament } from "../types";
+import { getTournamentConfig } from "../../utils/formatConfig";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import BracketPreview from "../../components/tournaments/bracket/BracketPreview";
+import { useToast } from "../../components/ui/Toast";
 
 function TournamentViewContent() {
+  const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
   const tournamentId = params.id as string;
@@ -73,11 +76,13 @@ function TournamentViewContent() {
       if (res.ok) {
         router.push(`/tournaments/${tournamentId}/lobby`);
       } else {
-        const err = await safeJson(res) || { message: "Join failed" };
-        alert(err.message || "Join failed");
+        // Toast instead of alert(): alert() blocks the whole page and
+        // is not allowed in this project.
+        const err = await safeJson(res) || { message: "Failed to join the tournament" };
+        toast(err.message || "Failed to join the tournament", "error");
       }
-    } catch (error) {
-      alert("Connection error");
+    } catch {
+      toast("Could not reach the server", "error");
     } finally {
       setJoining(false);
     }
@@ -164,10 +169,7 @@ function TournamentViewContent() {
                 <div className="relative group border-2 border-component-border overflow-hidden">
                   <div className="aspect-video relative overflow-hidden">
                     <Image 
-                      src={tournament.bannerUrl 
-                        ? (tournament.bannerUrl.startsWith("http") ? tournament.bannerUrl : `${API_URL}${tournament.bannerUrl}`)
-                        : "/placeholder.jpg"
-                      } 
+                      src={resolveImageUrl(tournament.bannerUrl, "/placeholder.jpg")}
                       alt={tournament.name} 
                       fill 
                       unoptimized
@@ -289,8 +291,8 @@ function TournamentViewContent() {
 
                 {/* Placement Points Module */}
                 {(() => {
-                  const cfg = (typeof tournament.format === 'object' ? tournament.format?.config : null) as any;
-                  if (!cfg) return null;
+                  if (!tournament.config && typeof tournament.format !== 'object') return null;
+                  const cfg = getTournamentConfig(tournament) as any;
                   const champion = cfg?.placementPointsChampion ?? 10;
                   const second = cfg?.placementPoints2nd ?? 7;
                   const third = cfg?.placementPoints3rd ?? 5;

@@ -44,8 +44,9 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
     { label: "LOSSES", value: stats.losses, color: "default" },
     { label: "DRAWS", value: stats.draws, color: "default" },
     { label: "TOURNAMENTS", value: stats.tournamentsPlayed, color: "default" },
-    { label: "OMW", value: `${(stats.omw * 100).toFixed(1)}%`, color: "default", title: "Opponent Match Win Rate" },
-    { label: "OOMW", value: `${(stats.oomw * 100).toFixed(1)}%`, color: "default", title: "Opponent's Opponent Match Win Rate" },
+    // The OMW / OOMW tiles were removed: the backend never calculates
+    // those tiebreaker values (it always sends 0 or just repeats the
+    // win rate), so the tiles showed numbers that were not real.
   ];
 
   const grid = (
@@ -56,10 +57,7 @@ export default function StatsGrid({ stats, variant = "default" }: StatsGridProps
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ delay: idx * 0.05 }}
-          title={item.title}
-          className={`
-            p-8 flex flex-col justify-center items-center transition-all border border-component-border bg-component-background group ${item.title ? "cursor-help" : ""}
-          `}
+          className="p-8 flex flex-col justify-center items-center transition-all border border-component-border bg-component-background group"
         >
           <span className="text-white/30 text-[9px] font-black uppercase tracking-[0.3em] mb-4 text-center font-poppins">
             {item.label}

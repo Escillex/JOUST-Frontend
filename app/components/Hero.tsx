@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
 import BrandButton from "./BrandButton";
-import { API_URL } from "../utils/api";
+import { resolveImageUrl } from "../utils/api";
 
 interface Slide {
   image: string;
@@ -81,7 +81,7 @@ export default function Hero({
         {slides.map((slide, idx) => (
           <img 
             key={idx}
-            src={slide.image.startsWith("http") || slide.image.startsWith("/") ? slide.image : `${API_URL}${slide.image}`}
+            src={resolveImageUrl(slide.image)}
             alt=""
             loading="eager"
           />
@@ -102,9 +102,7 @@ export default function Hero({
             <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/20 to-background z-10" />
             {slides[currentSlide].image && (
               <img
-                src={slides[currentSlide].image.startsWith("http") || slides[currentSlide].image.startsWith("/")
-                  ? slides[currentSlide].image
-                  : `${API_URL}${slides[currentSlide].image}`}
+                src={resolveImageUrl(slides[currentSlide].image)}
                 alt={slides[currentSlide].title || "Hero Image"}
                 className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-700 scale-105"
               />
@@ -127,7 +125,9 @@ export default function Hero({
       <div className="absolute bottom-12 right-12 w-32 h-32 border-b border-r border-primary/20 pointer-events-none z-20" />
       
       <div className="absolute top-12 right-12 flex flex-col items-end gap-1 z-20 opacity-20 hidden md:flex">
-        <span className="text-[8px] font-black tracking-widest text-primary">SYSTEM_INIT</span>
+        {/* Reworded from "SYSTEM_INIT": decorative labels must still use
+            real words, not made-up system jargon (project language rule). */}
+        <span className="text-[8px] font-black tracking-widest text-primary">HOBBY+</span>
         <span className="text-[8px] font-black tracking-widest text-white">LATENCY: 0.04ms</span>
         <span className="text-[8px] font-black tracking-widest text-white">UPTIME: 100.0%</span>
       </div>

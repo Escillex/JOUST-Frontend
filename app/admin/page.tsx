@@ -4,12 +4,12 @@ import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import { motion, AnimatePresence } from "motion/react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
+import { useToast } from "../components/ui/Toast";
 import StatCard from "../components/admin/StatCard";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
 import UserModal from "../components/admin/UserModal";
 import ConvertGuestModal from "../components/admin/ConvertGuestModal";
-import SystemLogs from "../components/admin/SystemLogs";
 import DevPanel from "../components/admin/DevPanel";
 import PresetManager from "../components/admin/PresetManager";
 
@@ -64,8 +64,23 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [tournaments, setTournaments] = useState<AdminTournament[]>([]);
   const [latency, setLatency] = useState(0);
-  const [errorMsg, setErrorMsg] = useState("");
+  const { toast } = useToast();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+
+  const withBusy = async (id: string, fn: () => Promise<void>) => {
+    if (busyIds.has(id)) return;
+    setBusyIds(prev => new Set(prev).add(id));
+    try {
+      await fn();
+    } finally {
+      setBusyIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
@@ -123,7 +138,7 @@ export default function AdminDashboard() {
       setLatency(Math.round(endTime - startTime));
     } catch (err) {
       console.error("Dashboard error", err);
-      setErrorMsg("API_FAILURE: CONNECTION_LOST");
+      toast("Failed to load dashboard data", "error");
     } finally {
       setIsLoading(false);
     }
@@ -141,16 +156,18 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleForceComplete = async (id: string) => {
-    if (!confirm("Execute terminal force-complete? All active matches will be finalized.")) return;
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
-    if (res.ok) {
-      setTournaments(prev => prev.map(t => t.id === id ? { ...t, status: "COMPLETED" } : t));
-      setStats(prev => ({ ...prev, activeTournaments: prev.activeTournaments - 1, completedTournaments: prev.completedTournaments + 1 }));
-    } else {
-      setErrorMsg("UPDATE_FAILURE: REQUEST_REJECTED");
-    }
-  };
+  const handleForceComplete = (id: string) =>
+    withBusy(id, async () => {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
+      if (res.ok) {
+        setTournaments(prev => prev.map(t => t.id === id ? { ...t, status: "COMPLETED" } : t));
+        setStats(prev => ({ ...prev, activeTournaments: prev.activeTournaments - 1, completedTournaments: prev.completedTournaments + 1 }));
+        toast("Tournament force-completed", "success");
+      } else {
+        const data = await safeJson(res);
+        toast(data?.message || "Failed to complete tournament", "error");
+      }
+    });
 
   const handleUserModalSubmit = async (userId: string | null, data: any) => {
     try {
@@ -162,7 +179,9 @@ export default function AdminDashboard() {
         });
         if (!res.ok) {
           const errData = await safeJson(res);
-          throw new Error(errData?.message || "INIT_FAILURE: USER_CREATION_REJECTED");
+          // Plain error message instead of a code like "INIT_FAILURE".
+          // Real users read this text, so it must be normal language.
+          throw new Error(errData?.message || "Failed to create user");
         }
       } else {
         const profileData = { username: data.username, email: data.email };
@@ -182,83 +201,104 @@ export default function AdminDashboard() {
         ]);
 
         if (!profileRes.ok || !rolesRes.ok) {
-          throw new Error("SYNC_FAILURE: UPDATE_REJECTED");
+          throw new Error("Failed to save user changes");
         }
       }
       await fetchData();
+      // Show a visible confirmation. Before this change nothing on the
+      // screen told the admin the action worked.
+      toast(userId ? "User updated" : "User created", "success");
     } catch (err: any) {
-      setErrorMsg(err.message);
+      // The old code stored the error in a state variable that was never
+      // shown on screen, so failures were invisible. A toast is visible.
+      toast(err.message, "error");
+      // Re-throw so the modal knows it failed and stays open.
       throw err;
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Permanently delete this user record?")) return;
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.AUTH.DELETE_USER(userId), { method: "DELETE" });
-      if (res.ok) {
-        const updatedUsers = users.filter(u => (u.id !== userId && u.sub !== userId));
-        setUsers(updatedUsers);
-        updateStats(updatedUsers, tournaments);
-      } else {
-        const data = await safeJson(res);
-        setErrorMsg(`DELETE_FAILURE: ${data?.message || "REJECTION"}`);
+  // confirm() popups are not allowed in this project (AGENTS.md rule 5).
+  // Instead we run the action directly and block repeat clicks with
+  // withBusy, then report the result with a toast.
+  const handleDeleteUser = (userId: string) =>
+    withBusy(userId, async () => {
+      try {
+        const res = await authenticatedFetch(API_ENDPOINTS.AUTH.DELETE_USER(userId), { method: "DELETE" });
+        if (res.ok) {
+          const updatedUsers = users.filter(u => (u.id !== userId && u.sub !== userId));
+          setUsers(updatedUsers);
+          updateStats(updatedUsers, tournaments);
+          toast("User deleted", "success");
+        } else {
+          const data = await safeJson(res);
+          toast(data?.message || "Failed to delete user", "error");
+        }
+      } catch {
+        toast("Network error while deleting user", "error");
       }
-    } catch (err) {
-      setErrorMsg("API_ERROR: DELETE_COMMAND_TIMED_OUT");
-    }
-  };
+    });
 
-  const handleDeleteFormat = async (formatId: string) => {
-    if (!confirm("Permanently decommission this format preset?")) return;
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(formatId), { method: "DELETE" });
-      if (res.ok) {
-        setFormats(prev => prev.filter(f => f.id !== formatId));
-      } else {
-        const data = await safeJson(res);
-        setErrorMsg(`DELETE_FAILURE: ${data?.message || "REJECTION"}`);
+  // Same pattern as handleDeleteUser: no confirm() popup, block double
+  // clicks with withBusy, show the outcome with a toast. The backend
+  // refuses to delete a preset that is still in use, so that error
+  // message must reach the admin instead of being hidden.
+  const handleDeleteFormat = (formatId: string) =>
+    withBusy(formatId, async () => {
+      try {
+        const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(formatId), { method: "DELETE" });
+        if (res.ok) {
+          setFormats(prev => prev.filter(f => f.id !== formatId));
+          toast("Format preset deleted", "success");
+        } else {
+          const data = await safeJson(res);
+          toast(data?.message || "Failed to delete format preset", "error");
+        }
+      } catch {
+        toast("Network error while deleting format preset", "error");
       }
-    } catch (err) {
-      setErrorMsg("API_ERROR: DELETE_COMMAND_TIMED_OUT");
-    }
-  };
+    });
 
   const handleBatchDelete = async (userIds: string[]) => {
-    if (!confirm(`Delete ${userIds.length} selected user records?`)) return;
     setIsLoading(true);
     try {
       const results = await Promise.all(
         userIds.map(id => authenticatedFetch(API_ENDPOINTS.AUTH.DELETE_USER(id), { method: "DELETE" }))
       );
+      // Some deletes can succeed while others fail, so we count the
+      // failures and report an exact number instead of a vague error.
       const successCount = results.filter(r => r.ok).length;
       if (successCount < userIds.length) {
-        setErrorMsg(`BATCH_FAILURE: ${userIds.length - successCount} USERS REMAIN`);
+        toast(`${userIds.length - successCount} of ${userIds.length} users could not be deleted`, "error");
+      } else {
+        toast(`${successCount} users deleted`, "success");
       }
       await fetchData();
-    } catch (err) {
-      setErrorMsg("BATCH_ERROR: EXECUTION_STOPPED");
+    } catch {
+      toast("Network error during batch delete", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleConvertGuest = async (guestId: string, data: any) => {
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.AUTH.CONVERT_GUEST(guestId), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        await fetchData();
-      } else {
-        const errData = await safeJson(res);
-        setErrorMsg(`UPDATE_FAILURE: ${errData?.message || "REJECTION"}`);
-      }
-    } catch (err) {
-      setErrorMsg("API_ERROR: UPDATE_TIMED_OUT");
+    // This function must THROW when the request fails. The modal only
+    // closes when this promise resolves, so throwing keeps the modal
+    // open and lets the admin fix the input and try again. The old
+    // version swallowed the error, so the modal closed and it looked
+    // like the conversion worked when it did not.
+    const res = await authenticatedFetch(API_ENDPOINTS.AUTH.CONVERT_GUEST(guestId), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errData = await safeJson(res);
+      const msg = errData?.message || "Failed to convert guest";
+      toast(msg, "error");
+      throw new Error(msg);
     }
+    await fetchData();
+    toast("Guest converted to a registered account", "success");
   };
 
   if (isAuthorized === false) return null;
@@ -376,17 +416,20 @@ export default function AdminDashboard() {
 
                 {/* Column 2: System Utilities (Narrow) */}
                 <div className="lg:col-span-4 space-y-8">
-                  <div className="bg-[#1B1B1B] border border-white/10 p-6">
-                    <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-6">System Audit Log</h3>
-                    <SystemLogs />
-                  </div>
+                  {/* The "System Audit Log" card was removed. It was not
+                      a real audit log: it re-downloaded all users and
+                      tournaments every 10 seconds just to invent
+                      log-looking lines from them. */}
 
                   {/* Tournament Format Manager */}
                   <div className="bg-[#1B1B1B] border border-white/10 p-6 space-y-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Tournament Formats</h3>
+                      {/* Switch the tab state directly. The old link pushed
+                          "?tab=PRESETS" to the URL, but nothing on this page
+                          reads that query parameter, so the button did nothing. */}
                       <button
-                        onClick={() => router.push("/admin?tab=PRESETS")}
+                        onClick={() => setActiveTab("PRESETS")}
                         className="text-[9px] font-black text-primary uppercase tracking-widest hover:brightness-125"
                       >
                         MANAGE

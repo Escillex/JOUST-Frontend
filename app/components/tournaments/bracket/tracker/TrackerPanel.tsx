@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MatchGameLog, GameTrackingMode, FormatConfig } from '../../../../tournaments/types';
 import { Match } from '../../../../tournaments/[id]/bracket/types';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../../utils/api';
+import { usePolling } from '../../../../utils/usePolling';
 import GameBar from './GameBar';
 import GameSeriesScore from './GameSeriesScore';
 import PlayerToolkit from './PlayerToolkit';
@@ -24,11 +25,7 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
   const [isUpdating, setIsUpdating] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevCompletedCount = useRef<number>(-1);
-
-  // Bye matches: no tracker
-  if (match.isBye) return null;
 
   const bestOf = formatConfig?.bestOf ?? 1;
   const winsNeeded = Math.ceil(bestOf / 2);
@@ -63,11 +60,9 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
 
   const fetchLogs = useCallback(async () => {
     try {
-      const res = await fetch(
-        (process.env.NEXT_PUBLIC_API_URL?.startsWith('http')
-          ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '')
-          : '/api/backend') + API_ENDPOINTS.MATCHES.TRACKER_GET(match.id)
-      );
+      // Uses the shared authenticatedFetch instead of a local copy of
+      // the base-URL logic, so URL handling stays in one place.
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.TRACKER_GET(match.id));
       if (res.ok) {
         const data = await res.json();
         const newLogs = Array.isArray(data) ? data : [];
@@ -84,12 +79,22 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
   }, [match.id]);
 
   // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
+  // Uses the shared usePolling hook so this poll also pauses while the
+  // browser tab is hidden. For a finished match (winner already set)
+  // the logs cannot change anymore, so fetch them once instead of
+  // polling every 4 seconds. Bye matches have no tracker at all, so
+  // they never fetch.
+  const seriesOver = !!match.winnerId;
+  usePolling(fetchLogs, 4000, !match.isBye && !seriesOver);
   useEffect(() => {
-    fetchLogs();
-    intervalRef.current = setInterval(fetchLogs, 4000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchLogs]);
+    if (!match.isBye && seriesOver) fetchLogs();
+  }, [match.isBye, seriesOver, fetchLogs]);
   // END OF TEMPORARY POLLING BLOCK
+
+  // Bye matches: no tracker. This check used to sit above the hooks,
+  // which breaks React's rule that hooks must run on every render in
+  // the same order — so it was moved below them.
+  if (match.isBye) return null;
 
   // ── Admin actions ─────────────────────────────────────────────────────────────
 

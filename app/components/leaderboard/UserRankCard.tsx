@@ -71,20 +71,10 @@ export default function UserRankCard({ stats, loading }: UserRankProps) {
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">DRAWS</p>
             <p className="text-4xl md:text-5xl font-black text-white/20 italic tracking-tighter font-poppins">{stats.draws}</p>
           </div>
-          <div 
-            className="text-center md:text-left cursor-help"
-            title="OMW: Opponent Match Win Rate"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">OMW</p>
-            <p className="text-4xl md:text-5xl font-black text-white/60 italic tracking-tighter font-poppins">{(stats.omw * 100).toFixed(1)}%</p>
-          </div>
-          <div 
-            className="text-center md:text-left cursor-help"
-            title="OOMW: Opponent's Opponent Match Win Rate"
-          >
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">OOMW</p>
-            <p className="text-4xl md:text-5xl font-black text-white/60 italic tracking-tighter font-poppins">{(stats.oomw * 100).toFixed(1)}%</p>
-          </div>
+          {/* The OMW / OOMW tiles were removed: the backend never
+              calculates those tiebreaker values (it always sends 0 or
+              just repeats the win rate), so the tiles showed numbers
+              that were not real. */}
           <div className="text-center md:text-left">
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">WIN RATE</p>
             <p className="text-4xl md:text-5xl font-black text-primary italic tracking-tighter font-poppins">

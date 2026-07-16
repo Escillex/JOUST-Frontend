@@ -33,8 +33,11 @@ export default async function Home() {
 
     if (tRes.ok) {
       const data = await tRes.json();
+      // "PENDING" was removed from this filter: it is not a real
+      // tournament status (the backend only uses UPCOMING, OPEN,
+      // ONGOING and COMPLETED), so checking for it did nothing.
       tournaments = data.filter((t: { status: string }) =>
-        t.status === "OPEN" || t.status === "UPCOMING" || t.status === "PENDING" || t.status === "ONGOING"
+        t.status === "OPEN" || t.status === "UPCOMING" || t.status === "ONGOING"
       );
     }
 

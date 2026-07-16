@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { getTournamentConfig } from "../../../utils/formatConfig";
 
 interface Props {
   tournament: Tournament;
@@ -13,7 +14,12 @@ type ResolutionStrategy = "DRAW" | "RANDOM" | "PLAYER1" | "PLAYER2";
 
 export default function RoundControlPanel({ tournament, fetchData, setMessage }: Props) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const allowsDraw = tournament.formatConfig?.allowDraw ?? false;
+  const config = getTournamentConfig(tournament);
+  // The backend rejects winnerless submits for series (bestOf > 1) and threshold-based matches
+  const allowsDraw =
+    (config.allowDraw ?? false) &&
+    (config.bestOf ?? 1) <= 1 &&
+    !(config.pointsThreshold && config.pointsThreshold > 0);
   const [strategy, setStrategy] = useState<ResolutionStrategy>("RANDOM");
 
   useEffect(() => {
@@ -117,20 +123,14 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
   const totalIncomplete = incompleteMatches.length;
 
   const handleForceResolveAll = async () => {
-    if (totalIncomplete === 0) return;
-    if (
-      !confirm(
-        `Are you sure you want to resolve all ${totalIncomplete} incomplete matches in Round ${activeRound.roundNumber} via "${strategy}" strategy?`
-      )
-    ) {
-      return;
-    }
+    if (totalIncomplete === 0 || isProcessing) return;
 
     setIsProcessing(true);
     setMessage(`Resolving ${totalIncomplete} matches using ${strategy}...`);
 
     try {
       // Complete matches according to selected strategy
+      let failed = 0;
       for (const match of incompleteMatches) {
         let winnerId: string | null = null;
         const p1Id = match.player1Id || match.player1?.id;
@@ -149,13 +149,18 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
           winnerId = null; // DRAW
         }
 
-        await authenticatedFetch(`/matches/${match.id}/submit`, {
+        const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.SUBMIT(match.id), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ winnerId }),
         });
+        if (!res.ok) failed++;
       }
-      setMessage(`Round ${activeRound.roundNumber} successfully resolved.`);
+      if (failed === 0) {
+        setMessage(`Round ${activeRound.roundNumber} successfully resolved.`);
+      } else {
+        setMessage(`${totalIncomplete - failed} of ${totalIncomplete} matches resolved; ${failed} failed.`);
+      }
       await fetchData();
     } catch (err) {
       setMessage("Failed to resolve round matches.");
@@ -165,6 +170,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
   };
 
   const handleResolveMatch = async (matchId: string, strat: ResolutionStrategy, p1Id: string | null, p2Id: string | null) => {
+    if (isProcessing) return;
     setIsProcessing(true);
     setMessage(`Resolving match...`);
 
@@ -183,7 +189,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
     }
 
     try {
-      const res = await authenticatedFetch(`/matches/${matchId}/submit`, {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.SUBMIT(matchId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ winnerId }),

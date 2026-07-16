@@ -5,7 +5,7 @@ import Link from "next/link";
 import * as m from "motion/react";
 import { BentoBox } from "../ui/Bento";
 import { Tournament } from "../../tournaments/types";
-import { API_URL } from "../../utils/api";
+import { resolveImageUrl } from "../../utils/api";
 
 interface TournamentListProps {
   tournaments: Tournament[];
@@ -55,7 +55,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
         {sorted.map((t, idx) => (
           <img 
             key={idx}
-            src={t.bannerUrl ? (t.bannerUrl.startsWith("http") ? t.bannerUrl : `${API_URL}${t.bannerUrl}`) : "/placeholder.jpg"}
+            src={resolveImageUrl(t.bannerUrl, "/placeholder.jpg")}
             alt=""
             loading="eager"
           />
@@ -141,10 +141,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
                   }}
                 >
                   <img 
-                    src={currentTournament.bannerUrl 
-                      ? (currentTournament.bannerUrl.startsWith("http") ? currentTournament.bannerUrl : `${API_URL}${currentTournament.bannerUrl}`)
-                      : "/placeholder.jpg"
-                    } 
+                    src={resolveImageUrl(currentTournament.bannerUrl, "/placeholder.jpg")}
                     alt={currentTournament.name}
                     className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700"
                   />

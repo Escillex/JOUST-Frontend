@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { motion } from "motion/react";
-import { API_URL } from "../utils/api";
+import { resolveImageUrl } from "../utils/api";
 
 export interface Product {
   id: string;
@@ -55,9 +55,7 @@ export default function ProductCard({ product, index }: ProductCardProps) {
       <div className="relative aspect-[4/5] bg-zinc-900 border-4 border-white group-hover:border-primary group-hover:shadow-[12px_12px_0px_0px_#52B946] transition-all duration-500 overflow-hidden mb-10">
         {product.image && (
           <img
-            src={product.image.startsWith("http") || product.image.startsWith("/")
-              ? product.image
-              : `${API_URL}${product.image}`}
+            src={resolveImageUrl(product.image)}
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />

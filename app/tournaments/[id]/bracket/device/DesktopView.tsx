@@ -32,9 +32,12 @@ export default function DesktopView({
     return (
         <div className="h-full w-full">
             {isElimination && viewMode === "BRACKET" ? (
-                <EliminationLayout 
+                <EliminationLayout
                     tournament={tournament}
                     leaderboard={leaderboard}
+                    // Scoring is a card-view-only feature (decided
+                    // 2026-07-15). The bracket tree is for viewing, so
+                    // it never shows SCORE buttons, even for admins.
                     isAdmin={false}
                     updating={updating}
                     onOpenScoring={onOpenScoring}

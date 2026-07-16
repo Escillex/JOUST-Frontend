@@ -1,7 +1,9 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
+import { useToast } from "../../components/ui/Toast";
+import { useUser } from "../../components/UserProvider";
 import Hero from "../../components/Hero";
 import Shop from "../../components/Shop";
 import ImageUpload from "../../components/ui/ImageUpload";
@@ -38,9 +40,25 @@ const BLANK_PRODUCT: Omit<StoreProduct, "id" | "sortOrder" | "isVisible"> = {
 export default function SiteVisualEditor() {
   const router = useRouter();
 
+  // Access control: this editor changes the public site, so only
+  // admins may open it. Before this check, anyone who knew the URL
+  // could load the page (the backend still rejected their saves, but
+  // the page itself should not render at all).
+  const { user, loading: userLoading } = useUser();
+  const isAdminUser = !!user?.roles?.includes("ADMIN");
+  useEffect(() => {
+    if (!userLoading && !isAdminUser) router.push("/");
+  }, [userLoading, isAdminUser, router]);
+
   // Hero state
+  // Feedback goes through toasts; alert() and confirm() popups are not
+  // allowed in this project.
+  const { toast } = useToast();
   const [heroAssets, setHeroAssets] = useState<SiteAsset[]>([]);
   const [uploadingHeroKey, setUploadingHeroKey] = useState<string | null>(null);
+  // Tracks the slide/product being deleted so the buttons can show
+  // progress and ignore repeated clicks.
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
 
   // Store state
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -88,9 +106,19 @@ export default function SiteVisualEditor() {
   };
 
   const handleHeroDelete = async (key: string) => {
-    if (!confirm(`Remove slide ${key}?`)) return;
-    const res = await authenticatedFetch(API_ENDPOINTS.IMAGES.DELETE_ASSET(key), { method: "DELETE" });
-    if (res.ok) fetchHeroAssets();
+    if (deletingKey) return;
+    setDeletingKey(key);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.IMAGES.DELETE_ASSET(key), { method: "DELETE" });
+      if (res.ok) {
+        toast("Slide removed", "success");
+        fetchHeroAssets();
+      } else {
+        toast("Failed to remove slide", "error");
+      }
+    } finally {
+      setDeletingKey(null);
+    }
   };
 
   // ─── Store CRUD handlers ───────────────────────────────────────
@@ -118,7 +146,7 @@ export default function SiteVisualEditor() {
             method: "POST",
             body: formData,
           });
-          if (!imgRes.ok) alert("Product created, but image upload failed.");
+          if (!imgRes.ok) toast("Product created, but the image upload failed", "error");
         }
         
         setNewProduct({ ...BLANK_PRODUCT });
@@ -126,11 +154,11 @@ export default function SiteVisualEditor() {
         fetchProducts();
       } else {
         const errData = await res.json().catch(() => ({}));
-        alert(`Failed to create: ${res.status} ${errData.message || ""}`);
+        toast(errData.message || "Failed to create product", "error");
       }
     } catch (err) {
       console.error("Failed to create product:", err);
-      alert("Network error: Check if backend is running.");
+      toast("Could not reach the server", "error");
     } finally {
       setSaving(false);
     }
@@ -152,9 +180,19 @@ export default function SiteVisualEditor() {
   };
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm("Delete this product?")) return;
-    const res = await authenticatedFetch(API_ENDPOINTS.STORE.DELETE(id), { method: "DELETE" });
-    if (res.ok) fetchProducts();
+    if (deletingKey) return;
+    setDeletingKey(id);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.STORE.DELETE(id), { method: "DELETE" });
+      if (res.ok) {
+        toast("Product deleted", "success");
+        fetchProducts();
+      } else {
+        toast("Failed to delete product", "error");
+      }
+    } finally {
+      setDeletingKey(null);
+    }
   };
 
   const handleProductImageUpload = async (id: string, file: File) => {
@@ -203,6 +241,34 @@ export default function SiteVisualEditor() {
 
   const inputCls = "w-full bg-black border border-white/10 px-3 py-2 text-[11px] text-white focus:outline-none focus:border-primary transition-all font-questrial";
   const labelCls = "text-[8px] font-black text-white/30 uppercase tracking-[0.3em] block mb-1";
+
+  // Create the image preview URL once per selected file, and release
+  // the old one when the file changes or the page closes. The old code
+  // called URL.createObjectURL on every render, which kept allocating
+  // new in-memory URLs that were never freed (a memory leak).
+  const newProductPreview = useMemo(
+    () => (newProductFile ? URL.createObjectURL(newProductFile) : undefined),
+    [newProductFile],
+  );
+  useEffect(() => {
+    return () => {
+      if (newProductPreview) URL.revokeObjectURL(newProductPreview);
+    };
+  }, [newProductPreview]);
+
+  // Pick the first unused slide number for a new upload. The old code
+  // used "number of slides + 1": with slides 1, 2 and 3, deleting
+  // slide 2 left a count of 2, so the next upload was named
+  // "hero_slide_3" and silently replaced the existing slide 3.
+  const nextHeroKey = (() => {
+    const used = new Set(heroAssets.map(a => a.key));
+    let n = 1;
+    while (used.has(`hero_slide_${n}`)) n++;
+    return `hero_slide_${n}`;
+  })();
+
+  // Render nothing for non-admins while the redirect above happens.
+  if (userLoading || !isAdminUser) return null;
 
   if (loading) return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
@@ -314,8 +380,8 @@ export default function SiteVisualEditor() {
                     + Add Slide {heroAssets.length + 1}
                   </p>
                   <ImageUpload
-                    onUpload={(file) => handleHeroUpload(`hero_slide_${heroAssets.length + 1}`, file)}
-                    uploading={uploadingHeroKey === `hero_slide_${heroAssets.length + 1}`}
+                    onUpload={(file) => handleHeroUpload(nextHeroKey, file)}
+                    uploading={uploadingHeroKey === nextHeroKey}
                     aspectRatio="aspect-video"
                     cropAspectRatio={16 / 9}
                     label="Upload New Slide"
@@ -436,7 +502,7 @@ export default function SiteVisualEditor() {
                     aspectRatio="aspect-[4/5]"
                     cropAspectRatio={4/5}
                     label={newProductFile ? "Image Selected" : "Upload Product Image"}
-                    currentUrl={newProductFile ? URL.createObjectURL(newProductFile) : undefined}
+                    currentUrl={newProductPreview}
                   />
 
                   <div>
