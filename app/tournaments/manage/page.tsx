@@ -15,7 +15,9 @@ export default function ManageTournaments() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const refresh = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE);
+    // Only what this user can actually manage: an organizer has no rights over
+    // tournaments they did not create, so listing those would be misleading.
+    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.MANAGEABLE);
     const data = await safeJson(res);
     if (Array.isArray(data)) setTournaments(data);
   };

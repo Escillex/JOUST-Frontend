@@ -4,9 +4,11 @@ import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
+import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { useToast } from "../../../components/ui/Toast";
 import { Tournament } from "../../types";
 import Link from "next/link";
+import ConnectionPill from "../../../components/ui/ConnectionPill";
 import { motion, AnimatePresence } from "motion/react";
 
 function TournamentLobbyContent() {
@@ -23,16 +25,24 @@ function TournamentLobbyContent() {
     if (tournamentId) fetchData();
   }, [tournamentId]);
 
-  // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
-  // Refresh every 2 minutes through the shared usePolling hook: it
-  // pauses while the tab is hidden and stops once the tournament is
-  // COMPLETED, because finished tournaments no longer change.
+  // Real-time lobby updates: when someone joins or the tournament changes
+  // status (for example the organizer starting it), refresh immediately.
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: () => fetchData(true),
+  });
+
+  // POLLING BLOCK - fallback behind the WebSocket connection
+  // Refresh through the shared usePolling hook: it pauses while the tab is
+  // hidden and stops once the tournament is COMPLETED, because finished
+  // tournaments no longer change. While the socket is connected it drops to a
+  // 5-minute safety-net tick (the socket drives freshness); when the socket
+  // drops it returns to the 2-minute rate.
   usePolling(
     () => fetchData(true),
-    120000,
+    connected ? 300000 : 120000,
     !!tournamentId && tournament?.status !== "COMPLETED",
   );
-  // END OF TEMPORARY POLLING BLOCK
+  // END OF POLLING BLOCK
 
   useEffect(() => {
     if (tournament?.name) {
@@ -146,6 +156,7 @@ function TournamentLobbyContent() {
                <div className="px-4 py-1.5 border border-primary text-primary text-[10px] font-black uppercase tracking-widest bg-primary/5">
                  {tournament.status}
                </div>
+               <ConnectionPill connected={connected} />
                <div className="px-4 py-1.5 border border-white/10 text-white/40 text-[10px] font-black uppercase tracking-widest">
                  {(typeof tournament.format === 'object' ? tournament.format?.system : "UNKNOWN")?.replace("_", " ") || "UNKNOWN"}
                </div>
@@ -202,12 +213,26 @@ function TournamentLobbyContent() {
                 </Link>
               )}
 
-              <Link 
+              <Link
                 href={`/tournaments/${tournamentId}`}
                 className="w-full py-6 border border-white/20 text-white/50 hover:border-white hover:text-white transition-all text-[11px] font-black uppercase tracking-[0.3em] text-center"
               >
                 VIEW DETAILS
               </Link>
+
+              {/* Leaving is only offered to a current participant while the
+                  tournament is still OPEN — the backend rejects leaving once it
+                  has started. Runs directly (no confirm popup, per project
+                  rule) and shows a "leaving" state while the request is sent. */}
+              {myParticipant && tournament.status === "OPEN" && (
+                <button
+                  onClick={handleLeave}
+                  disabled={withdrawing}
+                  className="w-full py-6 border border-red-500/40 text-red-400/80 hover:border-red-500 hover:text-red-400 transition-all text-[11px] font-black uppercase tracking-[0.3em] text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {withdrawing ? "LEAVING…" : "LEAVE TOURNAMENT"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -237,10 +262,10 @@ function TournamentLobbyContent() {
                        animate={{ opacity: 1, scale: 1 }}
                        transition={{ delay: idx * 0.05 }}
                        className={`p-6 border flex items-center justify-between transition-all group ${
-                         p.userId === myId 
-                           ? "border-primary/30 bg-primary/5" 
+                         p.userId === myId
+                           ? "border-primary/30 bg-primary/5"
                            : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"
-                       }`}
+                       }${p.status === "FORFEITED" ? " opacity-40" : ""}`}
                      >
                        <div className="flex items-center gap-5">
                           <span className={`text-[10px] font-black italic w-6 ${p.userId === myId ? "text-primary" : "text-white/10"}`}>
@@ -250,7 +275,9 @@ function TournamentLobbyContent() {
                             <span className={`text-sm font-black uppercase tracking-wider transition-colors ${p.userId === myId ? "text-primary" : "text-white"}`}>
                               {p.user.username}
                             </span>
-                            <span className="text-[8px] font-black text-white/10 uppercase tracking-widest group-hover:text-primary/40 transition-colors">PARTICIPANT</span>
+                            <span className="text-[8px] font-black text-white/10 uppercase tracking-widest group-hover:text-primary/40 transition-colors">
+                              {p.status === "FORFEITED" ? "FORFEITED" : "PARTICIPANT"}
+                            </span>
                           </div>
                        </div>
                        {p.userId === myId && (

@@ -37,7 +37,14 @@ export interface Tournament {
   venue: string | null;
   date: string | null;
   inviteToken: string;
+  /** Short custom invite-link name (e.g. "summer-cup"); null when unset,
+   *  in which case the long inviteToken is the only invite link. */
+  slug?: string | null;
   isPrivate: boolean;
+  /** Computed per request by the backend: true when the viewer may manage this
+   *  tournament. Management controls gate on this rather than on the viewer's
+   *  role, so what renders matches what the API will actually permit. */
+  canManage?: boolean;
   status: TournamentStatus;
   guestCleanupAt: string | null;
   createdAt: string;
@@ -53,6 +60,9 @@ export interface Tournament {
     id: string;
     userId: string;
     seed?: number;
+    /** ACTIVE by default; FORFEITED when the organizer removed the player from a
+     *  live tournament. Forfeited players are shown tagged and non-actionable. */
+    status?: "ACTIVE" | "FORFEITED";
     user: {
       id: string;
       username: string;
@@ -147,4 +157,13 @@ export interface TournamentTemplate {
   createdById: string;
   createdBy?: { id: string; username: string | null };
   createdAt: string;
+}
+/** A staff row on one tournament. Only ACCEPTED grants management rights;
+ *  PENDING and DECLINED grant nothing. */
+export interface TournamentStaff {
+  id: string;
+  userId: string;
+  status: "PENDING" | "ACCEPTED" | "DECLINED";
+  createdAt: string;
+  user: { id: string; username: string; avatarUrl?: string | null };
 }

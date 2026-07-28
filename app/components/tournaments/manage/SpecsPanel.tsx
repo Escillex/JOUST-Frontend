@@ -14,6 +14,7 @@ interface EditState {
   maxPlayers: number;
   prizePool: string | number;
   isPrivate: boolean;
+  slug: string;
 }
 
 interface FormatOption {
@@ -40,6 +41,13 @@ interface Props {
 export default function SpecsPanel({ tournament, tournamentId, isEditing, editState, formatOptions, onToggleEdit, onEditChange, onSubmit, onOpenRegistration, onStartTournament, fetchData, setMessage }: Props) {
   const { upload, remove, uploading } = useImageUpload();
   const stages = ["UPCOMING", "OPEN", "ONGOING", "COMPLETED"];
+
+  // The backend only accepts edits to the tournament details while the
+  // tournament is OPEN. The fields are locked here so the organizer can see
+  // that up front instead of filling in the form and having the save rejected.
+  // Changing the status itself stays available, otherwise there would be no way
+  // to move an ongoing tournament forward from this panel.
+  const canEditDetails = tournament.status === "OPEN";
 
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
@@ -130,12 +138,21 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
       {isEditing ? (
         <form onSubmit={onSubmit} className="space-y-6">
+          {!canEditDetails && (
+            <p className="text-xs text-[#888888] border border-white/20 rounded p-3">
+              Details are locked because this tournament is {tournament.status}. Only
+              tournaments with the OPEN status can be edited. The status can still be
+              changed below.
+            </p>
+          )}
+
           <div className="space-y-2">
             <label className="text-xs font-semibold text-[#888888] block">Format Preset</label>
-            <select 
-              value={editState.formatId} 
-              onChange={e => onEditChange("formatId", e.target.value)} 
-              className={inputCls}
+            <select
+              value={editState.formatId}
+              onChange={e => onEditChange("formatId", e.target.value)}
+              disabled={!canEditDetails}
+              className={`${inputCls} disabled:opacity-40`}
             >
               <option value="">Select a format</option>
               {formatOptions.map(f => (
@@ -145,6 +162,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
           </div>
 
           <div className={`space-y-6 transition-opacity ${!editState.formatId ? "opacity-30 pointer-events-none" : "opacity-100"}`}>
+            <fieldset disabled={!canEditDetails} className={`space-y-6 ${!canEditDetails ? "opacity-40" : ""}`}>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#888888] block">Tournament Name</label>
               <input value={editState.name} onChange={e => onEditChange("name", e.target.value)} className={inputCls} />
@@ -171,6 +189,24 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#888888] block">Invite Link Name</label>
+              <input
+                value={editState.slug}
+                onChange={e => onEditChange("slug", e.target.value)}
+                className={inputCls}
+                placeholder="e.g. summer-cup"
+              />
+              {/* Preview of the final link so the organizer knows exactly
+                  what will be shared before saving. */}
+              <p className="text-xs text-[#888888] break-all">
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}/tournaments/invite/${editState.slug || tournament.slug || tournament.inviteToken}`
+                  : ""}
+              </p>
+            </div>
+            </fieldset>
+
             <div className="space-y-2 pt-4 border-t border-white/10">
               <label className="text-xs font-semibold text-[#888888] block">System Status</label>
               <select
@@ -188,7 +224,11 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
               </select>
             </div>
 
-            <button type="submit" className="w-full h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors">
+            <button
+              type="submit"
+              disabled={!canEditDetails}
+              className="w-full h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+            >
               Save Specifications
             </button>
           </div>

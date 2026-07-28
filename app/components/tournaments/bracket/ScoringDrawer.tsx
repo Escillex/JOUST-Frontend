@@ -138,6 +138,7 @@ export default function ScoringDrawer({
                 formatConfig={formatConfig ?? {}}
                 isAdmin={isAdmin}
                 currentUserId={currentUserId}
+                tournamentId={tournamentId}
                 onMatchUpdated={() => onMatchUpdated?.()}
               />
             </div>

@@ -22,6 +22,8 @@ function TournamentViewContent() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [activeTab, setActiveTab] = useState<"DETAILS" | "PLAYERS" | "BRACKET">("DETAILS");
+  const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
+  const [respondingToInvite, setRespondingToInvite] = useState(false);
 
   useEffect(() => {
     if (tournamentId) {
@@ -48,6 +50,7 @@ function TournamentViewContent() {
       if (meRes.ok) {
         const data = await safeJson(meRes);
         if (data) setUser(data);
+        await loadInvitation(data);
       }
       if (tRes.ok) {
         const data = await safeJson(tRes);
@@ -58,6 +61,43 @@ function TournamentViewContent() {
       console.error("Fetch failed:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Only organizers can be invited to co-manage, so this request is skipped for
+  // everyone else rather than fired on every tournament page view.
+  const loadInvitation = async (me: { roles?: string[] } | null) => {
+    const canBeInvited = me?.roles?.some((r) => r === "ORGANIZER" || r === "ADMIN");
+    if (!canBeInvited) return;
+    const res = await authenticatedFetch(API_ENDPOINTS.ORGANIZERS.MY_INVITATIONS);
+    if (!res.ok) return;
+    const invitations = await safeJson(res);
+    const mine = Array.isArray(invitations)
+      ? invitations.find((i: { tournamentId: string }) => i.tournamentId === tournamentId)
+      : null;
+    setPendingInviteId(mine?.id ?? null);
+  };
+
+  const respondToInvitation = async (accept: boolean) => {
+    if (!pendingInviteId || respondingToInvite) return;
+    setRespondingToInvite(true);
+    try {
+      const endpoint = accept
+        ? API_ENDPOINTS.ORGANIZERS.ACCEPT(pendingInviteId)
+        : API_ENDPOINTS.ORGANIZERS.DECLINE(pendingInviteId);
+      const res = await authenticatedFetch(endpoint, { method: "PATCH" });
+      if (res.ok) {
+        setPendingInviteId(null);
+        toast(accept ? "You now co-manage this tournament" : "Invitation declined", "success");
+        // Accepting changes what this viewer may do, so the tournament is
+        // refetched to pick up its new canManage.
+        if (accept) await fetchData();
+      } else {
+        const err = await safeJson(res);
+        toast(err?.message || "Could not respond to the invitation", "error");
+      }
+    } finally {
+      setRespondingToInvite(false);
     }
   };
 
@@ -139,7 +179,31 @@ function TournamentViewContent() {
   return (
     <div className="min-h-screen w-full bg-[#1B1B1B] text-white font-poppins selection:bg-primary selection:text-black overflow-x-hidden">
       <main className="max-w-7xl mx-auto px-6 py-16 md:py-32 flex flex-col gap-16">
-        
+
+        {pendingInviteId && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between border border-primary/30 bg-primary/5 px-6 py-5">
+            <span className="text-[11px] font-black uppercase tracking-widest text-primary">
+              You have been invited to co-manage this tournament
+            </span>
+            <div className="flex gap-3">
+              <button
+                onClick={() => respondToInvitation(true)}
+                disabled={respondingToInvite}
+                className="px-6 py-2 text-[10px] font-black uppercase tracking-widest bg-primary text-black disabled:opacity-40"
+              >
+                {respondingToInvite ? "Working…" : "Accept"}
+              </button>
+              <button
+                onClick={() => respondToInvitation(false)}
+                disabled={respondingToInvite}
+                className="px-6 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 text-white/60 hover:text-white disabled:opacity-40"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-4 border-b border-white/5 pb-8">
           {tabs.map(tab => (
             <button
@@ -335,9 +399,9 @@ function TournamentViewContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {tournament.participants.map((p: any, idx: number) => (
-                  <div 
-                    key={p.userId} 
-                    className="p-8 border border-component-border bg-component-background relative group hover:border-primary/40 transition-all"
+                  <div
+                    key={p.userId}
+                    className={`p-8 border border-component-border bg-component-background relative group hover:border-primary/40 transition-all ${p.status === "FORFEITED" ? "opacity-40" : ""}`}
                   >
                     <div className="absolute top-4 right-4 text-[8px] font-black text-white/10 group-hover:text-primary transition-colors">
                       {String(idx + 1).padStart(2, '0')}
@@ -348,6 +412,11 @@ function TournamentViewContent() {
                       <span className="text-[8px] font-black text-white/20 uppercase tracking-widest mt-2">
                         {p.user.isGuest ? "GUEST" : "REGISTERED USER"}
                       </span>
+                      {p.status === "FORFEITED" && (
+                        <span className="text-[8px] font-black text-white/40 uppercase tracking-widest mt-1">
+                          Forfeited
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

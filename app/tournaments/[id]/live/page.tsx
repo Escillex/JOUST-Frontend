@@ -6,10 +6,12 @@ import { MatchGameLog } from '../../../tournaments/types';
 import { Round } from '../../../tournaments/[id]/bracket/types';
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from '../../../utils/api';
 import { usePolling } from '../../../utils/usePolling';
+import { useTournamentSocket, TrackerUpdatePayload } from '../../../utils/useTournamentSocket';
 import { getTournamentConfig } from '../../../utils/formatConfig';
 import LiveMatchGrid from '../../../components/tournaments/live/LiveMatchGrid';
 import TVOverlay from '../../../components/tournaments/live/TVOverlay';
 import Link from 'next/link';
+import ConnectionPill from '../../../components/ui/ConnectionPill';
 
 const POLL_INTERVAL = 4000;
 
@@ -75,12 +77,41 @@ export default function LivePage() {
     }
   }, [tournamentId]);
 
+  // Live tracker values arrive over the socket. Patch just the affected game
+  // log in place so the HP/points bars move without refetching every match.
+  const applyTrackerUpdate = useCallback((p: TrackerUpdatePayload) => {
+    setLogs(prev => {
+      const existing = prev[p.matchId];
+      // If this match is not currently on screen, ignore it; the coarse
+      // tournament:updated signal (and the fallback poll) will pick it up.
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [p.matchId]: existing.map(l =>
+          l.gameNumber === p.gameNumber
+            ? { ...l, player1Value: p.player1Value, player2Value: p.player2Value }
+            : l,
+        ),
+      };
+    });
+    setLastUpdated(new Date());
+  }, []);
+
+  // Real-time updates. onTournamentUpdate triggers a full refetch; tracker
+  // values are applied directly above.
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: fetchAll,
+    onTrackerUpdate: applyTrackerUpdate,
+  });
+
   // temporary polling block
-  // The shared usePolling hook pauses while the tab is hidden, and the
-  // "enabled" flag stops polling once the tournament is COMPLETED —
-  // before this change, this page kept requesting a finished tournament
-  // forever.
-  usePolling(fetchAll, POLL_INTERVAL, tournament?.status !== 'COMPLETED');
+  // Polling is now a fallback behind the WebSocket connection: while the socket
+  // is connected it drops to a slow 60s safety-net tick, and it returns to the
+  // fast 4s rate the moment the socket disconnects — so a dropped socket
+  // degrades to the old polling behaviour instead of a stale screen. The hook
+  // also pauses while the tab is hidden, and the "enabled" flag stops polling
+  // once the tournament is COMPLETED.
+  usePolling(fetchAll, connected ? 60000 : POLL_INTERVAL, tournament?.status !== 'COMPLETED');
   // end of temporary polling block
 
   useEffect(() => {
@@ -160,6 +191,7 @@ export default function LivePage() {
             <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm">
               TV BROADCAST MODE
             </span>
+            <ConnectionPill connected={connected} />
           </div>
         </div>
 

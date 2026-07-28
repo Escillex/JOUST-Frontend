@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
+import ConnectionPill from '../../../components/ui/ConnectionPill';
+import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { Match, LeaderboardEntry } from "./types";
 import { getTournamentConfig } from "../../../utils/formatConfig";
 import DesktopView from "./device/DesktopView";
@@ -69,12 +71,25 @@ function BracketViewContent() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
+  // Real-time bracket updates. On any change in this tournament (a submitted
+  // match, an advanced bracket, a status change) refresh the bracket silently.
+  // The tracker threshold popups below are intentionally NOT driven from the
+  // socket: the tracker:update payload does not carry the game mode needed to
+  // decide an admin threshold, so that low-latency detection stays on its own
+  // fast poll to avoid a regression.
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: () => fetchTournamentData(true),
+  });
+
+  // POLLING BLOCK - fallback behind the WebSocket connection
   // Rewritten to use the shared usePolling hook. The old version listed
   // seven state values as effect dependencies, so the 4-second timer was
   // destroyed and recreated on almost every render. usePolling reads the
   // latest state through a ref instead, so the timer is created once.
-  // It also pauses while the browser tab is hidden.
+  // It also pauses while the browser tab is hidden. This block stays at its
+  // fast rate even when the socket is connected because it detects tracker
+  // thresholds and must fire the scoring popups promptly; it only polls the
+  // current user's own ongoing matches, so the request volume is small.
   const hasOngoingMatches =
     tournament?.status === "ONGOING" &&
     (tournament.rounds?.flatMap((r: any) => r.matches)?.some((m: any) => m.status === "ONGOING") ?? false);
@@ -136,18 +151,20 @@ function BracketViewContent() {
   );
   // END OF TEMPORARY POLLING BLOCK
 
-  // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
+  // POLLING BLOCK - fallback behind the WebSocket connection
   // General auto-refresh for the bracket. Runs "silent" so it does not
   // flash the loading state, and only refreshes the tournament and
-  // leaderboard. The old version re-fetched the signed-in user and the
-  // full registered-user list on every 15-second tick, even though
-  // neither changes while looking at a bracket.
+  // leaderboard. This is the heavy full-tournament refresh, so when the
+  // socket is connected it drops to a slow 60s safety-net tick (the socket's
+  // onTournamentUpdate keeps the data live); it returns to 15s if the socket
+  // drops. The old version re-fetched the signed-in user and the full
+  // registered-user list on every tick, even though neither changes here.
   usePolling(
     () => fetchTournamentData(true),
-    15000,
+    connected ? 60000 : 15000,
     !!tournamentId && (tournament?.status === "ONGOING" || tournament?.status === "OPEN"),
   );
-  // END OF TEMPORARY POLLING BLOCK
+  // END OF POLLING BLOCK
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments"); return; }
@@ -175,14 +192,15 @@ function BracketViewContent() {
       if (!meRes.ok) return;
       const me = await safeJson(meRes);
       setCurrentUser(me);
+      // Management rights come from the tournament payload's canManage, not from
+      // the role: another organizer holds ORGANIZER but has no authority here,
+      // and showing them controls the API will reject is worse than hiding them.
+      // The registration panel's user list is still role-gated, because that
+      // endpoint is role-restricted in its own right.
       const auth = me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
-      setIsAdmin(auth);
       if (auth) {
-        setIsEditMode(editParam !== "false");
         const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
         if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
-      } else {
-        setIsEditMode(false);
       }
     } catch { /* identity load failure is non-fatal; page still renders */ }
   };
@@ -196,6 +214,10 @@ function BracketViewContent() {
       if (tRes.ok) {
         const t = await safeJson(tRes);
         setTournament(t);
+        // The backend decides who may manage this tournament; the UI follows it.
+        const canManage = !!t?.canManage;
+        setIsAdmin(canManage);
+        setIsEditMode(canManage && editParam !== "false");
         if (!silent) addLog("TOURNAMENT DATA READY", `${t.name.toUpperCase()} STATUS: ${t.status}`);
         
         // Auto-switch to CARD view for Swiss/Round Robin
@@ -312,6 +334,7 @@ function BracketViewContent() {
                 </span>
               </h1>
               <div className="flex items-center gap-3">
+                <ConnectionPill connected={connected} />
                 <span className={`text-[8px] font-black uppercase tracking-[0.3em] ${isAdmin ? "text-primary/60" : "text-foreground/20"}`}>
                   {isAdmin ? "SYSTEM ADMINISTRATOR" : "AUTHORIZED VIEWER"}
                 </span>

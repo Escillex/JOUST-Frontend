@@ -217,7 +217,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // confirm() popups are not allowed in this project (AGENTS.md rule 5).
+  // confirm() popups are not allowed in this project (CLAUDE.md rule 5).
   // Instead we run the action directly and block repeat clicks with
   // withBusy, then report the result with a toast.
   const handleDeleteUser = (userId: string) =>

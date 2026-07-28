@@ -119,8 +119,25 @@ export const API_ENDPOINTS = {
     // can be used to check that a user account is real.
     USER_BASIC_STATS: (id: string) => `/users/${id}/stats`,
   },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    READ: (id: string) => `/notifications/${id}/read`,
+    READ_ALL: '/notifications/read-all',
+  },
+  ORGANIZERS: {
+    LIST: (tournamentId: string) => `/tournaments/${tournamentId}/organizers`,
+    INVITE: (tournamentId: string) => `/tournaments/${tournamentId}/organizers`,
+    REVOKE: (tournamentId: string, userId: string) =>
+      `/tournaments/${tournamentId}/organizers/${userId}`,
+    MY_INVITATIONS: '/organizers/invitations',
+    ACCEPT: (id: string) => `/organizers/invitations/${id}/accept`,
+    DECLINE: (id: string) => `/organizers/invitations/${id}/decline`,
+  },
   TOURNAMENTS: {
     BASE: '/tournaments',
+    // Only the tournaments this user may manage; the backend applies the same
+    // rule the guards do, which the client cannot compute for itself.
+    MANAGEABLE: '/tournaments?manageable=true',
     CREATE: '/tournaments/createtournament',
     START: (id: string) => `/tournaments/starttournament/${id}`,
     COMPLETE: (id: string) => `/tournaments/${id}/complete`,
@@ -128,6 +145,8 @@ export const API_ENDPOINTS = {
     JOIN_GUEST: (id: string) => `/tournaments/${id}/participants/guest`,
     LEAVE: (id: string) => `/tournaments/${id}/participants/leave`,
     UPDATE_SEED: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/seed`,
+    FORFEIT: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/forfeit`,
+    REPLACE: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/replace`,
     LEADERBOARD: (id: string) => `/tournaments/${id}/leaderboard`,
     GET_ONE: (id: string) => `/tournaments/${id}`,
     ROUNDS: (id: string) => `/tournaments/${id}/rounds`,

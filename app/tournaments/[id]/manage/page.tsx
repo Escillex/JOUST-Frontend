@@ -3,10 +3,14 @@ import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
+import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { getRawTournamentConfig } from "../../../utils/formatConfig";
 import { Tournament, FormatConfig } from "../../types";
+import { useToast } from "../../../components/ui/Toast";
+import { useUser } from "../../../components/UserProvider";
 import ControlRoomHeader from "../../../components/tournaments/manage/ControlRoomHeader";
 import RosterPanel from "../../../components/tournaments/manage/RosterPanel";
+import StaffPanel from "../../../components/tournaments/manage/StaffPanel";
 import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import DeploymentPanel from "../../../components/tournaments/manage/DeploymentPanel";
@@ -22,14 +26,21 @@ function ControlRoomContent() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [allUsers, setAllUsers]     = useState<{ id: string; username: string }[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [message, setMessage]       = useState("");
+  // Feedback is shown through the fixed-position toast system instead of
+  // the old banner at the top of the page: the banner was invisible when
+  // the organizer was scrolled down at the panel they were acting on,
+  // which made failed saves look like "nothing happened".
+  const { toast } = useToast();
+  // Read the signed-in user from the shared provider rather than firing another
+  // /auth/me: the staff panel only needs to know whether this is the creator.
+  const { user: currentUser } = useUser();
 
   const [isEditing, setIsEditing]           = useState(false);
   const [isEditingRules, setIsEditingRules] = useState(false);
   const [formatConfig, setFormatConfig]     = useState<FormatConfig>({});
   const [formatDefinitions, setFormatDefinitions] = useState<any[]>([]);
   const [formats, setFormats] = useState<any[]>([]);
-  const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false });
+  const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false, slug: "" });
 
   const [guestUsername, setGuestUsername]     = useState("");
   const [batchGuestCount, setBatchGuestCount] = useState<number | "">("");
@@ -38,6 +49,9 @@ function ControlRoomContent() {
   const [isStarting, setIsStarting]           = useState(false);
   const [isAddingGuest, setIsAddingGuest]     = useState(false);
   const [isInviting, setIsInviting]           = useState(false);
+  // userId currently being forfeited or replaced, so that row can show a busy
+  // state and no two roster actions can overlap.
+  const [actingOn, setActingOn]               = useState<string | null>(null);
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments/manage"); return; }
@@ -45,17 +59,23 @@ function ControlRoomContent() {
     fetchFormatDefinitions();
   }, [tournamentId]);
 
-  // temporary polling block
-  // Background refresh through the shared usePolling hook: it pauses
-  // while the tab is hidden and stops entirely once the tournament is
-  // COMPLETED (a finished tournament's data no longer changes, so
-  // polling it was wasted traffic).
+  // Real-time refresh: when a match is submitted, the bracket advances, or a
+  // participant joins/leaves, refresh the manage view immediately.
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: () => fetchData(true),
+  });
+
+  // polling block - fallback behind the WebSocket connection
+  // Background refresh through the shared usePolling hook: it pauses while the
+  // tab is hidden and stops entirely once the tournament is COMPLETED. While
+  // the socket is connected it drops to a slow 60s safety-net tick (the socket
+  // drives freshness); when the socket drops it returns to the fast 10s rate.
   usePolling(
     () => fetchData(true),
-    10000,
+    connected ? 60000 : 10000,
     !!tournament && tournament.status !== "COMPLETED",
   );
-  // end of temporary polling block
+  // end of polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -91,6 +111,14 @@ function ControlRoomContent() {
       const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!));
       if (tRes.ok) {
         const t = await safeJson(tRes);
+        // The role check above only proves they are an organizer at all. This is
+        // the real gate: holding ORGANIZER does not grant rights over somebody
+        // else's tournament, and every endpoint on this page would reject them.
+        if (t && t.canManage === false) {
+          toast("You do not have permission to manage this tournament", "error");
+          router.push("/tournaments");
+          return;
+        }
         setTournament(t);
         if (!silent) {
           setEditState({
@@ -100,12 +128,13 @@ function ControlRoomContent() {
             maxPlayers: t.maxPlayers,
             prizePool: t.prizePool || "",
             isPrivate: t.isPrivate || false,
+            slug: t.slug || "",
           });
           setFormatConfig(getRawTournamentConfig(t));
         }
-      } else if (!silent) { setMessage("Tournament not found"); }
-    } catch { 
-      if (!silent) setMessage("Failed to load data"); 
+      } else if (!silent) { toast("Tournament not found", "error"); }
+    } catch {
+      if (!silent) toast("Failed to load data", "error");
     }
     finally { 
       if (!silent) setLoading(false); 
@@ -114,7 +143,6 @@ function ControlRoomContent() {
 
   const handleUpdateTournament = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    setMessage("Saving changes...");
 
     try {
       // Rule edits are stored on the tournament itself, never on the shared preset
@@ -129,6 +157,15 @@ function ControlRoomContent() {
         maxPlayers: Number(editState.maxPlayers),
         prizePool: editState.prizePool === "" ? null : Number(editState.prizePool),
         isPrivate: editState.isPrivate,
+        // The invite-link name is normalized to the allowed characters
+        // (lowercase letters, numbers, dashes) before sending, so typing
+        // "Summer Cup" simply becomes "summer-cup" instead of a 400 error.
+        // An empty string tells the backend to remove the custom name.
+        slug: editState.slug
+          .toLowerCase()
+          .replace(/[^a-z0-9-]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 40),
       };
       if (hasConfigChanges) {
         body.config = formatConfig;
@@ -144,23 +181,23 @@ function ControlRoomContent() {
       });
 
       if (res.ok) {
-        setMessage("Tournament settings and rules successfully saved!");
+        toast("Tournament settings and rules successfully saved", "success");
         setIsEditing(false);
         setIsEditingRules(false);
         fetchData();
       } else {
         const data = await safeJson(res);
-        setMessage(data?.message || "Update failed");
+        toast(data?.message || "Update failed", "error");
       }
     } catch (err: any) {
-      setMessage(err.message || "An error occurred during update");
+      toast(err.message || "An error occurred during update", "error");
     }
   };
 
   const handleAddGuest = async () => {
     if (isAddingGuest) return;
     if (!guestUsername || !tournament || tournament.participants.length >= tournament.maxPlayers) {
-      setMessage("Tournament at maximum capacity"); return;
+      toast("Tournament at maximum capacity", "error"); return;
     }
     setIsAddingGuest(true);
     try {
@@ -168,8 +205,8 @@ function ControlRoomContent() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }),
       });
       const data = await safeJson(res);
-      if (res.ok) { setMessage("Guest Registered"); setGuestUsername(""); fetchData(); }
-      else { setMessage(data?.message || "Guest failed"); }
+      if (res.ok) { toast("Guest registered", "success"); setGuestUsername(""); fetchData(); }
+      else { toast(data?.message || "Guest registration failed", "error"); }
     } finally {
       setIsAddingGuest(false);
     }
@@ -178,9 +215,8 @@ function ControlRoomContent() {
   const handleBatchAddGuests = async () => {
     if (!tournament || !batchGuestCount || Number(batchGuestCount) <= 0) return;
     const countToAdd = Math.min(Number(batchGuestCount), tournament.maxPlayers - tournament.participants.length);
-    if (countToAdd <= 0) { setMessage("Tournament at maximum capacity"); return; }
+    if (countToAdd <= 0) { toast("Tournament at maximum capacity", "error"); return; }
     setBatchLoading(true);
-    setMessage(`Generating ${countToAdd} guest(s)...`);
     let added = 0;
     for (let i = 0; i < countToAdd; i++) {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
@@ -190,7 +226,7 @@ function ControlRoomContent() {
     }
     setBatchLoading(false);
     setBatchGuestCount("");
-    setMessage(`${added} guest(s) added successfully.`);
+    toast(`${added} guest(s) added`, added > 0 ? "success" : "error");
     await fetchData();
   };
 
@@ -202,8 +238,8 @@ function ControlRoomContent() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
       });
       const data = await safeJson(res);
-      if (res.ok) { setMessage("Participant Registered"); fetchData(); }
-      else { setMessage(data?.message || "Registration failed"); }
+      if (res.ok) { toast("Participant registered", "success"); fetchData(); }
+      else { toast(data?.message || "Registration failed", "error"); }
     } finally {
       setIsInviting(false);
     }
@@ -235,7 +271,7 @@ function ControlRoomContent() {
       }
       await fetchData();
     } catch (e) {
-      setMessage("Failed to reorder roster");
+      toast("Failed to reorder roster", "error");
     } finally {
       setLoading(false);
     }
@@ -247,11 +283,44 @@ function ControlRoomContent() {
       body: JSON.stringify({ userId }),
     });
     if (res.ok) {
-      setMessage("Participant Removed");
+      toast("Participant removed", "success");
       fetchData();
     } else {
       const data = await safeJson(res);
-      setMessage(data?.message || "Removal failed");
+      toast(data?.message || "Removal failed", "error");
+    }
+  };
+
+  // Forfeit removes a player from a live tournament (their opponents win by
+  // walkover and the bracket advances); replace swaps a substitute into a slot
+  // the player has not yet played from. Both run directly with a per-row busy
+  // state instead of a confirmation dialog, and the realtime emit on the backend
+  // refreshes every other open view.
+  const handleForfeit = async (userId: string) => {
+    if (actingOn) return;
+    setActingOn(userId);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.FORFEIT(tournamentId!, userId), { method: "POST" });
+      if (res.ok) { toast("Player forfeited", "success"); await fetchData(true); }
+      else { const d = await safeJson(res); toast(d?.message || "Could not forfeit player", "error"); }
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const handleReplace = async (userId: string, body: { substituteUserId?: string; guestName?: string }) => {
+    if (actingOn) return;
+    setActingOn(userId);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.REPLACE(tournamentId!, userId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) { toast("Player replaced", "success"); await fetchData(true); }
+      else { const d = await safeJson(res); toast(d?.message || "Could not replace player", "error"); }
+    } finally {
+      setActingOn(null);
     }
   };
 
@@ -261,8 +330,8 @@ function ControlRoomContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "OPEN" }),
     });
-    if (res.ok) { setMessage("Registration opened!"); fetchData(); }
-    else { const d = await safeJson(res); setMessage(d?.message || "Failed to open registration"); }
+    if (res.ok) { toast("Registration opened", "success"); fetchData(); }
+    else { const d = await safeJson(res); toast(d?.message || "Failed to open registration", "error"); }
   };
 
   const handleStartTournament = async () => {
@@ -270,8 +339,8 @@ function ControlRoomContent() {
     setIsStarting(true);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
-      if (res.ok) { setMessage("Tournament started!"); fetchData(); }
-      else { const d = await safeJson(res); setMessage(d?.message || "Failed to start tournament"); }
+      if (res.ok) { toast("Tournament started", "success"); fetchData(); }
+      else { const d = await safeJson(res); toast(d?.message || "Failed to start tournament", "error"); }
     } finally {
       setIsStarting(false);
     }
@@ -313,17 +382,15 @@ function ControlRoomContent() {
           onRefresh={fetchData}
         />
 
-        {message && (
-          <div className="mb-6 p-3 bg-[#000000] border border-white/20 rounded-[4px] text-white text-center text-sm font-semibold animate-in fade-in slide-in-from-top-2">
-            {message}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <RosterPanel 
-            tournament={tournament} 
-            onReorder={handleReorder} 
-            onRemove={handleRemoveParticipant} 
+          <RosterPanel
+            tournament={tournament}
+            allUsers={allUsers}
+            onReorder={handleReorder}
+            onRemove={handleRemoveParticipant}
+            onForfeit={handleForfeit}
+            onReplace={handleReplace}
+            actingOn={actingOn}
           />
 
           <div className="lg:col-span-4 space-y-6">
@@ -339,7 +406,7 @@ function ControlRoomContent() {
               onOpenRegistration={handleOpenRegistration}
               onStartTournament={handleStartTournament}
               fetchData={fetchData}
-              setMessage={setMessage}
+              setMessage={toast}
             />
             <FormatRulesPanel
               tournament={tournament}
@@ -355,9 +422,16 @@ function ControlRoomContent() {
               <RoundControlPanel
                 tournament={tournament}
                 fetchData={fetchData}
-                setMessage={setMessage}
+                setMessage={toast}
               />
             )}
+            <StaffPanel
+              tournamentId={tournamentId!}
+              isCreator={
+                !!tournament.createdById &&
+                tournament.createdById === (currentUser?.sub || currentUser?.id)
+              }
+            />
             <DeploymentPanel
               tournament={tournament}
               allUsers={allUsers}

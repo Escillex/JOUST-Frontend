@@ -1,4 +1,5 @@
 import { Tournament } from "../../../tournaments/types";
+import { useToast } from "../../ui/Toast";
 
 interface Props {
   tournament: Tournament;
@@ -11,6 +12,54 @@ interface Props {
 }
 
 export default function ControlRoomHeader({ tournament, tournamentId, onBack, onOpenTournament, onStartTournament, onViewBracket, onRefresh }: Props) {
+  const { toast } = useToast();
+
+  // Puts the public invite URL on the clipboard so the organizer can
+  // paste it into chat apps. The short slug is preferred; tournaments
+  // created before slugs existed fall back to the long UUID token.
+  const handleCopyInvite = async () => {
+    const url = `${window.location.origin}/tournaments/invite/${tournament.slug ?? tournament.inviteToken}`;
+
+    // The modern Clipboard API only exists in a "secure context": HTTPS, or
+    // http://localhost. When the app is opened over a plain-HTTP LAN IP (for
+    // example http://192.168.x.x:3000 during device testing) navigator.clipboard
+    // is undefined, so we fall back to the old textarea + execCommand method,
+    // which works there too.
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast("Invite link copied to clipboard", "success");
+        return;
+      } catch {
+        // Permission denied or blocked — drop through to the fallback below.
+      }
+    }
+
+    // Fallback: put the URL in an off-screen textarea, select it, and ask the
+    // browser to copy the selection. execCommand is deprecated but is the only
+    // copy path available outside a secure context.
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      // Keep it out of view and out of the layout so nothing flickers.
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      textarea.style.pointerEvents = "none";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (ok) {
+        toast("Invite link copied to clipboard", "success");
+      } else {
+        // Even the fallback failed — show the link so it can be copied by hand.
+        toast(`Could not copy automatically. Link: ${url}`, "error");
+      }
+    } catch {
+      toast(`Could not copy automatically. Link: ${url}`, "error");
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8 pb-6 border-b border-white/20">
       <div className="space-y-4">
@@ -41,6 +90,9 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
             </svg>
           </button>
         )}
+        <button onClick={handleCopyInvite} className="flex-1 md:flex-none px-6 py-2.5 bg-[#1B1B1B] border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors">
+          Copy Invite Link
+        </button>
         <button onClick={onViewBracket} className="flex-1 md:flex-none px-6 py-2.5 bg-[#1B1B1B] border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors">
           View Bracket
         </button>

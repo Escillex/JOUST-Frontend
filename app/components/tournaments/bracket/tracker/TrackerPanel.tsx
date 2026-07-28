@@ -5,6 +5,7 @@ import { MatchGameLog, GameTrackingMode, FormatConfig } from '../../../../tourna
 import { Match } from '../../../../tournaments/[id]/bracket/types';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../../utils/api';
 import { usePolling } from '../../../../utils/usePolling';
+import { useTournamentSocket, TrackerUpdatePayload } from '../../../../utils/useTournamentSocket';
 import GameBar from './GameBar';
 import GameSeriesScore from './GameSeriesScore';
 import PlayerToolkit from './PlayerToolkit';
@@ -14,12 +15,15 @@ interface TrackerPanelProps {
   formatConfig: FormatConfig;
   isAdmin: boolean;
   currentUserId?: string;
+  // Needed to subscribe to this tournament's real-time updates so the HP/points
+  // bars move live. When absent (older callers) the panel falls back to polling.
+  tournamentId?: string;
   onMatchUpdated?: () => void;
 }
 
 type ConfirmState = { type: 'winner'; winnerId: string } | { type: 'draw' } | null;
 
-export default function TrackerPanel({ match, formatConfig, isAdmin, currentUserId, onMatchUpdated }: TrackerPanelProps) {
+export default function TrackerPanel({ match, formatConfig, isAdmin, currentUserId, tournamentId, onMatchUpdated }: TrackerPanelProps) {
   const [logs, setLogs] = useState<MatchGameLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -78,18 +82,41 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
     finally { setIsLoading(false); }
   }, [match.id]);
 
-  // TEMPORARY POLLING BLOCK - TO BE REPLACED BY WEBSOCKETS
-  // Uses the shared usePolling hook so this poll also pauses while the
-  // browser tab is hidden. For a finished match (winner already set)
-  // the logs cannot change anymore, so fetch them once instead of
-  // polling every 4 seconds. Bye matches have no tracker at all, so
-  // they never fetch.
   const seriesOver = !!match.winnerId;
-  usePolling(fetchLogs, 4000, !match.isBye && !seriesOver);
+
+  // Live tracker values arrive over the socket. Patch the active game log's
+  // values directly so the HP/points bars move without a refetch. Only apply
+  // updates for this match; other matches' updates are ignored here.
+  const applyTrackerUpdate = useCallback((p: TrackerUpdatePayload) => {
+    if (p.matchId !== match.id) return;
+    setLogs(prev =>
+      prev.map(l =>
+        l.gameNumber === p.gameNumber
+          ? { ...l, player1Value: p.player1Value, player2Value: p.player2Value }
+          : l,
+      ),
+    );
+  }, [match.id]);
+
+  // A game opening or closing changes the log list (new game, series score),
+  // which the payload does not carry, so refetch the logs on the coarse signal.
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: fetchLogs,
+    onTrackerUpdate: applyTrackerUpdate,
+  });
+
+  // POLLING BLOCK - fallback behind the WebSocket connection
+  // Uses the shared usePolling hook so this poll also pauses while the browser
+  // tab is hidden. While the socket is connected it drops to a slow 60s
+  // safety-net tick (the socket drives the live values); it returns to the fast
+  // 4s rate when the socket drops. For a finished match (winner already set)
+  // the logs cannot change anymore, so fetch them once instead of polling. Bye
+  // matches have no tracker at all, so they never fetch.
+  usePolling(fetchLogs, connected ? 60000 : 4000, !match.isBye && !seriesOver);
   useEffect(() => {
     if (!match.isBye && seriesOver) fetchLogs();
   }, [match.isBye, seriesOver, fetchLogs]);
-  // END OF TEMPORARY POLLING BLOCK
+  // END OF POLLING BLOCK
 
   // Bye matches: no tracker. This check used to sit above the hooks,
   // which breaks React's rule that hooks must run on every render in

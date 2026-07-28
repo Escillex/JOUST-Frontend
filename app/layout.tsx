@@ -28,6 +28,7 @@ export const viewport: Viewport = {
 
 import Navibar from "./components/Navibar";
 import { UserProvider } from "./components/UserProvider";
+import { NotificationProvider } from "./components/NotificationProvider";
 import { ToastProvider } from "./components/ui/Toast";
 import MobileTopBar from "./components/mobile/MobileTopBar";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
@@ -49,6 +50,7 @@ export default function RootLayout({
             (production only) and makes the site installable. */}
         <ServiceWorkerRegister />
         <UserProvider>
+          <NotificationProvider>
           <ToastProvider>
           <InitialAppLoader>
             {/* Desktop Navigation */}
@@ -71,6 +73,7 @@ export default function RootLayout({
             </div>
           </InitialAppLoader>
           </ToastProvider>
+          </NotificationProvider>
         </UserProvider>
       </body>
     </html>

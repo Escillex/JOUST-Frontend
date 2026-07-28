@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { resolveImageUrl } from "../utils/api";
 import { useUser } from "./UserProvider";
+import NotificationBell from "./NotificationBell";
 
 /**
  * Navibar - The primary navigation component.
@@ -112,6 +113,8 @@ export default function Navibar() {
             /* Stable greeble-style loading placeholder to prevent layout shifts */
             <div className="w-10 h-10 border-2 border-white/10 bg-[#1B1B1B] animate-pulse" />
           ) : user ? (
+            <>
+            <NotificationBell />
             <div className="relative" ref={profileMenuRef}>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -192,6 +195,7 @@ export default function Navibar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <motion.div
               whileHover={{ scale: 1.05 }}
