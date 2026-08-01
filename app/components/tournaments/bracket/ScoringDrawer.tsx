@@ -1,10 +1,19 @@
 "use client";
+import { SkeletonPanel } from "../../ui/Skeleton";
+import dynamic from "next/dynamic";
 import { useState, useEffect } from 'react';
 import { Match } from '../../../tournaments/[id]/bracket/types';
 import { FormatConfig } from '../../../tournaments/types';
-import TrackerPanel from './tracker/TrackerPanel';
+// Lazy-loaded: TrackerPanel is the largest component in the bracket tree and
+// is only reachable once an organizer opens the scoring drawer, so it does not
+// belong in the initial bundle.
+const TrackerPanel = dynamic(() => import('./tracker/TrackerPanel'), {
+  ssr: false,
+  loading: () => <SkeletonPanel rows={4} />,
+});
 import GameSeriesScore from './tracker/GameSeriesScore';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../utils/api';
+import { canOfferDraw } from '../../../utils/formatConfig';
 
 interface Props {
   match: Match | null;
@@ -16,6 +25,9 @@ interface Props {
   onMatchUpdated?: () => void;
   tournamentId?: string;
   tournamentStatus?: string;
+  /** Tournament system. Required to decide whether a draw is safe to offer at
+   *  all — see canOfferDraw. */
+  system?: string;
 }
 
 type DrawerMode = 'quick' | 'tracker';
@@ -29,7 +41,8 @@ export default function ScoringDrawer({
   currentUserId,
   onMatchUpdated,
   tournamentId,
-  tournamentStatus
+  tournamentStatus,
+  system
 }: Props) {
   const hasTrackerCapability = !!(match && !match.isBye);
   const [mode, setMode] = useState<DrawerMode>(hasTrackerCapability ? 'tracker' : 'quick');
@@ -51,7 +64,11 @@ export default function ScoringDrawer({
   const p1Score = match.player1Score ?? 0;
   const p2Score = match.player2Score ?? 0;
   const seriesComplete = (p1Score >= winsNeeded || p2Score >= winsNeeded || !!match.winnerId || match.status === 'COMPLETED');
-  const seriesWinnerName = seriesComplete
+  // A draw is COMPLETED with no winner. Checked before any winner lookup below,
+  // because the final `winnerId === player1` comparison is false for a draw and
+  // would otherwise announce player 2 as the winner of a match nobody won.
+  const isDraw = match.status === 'COMPLETED' && !match.winnerId && !match.isBye;
+  const seriesWinnerName = seriesComplete && !isDraw
     ? (p1Score >= winsNeeded ? p1Name : p2Score >= winsNeeded ? p2Name : (match.winnerId === match.player1?.id ? p1Name : p2Name))
     : null;
 
@@ -136,6 +153,7 @@ export default function ScoringDrawer({
               <TrackerPanel
                 match={match}
                 formatConfig={formatConfig ?? {}}
+                system={system}
                 isAdmin={isAdmin}
                 currentUserId={currentUserId}
                 tournamentId={tournamentId}
@@ -168,7 +186,9 @@ export default function ScoringDrawer({
               {seriesComplete && (
                 <div className="mb-4 bg-primary/10 border border-primary/30 p-6 flex flex-col items-center gap-3 text-center animate-in fade-in duration-300">
                   <span className="text-[9px] font-black text-primary uppercase tracking-[0.3em]">Series Complete</span>
-                  <p className="text-lg font-black text-white uppercase tracking-tight">{seriesWinnerName} Wins</p>
+                  <p className="text-lg font-black text-white uppercase tracking-tight">
+                    {isDraw ? 'Drawn' : `${seriesWinnerName} Wins`}
+                  </p>
                   <p className="text-[9px] text-white/30 uppercase tracking-widest">{p1Score} — {p2Score}</p>
                 </div>
               )}
@@ -184,7 +204,7 @@ export default function ScoringDrawer({
                             <button
                               onClick={() => handleRecordGameWin(match.player1?.id || '')}
                               disabled={!match.player1 || isSubmittingGame}
-                              className="py-4 bg-[#52B946]/10 border border-[#52B946]/30 hover:border-primary text-primary transition-all text-[11px] font-black uppercase tracking-widest rounded-sm flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="py-4 bg-primary/10 border border-primary/30 hover:border-primary text-primary transition-all text-[11px] font-black uppercase tracking-widest rounded-sm flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <span>{isSubmittingGame ? '...' : 'Record Game Win'}</span>
                               <span className="text-[8px] text-white/45 font-bold">{p1Name}</span>
@@ -193,7 +213,7 @@ export default function ScoringDrawer({
                             <button
                               onClick={() => handleRecordGameWin(match.player2?.id || '')}
                               disabled={!match.player2 || isSubmittingGame}
-                              className="py-4 bg-[#52B946]/10 border border-[#52B946]/30 hover:border-primary text-primary transition-all text-[11px] font-black uppercase tracking-widest rounded-sm flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="py-4 bg-primary/10 border border-primary/30 hover:border-primary text-primary transition-all text-[11px] font-black uppercase tracking-widest rounded-sm flex flex-col items-center justify-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <span>{isSubmittingGame ? '...' : 'Record Game Win'}</span>
                               <span className="text-[8px] text-white/45 font-bold">{p2Name}</span>
@@ -258,8 +278,12 @@ export default function ScoringDrawer({
                     ) : null
                   )}
 
-                  {/* Backend rejects a winnerless submit for series (bestOf > 1) and threshold-based matches */}
-                  {!seriesComplete && formatConfig?.allowDraw && bestOf <= 1 && !(formatConfig?.pointsThreshold && formatConfig.pointsThreshold > 0) && (
+                  {/* canOfferDraw folds in the two limits the backend enforces on a
+                      winnerless submit (no series, no threshold scoring) AND the
+                      system check that used to be missing here: on an elimination
+                      bracket a draw stalls or corrupts the bracket, so the button
+                      must not be reachable even if allowDraw was set. */}
+                  {!seriesComplete && canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
                     <div className="pt-4 border-t border-white/5">
                       <button
                         onClick={() => onScore(null)}
@@ -287,10 +311,28 @@ export default function ScoringDrawer({
                         </p>
                       </div>
                     </div>
+                  ) : isDraw ? (
+                    /* Without this branch a drawn match fell through to the
+                       "not started yet" state below, telling the organizer a
+                       finished match was still waiting to begin. */
+                    <div className="bg-white/5 border border-white/20 p-8 flex flex-col items-center justify-center gap-4 text-center">
+                      <div className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center text-white/70 bg-white/5 text-[10px] font-black uppercase tracking-widest">
+                        D
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.3em]">Match Complete</span>
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tight italic">
+                          Drawn
+                        </h3>
+                        <p className="text-[10px] text-white/40 uppercase tracking-widest">
+                          Series Score: {match.player1Score ?? 0} — {match.player2Score ?? 0}
+                        </p>
+                      </div>
+                    </div>
                   ) : (
                     <div className="p-8 border border-dashed border-white/10 flex flex-col items-center justify-center text-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white/30 animate-pulse">Match Standby</span>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-white/15">Waiting for players or organizers to commence the match</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/30 animate-pulse">Not Started</span>
+                      <span className="text-[9px] font-black uppercase tracking-wider text-white/15">This match has not been started yet</span>
                     </div>
                   )}
                 </div>

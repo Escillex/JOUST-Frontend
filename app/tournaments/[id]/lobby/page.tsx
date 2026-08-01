@@ -9,6 +9,8 @@ import { useToast } from "../../../components/ui/Toast";
 import { Tournament } from "../../types";
 import Link from "next/link";
 import ConnectionPill from "../../../components/ui/ConnectionPill";
+import LastUpdated from "../../../components/ui/LastUpdated";
+import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../../components/ui/Skeleton";
 import { motion, AnimatePresence } from "motion/react";
 
 function TournamentLobbyContent() {
@@ -18,6 +20,9 @@ function TournamentLobbyContent() {
   const tournamentId = params.id as string;
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
+  // When the roster on screen was last refreshed. Players watch this page
+  // waiting to be seeded, so a stalled poll must not look like "no news yet".
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +36,7 @@ function TournamentLobbyContent() {
     onTournamentUpdate: () => fetchData(true),
   });
 
-  // POLLING BLOCK - fallback behind the WebSocket connection
+  // temporary polling block - fallback behind the WebSocket connection
   // Refresh through the shared usePolling hook: it pauses while the tab is
   // hidden and stops once the tournament is COMPLETED, because finished
   // tournaments no longer change. While the socket is connected it drops to a
@@ -42,7 +47,7 @@ function TournamentLobbyContent() {
     connected ? 300000 : 120000,
     !!tournamentId && tournament?.status !== "COMPLETED",
   );
-  // END OF POLLING BLOCK
+  // end of temporary polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -55,7 +60,7 @@ function TournamentLobbyContent() {
     try {
       const [meRes, tRes] = await Promise.all([
         authenticatedFetch(API_ENDPOINTS.AUTH.ME),
-        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!))
+        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE_SUMMARY(tournamentId!))
       ]);
       
       if (meRes.ok) {
@@ -65,6 +70,7 @@ function TournamentLobbyContent() {
       if (tRes.ok) {
         const data = await safeJson(tRes);
         setTournament(data);
+        setLastUpdated(new Date());
       }
     } catch (error) {
       console.error("Lobby fetch failed:", error);
@@ -102,16 +108,35 @@ function TournamentLobbyContent() {
     }
   };
 
+  // The lobby shell — background, container, section heading — renders straight
+  // away and only the tournament-dependent blocks are placeholders, so the page
+  // keeps its final layout instead of snapping from a centred message into a
+  // full page once the fetch lands.
   if (loading || !tournament) {
     return (
-      <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center">
-        <motion.div 
-          animate={{ opacity: [0.3, 1, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          className="text-[10px] font-black text-primary uppercase tracking-[1em]"
-        >
-          LOADING DATA
-        </motion.div>
+      <div className="min-h-screen bg-background text-white font-poppins relative overflow-hidden">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.03]"
+          style={{ backgroundImage: 'radial-gradient(circle, #52B946 1px, transparent 1px)', backgroundSize: '32px 32px' }}
+        />
+        <main className="max-w-7xl mx-auto px-6 py-12 md:py-20 relative z-10">
+          <SkeletonStatus label="Loading tournament lobby" />
+          <section className="mb-20">
+            <div className="flex items-center gap-4 mb-8">
+              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-primary">TOURNAMENT LOBBY</span>
+              <div className="h-[1px] flex-1 bg-white/5" />
+            </div>
+            <div className="flex flex-col gap-6">
+              <Skeleton className="h-[clamp(2.5rem,12vw,7rem)] w-3/4" />
+              <div className="flex flex-wrap items-center gap-6">
+                <Skeleton className="h-7 w-28" />
+                <Skeleton className="h-7 w-32" />
+                <Skeleton className="h-7 w-40" />
+              </div>
+            </div>
+          </section>
+          <SkeletonPanel rows={6} />
+        </main>
       </div>
     );
   }
@@ -120,7 +145,7 @@ function TournamentLobbyContent() {
   const myParticipant = tournament.participants.find(p => p.userId === myId);
 
   return (
-    <div className="min-h-screen bg-[#1B1B1B] text-white font-poppins selection:bg-primary selection:text-black relative overflow-hidden">
+    <div className="min-h-screen bg-background text-white font-poppins selection:bg-primary selection:text-black relative overflow-hidden">
       {/* Technical Background Layer */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
            style={{ backgroundImage: 'radial-gradient(circle, #52B946 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
@@ -157,6 +182,7 @@ function TournamentLobbyContent() {
                  {tournament.status}
                </div>
                <ConnectionPill connected={connected} />
+               <LastUpdated lastUpdated={lastUpdated} />
                <div className="px-4 py-1.5 border border-white/10 text-white/40 text-[10px] font-black uppercase tracking-widest">
                  {(typeof tournament.format === 'object' ? tournament.format?.system : "UNKNOWN")?.replace("_", " ") || "UNKNOWN"}
                </div>
@@ -176,7 +202,7 @@ function TournamentLobbyContent() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="relative p-10 bg-[#1B1B1B]/40 border border-white/5 group"
+              className="relative p-10 bg-background/40 border border-white/5 group"
             >
               {/* Corner Accents */}
               <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-primary" />
@@ -242,7 +268,7 @@ function TournamentLobbyContent() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="bg-[#1B1B1B]/20 border border-white/5 p-8"
+              className="bg-background/20 border border-white/5 p-8"
             >
               <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
                  <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-white/40">PARTICIPANT ROSTER</h2>

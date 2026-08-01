@@ -1,21 +1,38 @@
 "use client";
+import dynamic from "next/dynamic";
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import ConnectionPill from '../../../components/ui/ConnectionPill';
+import LastUpdated from '../../../components/ui/LastUpdated';
+import { Skeleton, SkeletonStatus } from '../../../components/ui/Skeleton';
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
-import { Match, LeaderboardEntry } from "./types";
-import { getTournamentConfig } from "../../../utils/formatConfig";
+import { Match, LeaderboardEntry, LogEntry } from "./types";
+import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, usesPointsStandings } from "../../../utils/formatConfig";
 import DesktopView from "./device/DesktopView";
 import MobileView from "./device/MobileView";
 import ScoringDrawer from "../../../components/tournaments/bracket/ScoringDrawer";
 import MaximizedModal from "../../../components/tournaments/bracket/MaximizedModal";
-import TerminalLogs from "../../../components/tournaments/bracket/TerminalLogs";
+import ActivityLog from "../../../components/tournaments/bracket/ActivityLog";
 import LiveStandings from "../../../components/tournaments/bracket/LiveStandings";
-import DeploymentFooter from "../../../components/tournaments/bracket/DeploymentFooter";
-import BracketPreview from "../../../components/tournaments/bracket/BracketPreview";
+import AddParticipantsFooter from "../../../components/tournaments/bracket/AddParticipantsFooter";
+// Lazy-loaded: see the note on the tournament detail page. @xyflow/react is
+// the heaviest dependency here and is only needed once the bracket view is
+// actually rendered.
+const BracketPreview = dynamic(
+  () => import("../../../components/tournaments/bracket/BracketPreview"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[400px] flex items-center justify-center">
+        <SkeletonStatus label="Loading bracket" />
+        <Skeleton className="w-full h-full" />
+      </div>
+    ),
+  },
+);
 
 const randomGuestName = () => `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -30,7 +47,6 @@ const findMatchInTournament = (t: any, matchId: string): Match | null => {
   return null;
 };
 
-interface LogEntry { id: string; action: string; details?: string; timestamp: string; }
 
 function BracketViewContent() {
   const params = useParams();
@@ -40,6 +56,9 @@ function BracketViewContent() {
   const tournamentId = params.id as string;
 
   const [tournament, setTournament]     = useState<any | null>(null);
+  // When the bracket on screen was last refreshed, so a silently failing poll
+  // cannot leave it looking current.
+  const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
   const [leaderboard, setLeaderboard]   = useState<LeaderboardEntry[]>([]);
   const [logs, setLogs]                 = useState<LogEntry[]>([]);
   const [isAdmin, setIsAdmin]           = useState(false);
@@ -53,7 +72,7 @@ function BracketViewContent() {
   const [isStarting, setIsStarting]           = useState(false);
   const [isRegistering, setIsRegistering]     = useState(false);
   const [scoringMatch, setScoringMatch]       = useState<Match | null>(null);
-  const [maximizedPanel, setMaximizedPanel]   = useState<"TERMINAL" | "STANDINGS" | null>(null);
+  const [maximizedPanel, setMaximizedPanel]   = useState<"ACTIVITY" | "STANDINGS" | null>(null);
   const [isMobile, setIsMobile]               = useState(false);
   const [viewMode, setViewMode]               = useState<"CARD" | "BRACKET">("BRACKET");
   const [activePlayerMatchPopup, setActivePlayerMatchPopup] = useState<Match | null>(null);
@@ -81,7 +100,7 @@ function BracketViewContent() {
     onTournamentUpdate: () => fetchTournamentData(true),
   });
 
-  // POLLING BLOCK - fallback behind the WebSocket connection
+  // temporary polling block - fallback behind the WebSocket connection
   // Rewritten to use the shared usePolling hook. The old version listed
   // seven state values as effect dependencies, so the 4-second timer was
   // destroyed and recreated on almost every render. usePolling reads the
@@ -149,9 +168,9 @@ function BracketViewContent() {
     4000,
     hasOngoingMatches,
   );
-  // END OF TEMPORARY POLLING BLOCK
+  // end of temporary polling block
 
-  // POLLING BLOCK - fallback behind the WebSocket connection
+  // temporary polling block - fallback behind the WebSocket connection
   // General auto-refresh for the bracket. Runs "silent" so it does not
   // flash the loading state, and only refreshes the tournament and
   // leaderboard. This is the heavy full-tournament refresh, so when the
@@ -164,7 +183,7 @@ function BracketViewContent() {
     connected ? 60000 : 15000,
     !!tournamentId && (tournament?.status === "ONGOING" || tournament?.status === "OPEN"),
   );
-  // END OF POLLING BLOCK
+  // end of temporary polling block
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments"); return; }
@@ -199,8 +218,14 @@ function BracketViewContent() {
       // endpoint is role-restricted in its own right.
       const auth = me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
       if (auth) {
-        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
-        if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
+        // /auth/registered-users is ADMIN-only, so every non-admin organizer got a 403
+        // here and the picker below stayed empty. /auth/users is ORGANIZER|ADMIN; it
+        // includes guests, so they are filtered out to keep the same meaning.
+        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.USERS);
+        if (usersRes.ok) {
+          const everyone = (await safeJson(usersRes)) ?? [];
+          setAllUsers(everyone.filter((u: { isGuest?: boolean }) => !u.isGuest));
+        }
       }
     } catch { /* identity load failure is non-fatal; page still renders */ }
   };
@@ -214,6 +239,7 @@ function BracketViewContent() {
       if (tRes.ok) {
         const t = await safeJson(tRes);
         setTournament(t);
+        setLastUpdated(new Date());
         // The backend decides who may manage this tournament; the UI follows it.
         const canManage = !!t?.canManage;
         setIsAdmin(canManage);
@@ -303,11 +329,36 @@ function BracketViewContent() {
     setScoringMatch(match);
   };
 
+  // Shows the page frame and a bracket-shaped placeholder rather than blanking
+  // the screen behind a spinner. The bracket payload is the largest read in the
+  // app, so on venue Wi-Fi this state can persist for several seconds.
   if (loading && !tournament) return (
-    <div className="min-h-screen w-full bg-background flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse font-poppins">Syncing Brackets</p>
+    <div className="min-h-screen w-full bg-background">
+      <div className="w-full max-w-[1800px] mx-auto px-4 md:px-8 py-8 flex flex-col gap-8">
+        <SkeletonStatus label="Loading tournament bracket" />
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/10 pb-6">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-8 w-72" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-24" />
+          </div>
+        </div>
+
+        {/* Column-per-round shape, so the placeholder reads as a bracket. */}
+        <div className="flex gap-6 overflow-hidden">
+          {[8, 4, 2, 1].map((matches, col) => (
+            <div key={col} className="flex flex-col justify-around gap-4 min-w-[220px]">
+              <Skeleton className="h-3 w-20" />
+              {Array.from({ length: matches }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -335,6 +386,7 @@ function BracketViewContent() {
               </h1>
               <div className="flex items-center gap-3">
                 <ConnectionPill connected={connected} />
+                <LastUpdated lastUpdated={lastUpdated} />
                 <span className={`text-[8px] font-black uppercase tracking-[0.3em] ${isAdmin ? "text-primary/60" : "text-foreground/20"}`}>
                   {isAdmin ? "SYSTEM ADMINISTRATOR" : "AUTHORIZED VIEWER"}
                 </span>
@@ -346,7 +398,7 @@ function BracketViewContent() {
           <div className="flex items-center gap-4">
             <div className="flex bg-foreground/5 border border-white/5 p-1 rounded-xl">
               <button 
-                onClick={() => { setViewMode("CARD"); addLog("UI_COMMAND", "SWITCHED TO CARD VIEW"); }}
+                onClick={() => { setViewMode("CARD"); addLog("VIEW", "SWITCHED TO CARD VIEW"); }}
                 className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === "CARD" ? 'bg-primary text-white shadow-lg' : 'text-foreground/40 hover:text-foreground'}`}
               >
                 {(() => {
@@ -364,7 +416,7 @@ function BracketViewContent() {
                 return true;
               })() && (
                 <button 
-                  onClick={() => { setViewMode("BRACKET"); addLog("UI_COMMAND", "SWITCHED TO BRACKET VIEW"); }}
+                  onClick={() => { setViewMode("BRACKET"); addLog("VIEW", "SWITCHED TO BRACKET VIEW"); }}
                   className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === "BRACKET" ? 'bg-primary text-white shadow-lg' : 'text-foreground/40 hover:text-foreground'}`}
                 >
                   Bracket View
@@ -389,7 +441,7 @@ function BracketViewContent() {
                 onClick={() => {
                   const nextVal = !isEditMode;
                   setIsEditMode(nextVal);
-                  addLog("UI_COMMAND", `EDIT MODE: ${nextVal ? "ENABLED" : "DISABLED"}`);
+                  addLog("VIEW", `EDIT MODE: ${nextVal ? "ENABLED" : "DISABLED"}`);
                   const url = new URL(window.location.href);
                   url.searchParams.set("edit", String(nextVal));
                   window.history.replaceState(null, "", url.toString());
@@ -439,7 +491,7 @@ function BracketViewContent() {
                   transition={{ delay: 0.3, type: "spring", stiffness: 100, damping: 12 }}
                   className="text-6xl md:text-8xl font-black text-white uppercase tracking-tighter leading-none font-poppins italic group-hover:scale-[1.02] transition-transform duration-700"
                 >
-                  {tournament.winner.username || tournament.winner.guestName}
+                  {tournament.winner.username}
                 </motion.h2>
                 <motion.div 
                   initial={{ opacity: 0 }}
@@ -459,7 +511,7 @@ function BracketViewContent() {
                 className="w-32 h-32 md:w-48 md:h-48 bg-primary text-black flex items-center justify-center relative shadow-[0_0_50px_rgba(82,185,70,0.3)] shrink-0"
               >
                 <div className="absolute inset-2 border-2 border-black/20" />
-                <span className="text-6xl md:text-8xl font-black italic">{tournament.winner.username?.[0] || tournament.winner.guestName?.[0]}</span>
+                <span className="text-6xl md:text-8xl font-black italic">{tournament.winner.username?.[0]}</span>
               </motion.div>
             </div>
           </motion.div>
@@ -509,10 +561,16 @@ function BracketViewContent() {
 
         {/* Footer */}
         <footer className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <TerminalLogs logs={logs} onMaximize={() => { setMaximizedPanel("TERMINAL"); addLog("UI_COMMAND", "SYSTEM LOGS EXPANDED"); }} />
-          <LiveStandings leaderboard={leaderboard} onMaximize={() => { setMaximizedPanel("STANDINGS"); addLog("UI_COMMAND", "STANDINGS EXPANDED"); }} />
+          <ActivityLog logs={logs} onMaximize={() => { setMaximizedPanel("ACTIVITY"); addLog("VIEW", "ACTIVITY LOG EXPANDED"); }} />
+          {/* Points standings only where points decide the result (plan 8.5).
+              On an elimination bracket no match points are awarded at all since
+              8.1, so this panel would be a table of zeroes — the bracket above
+              already IS the standing. */}
+          {usesPointsStandings(getTournamentSystem(tournament)) && (
+            <LiveStandings leaderboard={leaderboard} tieBreakerOrder={getTieBreakerOrder(tournament)} onMaximize={() => { setMaximizedPanel("STANDINGS"); addLog("VIEW", "STANDINGS EXPANDED"); }} />
+          )}
           {activeAdmin && tournament?.status === "OPEN" && (
-            <DeploymentFooter
+            <AddParticipantsFooter
               tournament={tournament}
               allUsers={allUsers}
               guestUsername={guestUsername}
@@ -609,6 +667,7 @@ function BracketViewContent() {
       <ScoringDrawer 
         match={scoringMatch} 
         formatConfig={getTournamentConfig(tournament)}
+        system={getTournamentSystem(tournament)}
         isAdmin={activeAdmin}
         currentUserId={currentUser?.sub || currentUser?.id}
         tournamentId={tournamentId}
@@ -634,7 +693,7 @@ export default function BracketViewPage() {
       <div className="h-screen w-full bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse font-poppins">Initializing Terminal</p>
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-primary animate-pulse font-poppins">Loading tournament bracket</p>
         </div>
       </div>
     }>

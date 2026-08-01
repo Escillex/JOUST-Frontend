@@ -11,8 +11,6 @@ interface UserRankProps {
     losses: number;
     draws: number;
     matchWinPct: number;
-    omw: number;
-    oomw: number;
   } | null;
   loading?: boolean;
 }

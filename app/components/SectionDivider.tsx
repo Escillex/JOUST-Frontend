@@ -11,7 +11,7 @@ interface SectionDividerProps {
  */
 export default function SectionDivider({ label }: SectionDividerProps) {
   return (
-    <div className="relative h-48 md:h-64 w-full flex items-center overflow-hidden bg-[#1B1B1B] border-y-4 border-white/5 my-12">
+    <div className="relative h-48 md:h-64 w-full flex items-center overflow-hidden bg-background border-y-4 border-white/5 my-12">
       {/* Infinite Marquee Wrapper */}
       <div className="flex whitespace-nowrap">
         <motion.div 

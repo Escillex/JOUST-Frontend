@@ -33,6 +33,10 @@ export default function PresetManager() {
   // Config fields
   const [bestOf, setBestOf] = useState(1);
   const [allowDraw, setAllowDraw] = useState(false);
+  // How the field is placed into the bracket. RANDOM draws the field at random,
+  // which is what an event does unless the organizer has deliberately arranged
+  // the order; MANUAL honours the seed order set on the roster before start.
+  const [seedingMode, setSeedingMode] = useState<"RANDOM" | "MANUAL">("RANDOM");
   const [swissRounds, setSwissRounds] = useState(3);
   const [swissPointsWin, setSwissPointsWin] = useState(3);
   const [swissPointsDraw, setSwissPointsDraw] = useState(1);
@@ -60,7 +64,7 @@ export default function PresetManager() {
         setTemplates(data || []);
       }
     } catch (err) {
-      setError("Failed to sync presets");
+      setError("Failed to load presets");
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +76,7 @@ export default function PresetManager() {
     const config = {
       bestOf,
       allowDraw,
+      seedingMode,
       swissRounds: system === "SWISS" ? swissRounds : null,
       swissPointsForWin: swissPointsWin,
       swissPointsForDraw: swissPointsDraw,
@@ -159,6 +164,7 @@ export default function PresetManager() {
     setIsNewGame(false);
     setBestOf(1);
     setAllowDraw(false);
+    setSeedingMode("RANDOM");
     setPointsThreshold(0);
     setStartingHp(0);
     setPlacementChampion(10);
@@ -179,7 +185,7 @@ export default function PresetManager() {
 
   const labelCls = "text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block";
   const deeperLabelCls = "text-[10px] font-black text-white/20 uppercase tracking-widest mb-1 block";
-  const inputCls = "w-full bg-[#1B1B1B] border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary transition-all cursor-pointer hover:bg-white/[0.02]";
+  const inputCls = "w-full bg-background border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary transition-all cursor-pointer hover:bg-white/[0.02]";
 
   return (
     <div className="space-y-8">
@@ -206,11 +212,11 @@ export default function PresetManager() {
             <div>
               <label className={labelCls}>System Engine</label>
               <select value={system} onChange={e => setSystem(e.target.value as any)} className={inputCls}>
-                <option value="SINGLE_ELIMINATION" className="bg-[#1B1B1B] text-white">Single Elimination</option>
-                <option value="DOUBLE_ELIMINATION" className="bg-[#1B1B1B] text-white">Double Elimination</option>
-                <option value="SWISS" className="bg-[#1B1B1B] text-white">Swiss System</option>
-                <option value="ROUND_ROBIN" className="bg-[#1B1B1B] text-white">Round Robin</option>
-                <option value="HYBRID" className="bg-[#1B1B1B] text-white">Top Cut (Multi-Phase)</option>
+                <option value="SINGLE_ELIMINATION" className="bg-background text-white">Single Elimination</option>
+                <option value="DOUBLE_ELIMINATION" className="bg-background text-white">Double Elimination</option>
+                <option value="SWISS" className="bg-background text-white">Swiss System</option>
+                <option value="ROUND_ROBIN" className="bg-background text-white">Round Robin</option>
+                <option value="HYBRID" className="bg-background text-white">Top Cut (Multi-Phase)</option>
               </select>
             </div>
             <div>
@@ -248,11 +254,11 @@ export default function PresetManager() {
                   }}
                   className={inputCls}
                 >
-                  <option value="" className="bg-[#1B1B1B] text-white">None (General)</option>
+                  <option value="" className="bg-background text-white">None (General)</option>
                   {gameOptions.map(g => (
-                    <option key={g} value={g} className="bg-[#1B1B1B] text-white">{g}</option>
+                    <option key={g} value={g} className="bg-background text-white">{g}</option>
                   ))}
-                  <option value="__NEW__" className="bg-[#1B1B1B] text-primary">+ Define new game…</option>
+                  <option value="__NEW__" className="bg-background text-primary">+ Define new game…</option>
                 </select>
               )}
             </div>
@@ -284,8 +290,41 @@ export default function PresetManager() {
                     }} 
                     min={1}
                     step={2}
-                    className={inputCls} 
+                    className={inputCls}
                   />
+                </div>
+
+                <div className="space-y-1.5 pt-2">
+                  <label className={deeperLabelCls}>Seeding</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSeedingMode("RANDOM")}
+                      className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                        seedingMode === "RANDOM"
+                          ? "bg-primary/10 border-primary text-primary"
+                          : "bg-background border-white/10 text-white/40 hover:text-white"
+                      }`}
+                    >
+                      Random Draw
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSeedingMode("MANUAL")}
+                      className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                        seedingMode === "MANUAL"
+                          ? "bg-primary/10 border-primary text-primary"
+                          : "bg-background border-white/10 text-white/40 hover:text-white"
+                      }`}
+                    >
+                      Manual Seeding
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-white/30 leading-relaxed">
+                    {seedingMode === "RANDOM"
+                      ? "The field is drawn at random when the tournament starts. Any seed order set on the roster is ignored."
+                      : "The bracket follows the seed order arranged on the roster. Unseeded entrants are placed last."}
+                  </p>
                 </div>
               </div>
 
@@ -346,6 +385,12 @@ export default function PresetManager() {
                   </div>
                 )}
 
+                 {/* Deliberately NOT extended to HYBRID here, unlike
+                     CreateTournamentForm: this whole section is wrapped in a
+                     `pointer-events-none` block when system === "HYBRID" (see
+                     the container above), so a toggle added here would be a
+                     control nobody can reach. HYBRID phase-1 draws are set on
+                     the per-tournament form instead. Tracked as plan item 4.7. */}
                  {(system === "SWISS" || system === "ROUND_ROBIN") && (
                   <div className="space-y-1.5 pt-2">
                     <label className={deeperLabelCls}>Allow Draws</label>
@@ -355,8 +400,8 @@ export default function PresetManager() {
                         onClick={() => setAllowDraw(false)}
                         className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                           !allowDraw
-                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
-                            : "bg-[#1B1B1B] border-white/10 text-white/40 hover:text-white"
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-background border-white/10 text-white/40 hover:text-white"
                         }`}
                       >
                         Force Win
@@ -366,13 +411,22 @@ export default function PresetManager() {
                         onClick={() => setAllowDraw(true)}
                         className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                           allowDraw
-                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
-                            : "bg-[#1B1B1B] border-white/10 text-white/40 hover:text-white"
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-background border-white/10 text-white/40 hover:text-white"
                         }`}
                       >
                         Permit Draws
                       </button>
                     </div>
+                    {allowDraw && (bestOf > 1 || pointsThreshold > 0) && (
+                      /* Inert combination: the backend rejects a winnerless
+                         submit for a series or a threshold-scored match, so the
+                         Draw control would never appear during scoring. */
+                      <p className="text-[9px] text-[#FFB020] leading-relaxed">
+                        Inert with {bestOf > 1 ? "a best-of series" : "point-threshold scoring"} — set Best Of to 1
+                        {pointsThreshold > 0 ? " and clear the threshold" : ""} for draws to be offered.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -441,7 +495,7 @@ export default function PresetManager() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {templates.map(tpl => (
-          <div key={tpl.id} className="bg-[#1B1B1B] border border-white/5 p-6 group hover:border-white/20 transition-all flex flex-col justify-between min-h-[160px] relative overflow-hidden">
+          <div key={tpl.id} className="bg-background border border-white/5 p-6 group hover:border-white/20 transition-all flex flex-col justify-between min-h-[160px] relative overflow-hidden">
              {/* Diagonal accent */}
              <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 -rotate-45 translate-x-12 -translate-y-12 pointer-events-none" />
              
@@ -474,7 +528,7 @@ export default function PresetManager() {
                           }}
                           placeholder="GENERAL"
                           list="preset-game-options"
-                          className="w-24 bg-[#1B1B1B] border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
+                          className="w-24 bg-background border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
                         />
                         <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] text-primary hover:text-white px-1">✓</button>
                         <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/40 hover:text-white px-1">✕</button>

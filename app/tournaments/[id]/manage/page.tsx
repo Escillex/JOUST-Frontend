@@ -4,16 +4,17 @@ import { useParams, useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
-import { getRawTournamentConfig } from "../../../utils/formatConfig";
-import { Tournament, FormatConfig } from "../../types";
+import { getRawTournamentConfig, ruleView, writeRuleValue, RawConfig } from "../../../utils/formatConfig";
+import { Tournament } from "../../types";
 import { useToast } from "../../../components/ui/Toast";
+import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../../components/ui/Skeleton";
 import { useUser } from "../../../components/UserProvider";
 import ControlRoomHeader from "../../../components/tournaments/manage/ControlRoomHeader";
 import RosterPanel from "../../../components/tournaments/manage/RosterPanel";
 import StaffPanel from "../../../components/tournaments/manage/StaffPanel";
 import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
-import DeploymentPanel from "../../../components/tournaments/manage/DeploymentPanel";
+import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
 
 const randomGuestName = () => `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -26,6 +27,9 @@ function ControlRoomContent() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [allUsers, setAllUsers]     = useState<{ id: string; username: string }[]>([]);
   const [loading, setLoading]       = useState(true);
+  // When the tournament data on screen was last successfully refreshed. The
+  // organizer acts on this data, so a silent poll failure must be visible.
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   // Feedback is shown through the fixed-position toast system instead of
   // the old banner at the top of the page: the banner was invisible when
   // the organizer was scrolled down at the panel they were acting on,
@@ -37,7 +41,10 @@ function ControlRoomContent() {
 
   const [isEditing, setIsEditing]           = useState(false);
   const [isEditingRules, setIsEditingRules] = useState(false);
-  const [formatConfig, setFormatConfig]     = useState<FormatConfig>({});
+  // The RAW stored config, not the resolved view. On a hybrid these differ: the
+  // engine reads through `phase1`, so the editor renders ruleView(formatConfig)
+  // and writes back through writeRuleValue (plan 9.6).
+  const [formatConfig, setFormatConfig]     = useState<RawConfig>({});
   const [formatDefinitions, setFormatDefinitions] = useState<any[]>([]);
   const [formats, setFormats] = useState<any[]>([]);
   const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false, slug: "" });
@@ -65,7 +72,7 @@ function ControlRoomContent() {
     onTournamentUpdate: () => fetchData(true),
   });
 
-  // polling block - fallback behind the WebSocket connection
+  // temporary polling block - fallback behind the WebSocket connection
   // Background refresh through the shared usePolling hook: it pauses while the
   // tab is hidden and stops entirely once the tournament is COMPLETED. While
   // the socket is connected it drops to a slow 60s safety-net tick (the socket
@@ -75,7 +82,7 @@ function ControlRoomContent() {
     connected ? 60000 : 10000,
     !!tournament && tournament.status !== "COMPLETED",
   );
-  // end of polling block
+  // end of temporary polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -83,15 +90,24 @@ function ControlRoomContent() {
     }
   }, [tournament?.name]);
 
-  const fetchFormatDefinitions = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE);
-    if (res.ok) { const data = await safeJson(res); setFormatDefinitions(data?.formats ?? []); }
-  };
-
+  // One request feeding both pieces of state. These were two separate functions
+  // hitting the SAME endpoint, and the definitions one read `data?.formats` —
+  // but GET /tournament-formats returns a bare array, so that was always
+  // undefined and formatDefinitions was permanently []. That is the second,
+  // independent reason the rules editor rendered nothing, on top of the missing
+  // configFields catalog (plan 4.3 / 7.9): fixing only one would not have
+  // brought the panel back.
   const fetchFormats = async () => {
     const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.BASE);
-    if (res.ok) { const data = await safeJson(res); setFormats(data ?? []); }
+    if (res.ok) {
+      const data = await safeJson(res);
+      const list = Array.isArray(data) ? data : [];
+      setFormats(list);
+      setFormatDefinitions(list);
+    }
   };
+
+  const fetchFormatDefinitions = fetchFormats;
 
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -102,8 +118,14 @@ function ControlRoomContent() {
         const me = await safeJson(meRes);
         if (!me?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER")) { router.push("/tournaments"); return; }
 
-        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.REGISTERED_USERS);
-        if (usersRes.ok) setAllUsers(await safeJson(usersRes) ?? []);
+        // /auth/registered-users is ADMIN-only, so every non-admin organizer got a 403
+        // here and the picker below stayed empty. /auth/users is ORGANIZER|ADMIN; it
+        // includes guests, so they are filtered out to keep the same meaning.
+        const usersRes = await authenticatedFetch(API_ENDPOINTS.AUTH.USERS);
+        if (usersRes.ok) {
+          const everyone = (await safeJson(usersRes)) ?? [];
+          setAllUsers(everyone.filter((u: { isGuest?: boolean }) => !u.isGuest));
+        }
 
         await fetchFormats();
       }
@@ -120,6 +142,7 @@ function ControlRoomContent() {
           return;
         }
         setTournament(t);
+        setLastUpdated(new Date());
         if (!silent) {
           setEditState({
             name: t.name,
@@ -352,17 +375,52 @@ function ControlRoomContent() {
     setLoading(false);
   };
 
+  // Renders the console's own chrome immediately and skeletons only where the
+  // data goes, instead of hiding the whole screen behind a spinner. The back
+  // button in particular has to be reachable during a slow load — otherwise an
+  // organizer on bad Wi-Fi has no way out of this page but the browser's own
+  // back control.
   if (loading) return (
-    <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center font-sans">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-4 border-white/10 border-t-white/50 rounded-full animate-spin" />
-        <p className="text-sm text-white/50">Loading Dashboard...</p>
+    <div className="min-h-screen w-full bg-background font-sans overflow-x-hidden text-[#E0E0E0]">
+      <div className="w-full px-4 md:px-8 py-8 max-w-[1600px] mx-auto">
+        <SkeletonStatus label="Loading tournament management" />
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8 pb-6 border-b border-white/20">
+          <div className="space-y-4">
+            <button
+              onClick={() => router.push("/tournaments/manage")}
+              className="text-xs text-[#888888] hover:text-white transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+              Back to Dashboard
+            </button>
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-64" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-28" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 flex flex-col gap-6">
+            <SkeletonPanel rows={6} />
+            <SkeletonPanel rows={3} />
+          </div>
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            <SkeletonPanel rows={4} />
+            <SkeletonPanel rows={5} />
+          </div>
+        </div>
       </div>
     </div>
   );
 
   if (!tournament) return (
-    <div className="min-h-screen flex items-center justify-center text-white/50 bg-[#1B1B1B] font-sans text-sm">Tournament Not Found</div>
+    <div className="min-h-screen flex items-center justify-center text-white/50 bg-background font-sans text-sm">Tournament Not Found</div>
   );
 
   const system = typeof tournament.format === "string"
@@ -370,7 +428,7 @@ function ControlRoomContent() {
     : tournament.format?.system;
 
   return (
-    <div className="min-h-screen w-full bg-[#1B1B1B] font-sans overflow-x-hidden text-[#E0E0E0]">
+    <div className="min-h-screen w-full bg-background font-sans overflow-x-hidden text-[#E0E0E0]">
       <div className="w-full px-4 md:px-8 py-8 max-w-[1600px] mx-auto">
         <ControlRoomHeader
           tournament={tournament}
@@ -380,6 +438,8 @@ function ControlRoomContent() {
           onOpenTournament={handleOpenRegistration}
           onStartTournament={handleStartTournament}
           onRefresh={fetchData}
+          connected={connected}
+          lastUpdated={lastUpdated}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -412,10 +472,16 @@ function ControlRoomContent() {
               tournament={tournament}
               formatDefinitions={formatDefinitions}
               isEditing={isEditingRules}
-              formatConfig={formatConfig}
+              /* The flat view of what the engine will ACTUALLY apply. On a
+                 HYBRID tournament resolveConfig reads through `phase1`, so the
+                 raw top level is ignored — passing it here showed defaults
+                 instead of the real rules (plan 9.6). */
+              formatConfig={ruleView(formatConfig)}
               onToggleEdit={() => setIsEditingRules(true)}
               onDiscard={() => { setIsEditingRules(false); setFormatConfig(getRawTournamentConfig(tournament)); }}
-              onRuleChange={(k, v) => setFormatConfig(p => ({ ...p, [k]: v }))}
+              /* Writes into the phase the engine reads the key from, rather than
+                 setting a top-level key a hybrid config would never consult. */
+              onRuleChange={(k, v) => setFormatConfig(p => writeRuleValue(p, k, v))}
               onSave={handleSaveRules}
             />
             {tournament.status === "ONGOING" && (system === "SWISS" || system === "ROUND_ROBIN") && (
@@ -432,7 +498,7 @@ function ControlRoomContent() {
                 tournament.createdById === (currentUser?.sub || currentUser?.id)
               }
             />
-            <DeploymentPanel
+            <AddParticipantsPanel
               tournament={tournament}
               allUsers={allUsers}
               guestUsername={guestUsername}
@@ -456,7 +522,7 @@ function ControlRoomContent() {
 export default function ControlRoomPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center font-sans">
+      <div className="min-h-screen w-full bg-background flex items-center justify-center font-sans">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-white/10 border-t-white/50 rounded-full animate-spin" />
           <p className="text-sm text-white/50">Loading Dashboard...</p>

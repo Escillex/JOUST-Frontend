@@ -1,4 +1,6 @@
 "use client";
+import { Skeleton, SkeletonStatus } from "../../components/ui/Skeleton";
+import dynamic from "next/dynamic";
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -8,7 +10,22 @@ import { getTournamentConfig } from "../../utils/formatConfig";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import BracketPreview from "../../components/tournaments/bracket/BracketPreview";
+// Lazy-loaded: BracketPreview pulls in @xyflow/react, which is by far the
+// largest dependency in the app. Loading it up front made every visitor to a
+// tournament page download the whole bracket renderer even when they never
+// scrolled to it. ssr is disabled because the canvas measures the DOM.
+const BracketPreview = dynamic(
+  () => import("../../components/tournaments/bracket/BracketPreview"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[400px] flex items-center justify-center">
+        <SkeletonStatus label="Loading bracket" />
+        <Skeleton className="w-full h-full" />
+      </div>
+    ),
+  },
+);
 import { useToast } from "../../components/ui/Toast";
 
 function TournamentViewContent() {
@@ -130,7 +147,10 @@ function TournamentViewContent() {
 
   if (loading && !tournament) {
     return (
-      <div className="min-h-screen w-full bg-[#1B1B1B] font-questrial overflow-x-hidden">
+      <div className="min-h-screen w-full bg-background font-questrial overflow-x-hidden">
+        {/* The blocks below are decorative; this announces the load to screen
+            readers, which otherwise get silence while the page fills in. */}
+        <SkeletonStatus label="Loading tournament" />
         <div className="w-full px-4 md:px-12 py-12 max-w-[1600px] mx-auto animate-pulse">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <div className="lg:col-span-8 space-y-12">
@@ -177,7 +197,7 @@ function TournamentViewContent() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#1B1B1B] text-white font-poppins selection:bg-primary selection:text-black overflow-x-hidden">
+    <div className="min-h-screen w-full bg-background text-white font-poppins selection:bg-primary selection:text-black overflow-x-hidden">
       <main className="max-w-7xl mx-auto px-6 py-16 md:py-32 flex flex-col gap-16">
 
         {pendingInviteId && (
@@ -233,7 +253,7 @@ function TournamentViewContent() {
                 <div className="relative group border-2 border-component-border overflow-hidden">
                   <div className="aspect-video relative overflow-hidden">
                     <Image 
-                      src={resolveImageUrl(tournament.bannerUrl, "/placeholder.jpg")}
+                      src={resolveImageUrl(tournament.bannerUrl, "/placeholder.png")}
                       alt={tournament.name} 
                       fill 
                       unoptimized
@@ -408,7 +428,7 @@ function TournamentViewContent() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-black text-primary uppercase tracking-widest">SEED #{p.seed || idx + 1}</span>
-                      <span className="text-xl font-black text-white uppercase tracking-tighter truncate">{p.user.username || p.user.guestName}</span>
+                      <span className="text-xl font-black text-white uppercase tracking-tighter truncate">{p.user.username}</span>
                       <span className="text-[8px] font-black text-white/20 uppercase tracking-widest mt-2">
                         {p.user.isGuest ? "GUEST" : "REGISTERED USER"}
                       </span>
@@ -421,7 +441,7 @@ function TournamentViewContent() {
                   </div>
                 ))}
                 {tournament.participants.length === 0 && (
-                  <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 bg-[#1B1B1B]">
+                  <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 bg-background">
                     <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">No players registered for this tournament</p>
                   </div>
                 )}
@@ -526,7 +546,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
                 exit={{ opacity: 0 }}
                 className="text-[8px] font-black text-white/10 uppercase tracking-widest italic"
               >
-                {isHovered ? "Syncing..." : "Auto-Refresh"}
+                {isHovered ? "Refreshing..." : "Auto-Refresh"}
               </motion.span>
             ) : (
               <motion.span 
@@ -584,7 +604,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
 export default function TournamentViewPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div 
           animate={{ opacity: [0.3, 1, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}

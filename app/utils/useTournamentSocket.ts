@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { API_URL } from "./api";
+import { SOCKET_URL } from "./api";
 
 // Live values for a single game's tracker, mirroring the backend
 // RealtimeGateway payload. Sent often (every HP/points change), so the
@@ -13,16 +13,10 @@ export interface TrackerUpdatePayload {
   gameNumber: number;
 }
 
-// Where to open the socket:
-// - When NEXT_PUBLIC_API_URL is an absolute URL (the usual host/dev setup),
-//   API_URL is that "http://host:4000" origin and the socket connects straight
-//   to the backend.
-// - Otherwise API_URL is the "/api/backend" proxy path, which is HTTP-only; in
-//   that case we connect to the same origin and let the production reverse
-//   proxy route "/socket.io/" to the backend.
-// Either way, if the socket cannot connect the screens keep working through
-// their polling fallback, so this is never a hard dependency.
-const SOCKET_URL = API_URL.startsWith("http") ? API_URL : undefined;
+// SOCKET_URL is resolved centrally in utils/api.ts - see the comment there for
+// why the socket origin is deliberately not the same setting as the REST base.
+// If the socket cannot connect the screens keep working through their polling
+// fallback, so this is never a hard dependency.
 
 interface Handlers {
   // Coarse "something changed" — the caller should refetch its data.

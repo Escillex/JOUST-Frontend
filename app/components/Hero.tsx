@@ -27,9 +27,18 @@ interface HeroProps {
 }
 
 export default function Hero({ 
+  // Fallback slides, used only when an administrator has not uploaded any hero
+  // images yet. These pointed at /hero-bg-1.jpg and /hero-bg-2.jpg, which have
+  // never existed in public/ — so a fresh install rendered a hero of broken
+  // images, and InitialAppLoader sat waiting on two 404s.
+  //
+  // They now use /placeholder.png, which is deliberately and obviously a
+  // placeholder: hatched, dashed-bordered, and labelled "NO IMAGE SET". The
+  // earlier fix pointed here at placeholder.jpg — a finished Hobby+ brand
+  // banner — which loaded fine but made an unconfigured site look configured.
   slides = [
-    { image: "/hero-bg-1.jpg", title: "MASTER YOUR CRAFT", photoDesc: "COLLECTORS EDITION — SERIES 01" },
-    { image: "/hero-bg-2.jpg", title: "JOIN THE COMPETITION", photoDesc: "TOURNAMENT EVENT — LIVE" }
+    { image: "/placeholder.png", title: "MASTER YOUR CRAFT", photoDesc: "COLLECTORS EDITION — SERIES 01" },
+    { image: "/placeholder.png", title: "JOIN THE COMPETITION", photoDesc: "TOURNAMENT EVENT — LIVE" }
   ], 
   logo = "/hpluslogo.png", 
   description = "Experience the next level of hobby gaming. Professional tournaments, high-fidelity community, and the best gear, all in one place.",
@@ -75,10 +84,16 @@ export default function Hero({
   }, [slides.length]);
 
   return (
-    <section className="relative h-[85vh] md:h-[95vh] min-h-[600px] w-full overflow-hidden bg-[#1B1B1B] font-questrial selection:bg-primary selection:text-black">
-      {/* Eager preloader to prevent dynamic image flashing on throttled connections */}
+    <section className="relative h-[85vh] md:h-[95vh] min-h-[600px] w-full overflow-hidden bg-background font-questrial selection:bg-primary selection:text-black">
+      {/* Eager preloader to prevent dynamic image flashing on throttled
+          connections (CLAUDE.md Core Rule 8). Deliberately raw <img>, not
+          next/image: these render inside a 0x0 display:none container purely to
+          warm the browser cache, and next/image lazy-loads by default and needs
+          a sized positioned parent for `fill` — both of which defeat the point.
+          The visible image these preload IS a next/image. */}
       <div className="hidden aria-hidden pointer-events-none absolute w-0 h-0 overflow-hidden" style={{ display: 'none' }}>
         {slides.map((slide, idx) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img 
             key={idx}
             src={resolveImageUrl(slide.image)}
@@ -101,10 +116,13 @@ export default function Hero({
           >
             <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/20 to-background z-10" />
             {slides[currentSlide].image && (
-              <img
+              <Image
                 src={resolveImageUrl(slides[currentSlide].image)}
                 alt={slides[currentSlide].title || "Hero Image"}
-                className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-700 scale-105"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover opacity-60 transition-transform duration-700 scale-105"
               />
             )}
             <div className="relative w-full h-full bg-zinc-900 -z-10" />

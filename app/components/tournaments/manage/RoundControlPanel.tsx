@@ -2,7 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
-import { getTournamentConfig } from "../../../utils/formatConfig";
+import {
+  getTournamentConfig,
+  getTournamentSystem,
+  getTieBreakerOrder,
+  tieBreakerLabel,
+  canOfferDraw,
+} from "../../../utils/formatConfig";
 
 interface Props {
   tournament: Tournament;
@@ -15,11 +21,21 @@ type ResolutionStrategy = "DRAW" | "RANDOM" | "PLAYER1" | "PLAYER2";
 export default function RoundControlPanel({ tournament, fetchData, setMessage }: Props) {
   const [isProcessing, setIsProcessing] = useState(false);
   const config = getTournamentConfig(tournament);
-  // The backend rejects winnerless submits for series (bestOf > 1) and threshold-based matches
-  const allowsDraw =
-    (config.allowDraw ?? false) &&
-    (config.bestOf ?? 1) <= 1 &&
-    !(config.pointsThreshold && config.pointsThreshold > 0);
+  // canOfferDraw folds in the same limits this used to spell out (no series, no
+  // threshold scoring) PLUS the system check that was missing: offering "DRAW"
+  // as a bulk resolution strategy on an elimination bracket would strand every
+  // match it touched. The backend now refuses those submits outright (7.8), so
+  // without this the strategy would simply fail partway through.
+  const allowsDraw = canOfferDraw({
+    system: getTournamentSystem(tournament),
+    config,
+  });
+
+  // The configured tiebreakers, named rather than assumed. Three places in this
+  // panel previously asserted OMW% regardless of what was configured.
+  const tieBreakerNames = getTieBreakerOrder(tournament)
+    .map(tieBreakerLabel)
+    .join(" → ");
   const [strategy, setStrategy] = useState<ResolutionStrategy>("RANDOM");
 
   useEffect(() => {
@@ -54,7 +70,13 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
 
   const handleResolveTie = async (action: 'EXTEND_ROUND' | 'APPLY_TIEBREAKERS') => {
     setIsProcessing(true);
-    setMessage(action === 'EXTEND_ROUND' ? "Generating tiebreaker round..." : "Applying OMW% tiebreakers...");
+    // Names the configured tiebreakers instead of asserting OMW%, which was
+    // false for any tournament that configured a different order.
+    setMessage(
+      action === 'EXTEND_ROUND'
+        ? "Generating tiebreaker round..."
+        : `Applying tiebreakers (${tieBreakerNames})...`,
+    );
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.RESOLVE_TIE(tournament.id), {
         method: "POST",
@@ -62,7 +84,18 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
-        setMessage(action === 'EXTEND_ROUND' ? "Tiebreaker match generated!" : "Tie broken and tournament completed.");
+        // Show what the server actually reported. It returns { message,
+        // tiebreaker } and its message is the honest one — including the case
+        // where the configured tiebreakers could NOT separate the players.
+        // Overwriting it with a fixed "Tie broken and tournament completed."
+        // meant the organizer was never told the tie went unresolved.
+        const data = await safeJson(res);
+        setMessage(
+          data?.message ??
+            (action === 'EXTEND_ROUND'
+              ? "Tiebreaker round generated."
+              : "Tie resolved."),
+        );
         await fetchData();
       } else {
         const data = await safeJson(res);
@@ -102,15 +135,15 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
               <button
                 onClick={() => handleResolveTie('APPLY_TIEBREAKERS')}
                 disabled={isProcessing}
-                className="w-full h-12 bg-[#1B1B1B] hover:bg-white/10 text-white border border-white/20 font-black text-xs tracking-wider rounded transition-colors disabled:opacity-50 uppercase"
+                className="w-full h-12 bg-background hover:bg-white/10 text-white border border-white/20 font-black text-xs tracking-wider rounded transition-colors disabled:opacity-50 uppercase"
               >
-                Break Automatically (OMW%)
+                Break Automatically ({tieBreakerNames})
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-3 bg-[#52B946]/10 border border-[#52B946]/20 rounded text-center">
-            <p className="text-xs font-semibold text-[#52B946] uppercase">
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded text-center">
+            <p className="text-xs font-semibold text-primary uppercase">
               All Rounds Completed - Ready to Finalize
             </p>
           </div>
@@ -210,7 +243,12 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
 
   const getPlayerDisplayName = (player: any, placeholder: string) => {
     if (!player) return placeholder;
-    return (player.isGuest ? player.guestName : player.username) || placeholder;
+    // Plan 9.4. This read `player.guestName` for guests — a column dropped from
+    // the schema in migration 20260506201234_remove_guest_name. It resolved to
+    // undefined, so every guest fell through to the placeholder and this panel
+    // showed "TBD vs TBD" for guest-vs-guest matches, which at a walk-in event
+    // is most of them. Guests carry a real `username` now.
+    return player.username || placeholder;
   };
 
   return (
@@ -219,7 +257,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
         <h3 className="text-sm font-semibold text-white">
           Round Control
         </h3>
-        <span className="px-2 py-0.5 bg-[#52B946]/10 text-[#52B946] text-xs font-semibold rounded">
+        <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-semibold rounded">
           Round {activeRound.roundNumber} Active
         </span>
       </div>
@@ -233,7 +271,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
             <select
               value={strategy}
               onChange={e => setStrategy(e.target.value as ResolutionStrategy)}
-              className="w-full h-10 bg-[#1B1B1B] border border-white/20 rounded px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors"
+              className="w-full h-10 bg-background border border-white/20 rounded px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors"
             >
               {allowsDraw && <option value="DRAW">Permit Draw (1 Pt each)</option>}
               <option value="RANDOM">Coin Toss (Random Winner)</option>
@@ -249,7 +287,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
             {incompleteMatches.map((match: any, index) => (
               <div
                 key={match.id}
-                className="p-3 bg-[#1B1B1B] border border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded"
+                className="p-3 bg-background border border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-[#888888] font-mono">
@@ -273,7 +311,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
                     <button
                       onClick={() => handleResolveMatch(match.id, "PLAYER1", match.player1Id || match.player1?.id, match.player2Id || match.player2?.id)}
                       disabled={isProcessing}
-                      className="px-3 py-1 bg-[#1B1B1B] border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                      className="px-3 py-1 bg-background border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
                       title="Award win to home player"
                     >
                       P1 Win
@@ -282,7 +320,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
                       <button
                         onClick={() => handleResolveMatch(match.id, "DRAW", match.player1Id || match.player1?.id, match.player2Id || match.player2?.id)}
                         disabled={isProcessing}
-                        className="px-3 py-1 bg-[#1B1B1B] border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                        className="px-3 py-1 bg-background border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
                         title="Force a Draw result"
                       >
                         Draw
@@ -291,7 +329,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
                     <button
                       onClick={() => handleResolveMatch(match.id, "PLAYER2", match.player1Id || match.player1?.id, match.player2Id || match.player2?.id)}
                       disabled={isProcessing}
-                      className="px-3 py-1 bg-[#1B1B1B] border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                      className="px-3 py-1 bg-background border border-white/20 hover:bg-white/10 text-white text-xs font-semibold rounded transition-colors disabled:opacity-50"
                       title="Award win to away player"
                     >
                       P2 Win
@@ -299,14 +337,14 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
                     <button
                       onClick={() => handleResolveMatch(match.id, "RANDOM", match.player1Id || match.player1?.id, match.player2Id || match.player2?.id)}
                       disabled={isProcessing}
-                      className="px-3 py-1 bg-[#1B1B1B] border border-[#FF4D4D]/50 hover:bg-[#FF4D4D]/10 text-[#FF4D4D] text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                      className="px-3 py-1 bg-background border border-[#FF4D4D]/50 hover:bg-[#FF4D4D]/10 text-[#FF4D4D] text-xs font-semibold rounded transition-colors disabled:opacity-50"
                       title="Coin toss (Random selection)"
                     >
                       Coin
                     </button>
                   </div>
 
-                  <div className="text-[10px] font-semibold text-[#52B946] bg-[#52B946]/10 px-2 py-0.5 rounded border border-[#52B946]/20 uppercase">
+                  <div className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 uppercase">
                     {match.status}
                   </div>
                 </div>
@@ -328,8 +366,8 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
           </div>
         </div>
       ) : (
-        <div className="p-3 bg-[#52B946]/10 border border-[#52B946]/20 rounded text-center">
-          <p className="text-xs font-semibold text-[#52B946] uppercase">
+        <div className="p-3 bg-primary/10 border border-primary/20 rounded text-center">
+          <p className="text-xs font-semibold text-primary uppercase">
             All active matches completed. Proceeding...
           </p>
         </div>

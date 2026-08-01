@@ -45,6 +45,26 @@ function sorted(ps: RawParticipant[]) {
   });
 }
 
+/** Slot order for a bracket of `size`, as 1-based seed numbers.
+ *
+ *  This MUST stay identical to `standardSeedOrder` in
+ *  `server/src/Formats/bracket-seeding.helper.ts` — that file carries the full
+ *  explanation. A preview that disagrees with the engine is worse than no
+ *  preview, and this component previously used a third algorithm that agreed
+ *  with neither the engine nor the server-side preview endpoint: it paired
+ *  1-vs-n, put byes on the top seeds' opponents, and at 5, 6 and 9-14 players
+ *  it displayed some players twice while dropping others entirely. */
+function standardSeedOrder(size: number): number[] {
+  let order = [1];
+  while (order.length < size) {
+    const n = order.length * 2;
+    const next: number[] = [];
+    for (const seed of order) { next.push(seed, n + 1 - seed); }
+    order = next;
+  }
+  return order;
+}
+
 function computeAllRounds(ps: RawParticipant[], format: string): PreviewRound[] {
   const s = sorted(ps); const n = s.length;
   const isElim = format === "SINGLE_ELIMINATION" || format === "DOUBLE_ELIMINATION";
@@ -63,15 +83,23 @@ function computeAllRounds(ps: RawParticipant[], format: string): PreviewRound[] 
   const powerOf2 = Math.pow(2, Math.ceil(Math.log2(n || 2)));
   const totalRounds = Math.log2(powerOf2);
   
+  // Seeded slot layout, matching the engine exactly. Empty slots are the
+  // highest seed numbers, which is what turns them into byes for the top seeds.
+  const slotSeeds = standardSeedOrder(powerOf2);
+  const slot = (seedNumber: number) => {
+    const p = s[seedNumber - 1];
+    if (!p) return null;
+    return { userId: p.userId, name: p.user.username, seed: p.seed ?? seedNumber, isGuest: p.user.isGuest };
+  };
+
   let currentMatchCount = powerOf2 / 2;
   for (let r = 1; r <= totalRounds; r++) {
     const matches: PreviewMatch[] = [];
     for (let m = 0; m < currentMatchCount; m++) {
       let p1 = null; let p2 = null;
       if (r === 1) {
-        const p1Idx = m; const p2Idx = n - 1 - m; 
-        if (s[p1Idx]) p1 = { userId: s[p1Idx].userId, name: s[p1Idx].user.username, seed: s[p1Idx].seed ?? p1Idx + 1, isGuest: s[p1Idx].user.isGuest };
-        if (p2Idx > p1Idx && s[p2Idx]) p2 = { userId: s[p2Idx].userId, name: s[p2Idx].user.username, seed: s[p2Idx].seed ?? p2Idx + 1, isGuest: s[p2Idx].user.isGuest };
+        p1 = slot(slotSeeds[m * 2]);
+        p2 = slot(slotSeeds[m * 2 + 1]);
       }
       matches.push({ id: `preview-${r}-${m}`, matchIndex: m, player1: p1, player2: p2 });
     }
@@ -96,7 +124,7 @@ function PlayerPicker({ participants, excludeId, onSelect, onClose }: {
       <div className="p-3 border-b border-white/10 bg-white/5">
         <input ref={ref} value={q} onChange={e => setQ(e.target.value)}
           placeholder="Search participants..."
-          className="w-full bg-[#1B1B1B] border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-primary transition-all outline-none rounded-sm font-sans" />
+          className="w-full bg-background border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-primary transition-all outline-none rounded-sm font-sans" />
       </div>
       <div className="max-h-80 overflow-y-auto custom-scrollbar">
         {opts.length === 0

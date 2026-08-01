@@ -1,9 +1,9 @@
-import { LeaderboardEntry } from "../../../tournaments/[id]/bracket/types";
+"use client";
+import { LeaderboardEntry, LogEntry } from "../../../tournaments/[id]/bracket/types";
 
-interface LogEntry { id: string; action: string; details?: string; timestamp: string; }
 
 interface Props {
-  panel: "TERMINAL" | "STANDINGS" | null;
+  panel: "ACTIVITY" | "STANDINGS" | null;
   logs: LogEntry[];
   leaderboard: LeaderboardEntry[];
   onClose: () => void;
@@ -13,18 +13,18 @@ export default function MaximizedModal({ panel, logs, leaderboard, onClose }: Pr
   if (!panel) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-[#1B1B1B]/95 backdrop-blur-2xl animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-background/95 backdrop-blur-2xl animate-in fade-in duration-300">
       <div className="w-full max-w-6xl bg-background border border-primary/20 rounded-[3rem] flex flex-col h-[85vh] shadow-2xl relative overflow-hidden">
         <button onClick={onClose} className="absolute top-10 right-10 w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center text-foreground/20 hover:text-white transition-all font-black text-xl font-poppins z-50">✕</button>
 
         <div className="p-12 pb-6 shrink-0">
           <span className="text-xs font-black text-primary uppercase tracking-[0.4em] font-poppins mb-2 block">Full Screen View</span>
           <h2 className="text-4xl md:text-6xl font-black text-foreground uppercase tracking-tighter font-poppins">
-            {panel === "TERMINAL" ? "Terminal Logs" : "Tournament Standings"}
+            {panel === "ACTIVITY" ? "Activity Log" : "Tournament Standings"}
           </h2>
         </div>
 
-        {panel === "TERMINAL" ? (
+        {panel === "ACTIVITY" ? (
           <div className="px-12 pb-12 flex-1 overflow-hidden flex flex-col">
             <div className="bg-foreground/5 border border-white/5 rounded-[2rem] p-8 flex-1 overflow-y-auto custom-scrollbar font-mono text-sm space-y-6">
               {logs.map(log => (

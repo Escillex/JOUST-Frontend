@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { authenticatedFetch, safeJson } from './api';
+import { authenticatedFetch, safeJson, UPLOAD_TIMEOUT_MS } from './api';
 
 export function useImageUpload() {
   const [uploading, setUploading] = useState(false);
@@ -17,6 +17,9 @@ export function useImageUpload() {
       const res = await authenticatedFetch(endpoint, {
         method: 'POST',
         body: formData,
+        // An image is real bytes over the same slow link, so the default
+        // request timeout is far too short for it.
+        timeoutMs: UPLOAD_TIMEOUT_MS,
       });
 
       const data = await safeJson(res);

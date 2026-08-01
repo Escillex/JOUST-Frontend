@@ -1,18 +1,9 @@
 "use client";
+import { LeaderboardStats } from "../../tournaments/types";
 
 import React from "react";
 import * as m from "motion/react";
 
-interface LeaderboardStats {
-  points: number;
-  tournamentsPlayed: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  matchWinPct: number;
-  omw: number;
-  oomw: number;
-}
 
 import { BentoBox } from "../ui/Bento";
 

@@ -39,10 +39,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             role="status"
             className={`pointer-events-auto max-w-sm px-4 py-3 border rounded text-sm font-semibold shadow-2xl animate-in fade-in slide-in-from-bottom-2 ${
               t.kind === "success"
-                ? "bg-[#101B0E] border-[#52B946]/40 text-[#52B946]"
+                ? "bg-[#101B0E] border-primary/40 text-primary"
                 : t.kind === "error"
                   ? "bg-[#1F0E0E] border-[#FF4D4D]/40 text-[#FF4D4D]"
-                  : "bg-[#1B1B1B] border-white/20 text-white"
+                  : "bg-background border-white/20 text-white"
             }`}
           >
             {t.message}

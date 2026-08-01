@@ -40,10 +40,10 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#1B1B1B]/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-[#1B1B1B] border border-white/10 w-full max-w-[440px] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden rounded-sm">
-        <div className="p-6 border-b border-white/5 bg-[#1B1B1B]">
+      <div className="relative bg-background border border-white/10 w-full max-w-[440px] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden rounded-sm">
+        <div className="p-6 border-b border-white/5 bg-background">
           {/* Reworded: this modal used sci-fi style wording ("Status
               Elevation Service"). Project rule: admin screens use plain,
               professional language. */}
@@ -66,7 +66,7 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
                 type="text" required
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
-                className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
               />
             </div>
 
@@ -76,7 +76,7 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
                 type="email" required
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
                 placeholder="user@example.com"
               />
             </div>
@@ -87,7 +87,7 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
                 type="password" required
                 value={formData.password}
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                className="w-full h-10 bg-[#1B1B1B] border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
                 placeholder="••••••••"
               />
             </div>

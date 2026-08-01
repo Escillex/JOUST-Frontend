@@ -43,7 +43,7 @@ export default function CreateTournamentPage() {
   };
 
   if (isAuthorized === false) return null;
-  if (isAuthorized === null) return <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center text-primary font-black uppercase tracking-widest animate-pulse">Verifying Creator Status...</div>;
+  if (isAuthorized === null) return <div className="min-h-screen bg-background flex items-center justify-center text-primary font-black uppercase tracking-widest animate-pulse">Verifying Creator Status...</div>;
 
   return (
     <ManagerLayout breadcrumbs={[{ label: "TOURNAMENTS", href: "/tournaments/manage" }, { label: "CREATE NEW" }]}>

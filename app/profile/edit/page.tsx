@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import HomeFrame from "../../components/HomeFrame";
 import FadeIn from "../../components/FadeIn";
 import ImageUpload from "../../components/ui/ImageUpload";
-import { authenticatedFetch, API_ENDPOINTS, API_URL } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, API_URL, UPLOAD_TIMEOUT_MS } from "../../utils/api";
 import { useUser } from "../../components/UserProvider";
 import { motion } from "motion/react";
 
@@ -28,9 +28,11 @@ export default function ProfileEditPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await authenticatedFetch(`/images/avatar/${user.id}`, {
+      const res = await authenticatedFetch(API_ENDPOINTS.IMAGES.UPLOAD_AVATAR(user.id), {
         method: "POST",
         body: formData,
+        // Uploads carry real bytes; the default request timeout is for reads.
+        timeoutMs: UPLOAD_TIMEOUT_MS,
       });
 
       if (res.ok) {
@@ -50,7 +52,7 @@ export default function ProfileEditPage() {
     
     setUploading(true);
     try {
-      const res = await authenticatedFetch(`/images/avatar/${user.id}`, {
+      const res = await authenticatedFetch(API_ENDPOINTS.IMAGES.DELETE_AVATAR(user.id), {
         method: "DELETE",
       });
 

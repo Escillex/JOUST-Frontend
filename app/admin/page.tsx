@@ -12,6 +12,7 @@ import UserModal from "../components/admin/UserModal";
 import ConvertGuestModal from "../components/admin/ConvertGuestModal";
 import DevPanel from "../components/admin/DevPanel";
 import PresetManager from "../components/admin/PresetManager";
+import { Skeleton, SkeletonPanel, SkeletonStatus } from "../components/ui/Skeleton";
 
 
 
@@ -304,7 +305,7 @@ export default function AdminDashboard() {
   if (isAuthorized === false) return null;
 
   if (isMobile) return (
-    <div className="min-h-screen bg-[#1B1B1B] flex flex-col items-center justify-center p-8 text-center">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 text-center">
       <div className="w-16 h-16 border border-white/10 flex items-center justify-center mb-6">
         <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -323,22 +324,18 @@ export default function AdminDashboard() {
     </div>
   );
 
-  if (isLoading && users.length === 0) return (
-    <div className="min-h-screen w-full bg-[#1B1B1B] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-12 h-12 border-4 border-white/5 border-t-primary animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[0.5em] text-primary animate-pulse font-poppins italic">Authorizing Admin Session...</p>
-      </div>
-    </div>
-  );
+  // The tab chrome renders immediately and only the panel body is a placeholder,
+  // so the administrator can switch tabs while the first fetch is still running
+  // instead of waiting on a full-screen spinner.
+  const isLoadingUsers = isLoading && users.length === 0;
 
   return (
-    <div className={`min-h-screen bg-[#1B1B1B] text-[#E0E0E0] ${inter.className} flex flex-col p-4 md:p-12 gap-0`}>
+    <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col p-4 md:p-12 gap-0`}>
       <div className="max-w-7xl mx-auto w-full flex flex-col">
         {/* Tactical Folder Tabs */}
         <div className="flex items-end gap-1 px-4">
           {/* Brand Tab */}
-          <div className="px-6 py-4 bg-[#1B1B1B] border-t-2 border-l-2 border-r-2 border-white/10 flex flex-col justify-center min-w-[160px]">
+          <div className="px-6 py-4 bg-background border-t-2 border-l-2 border-r-2 border-white/10 flex flex-col justify-center min-w-[160px]">
             <div className="text-white font-black tracking-tighter text-xl font-poppins uppercase leading-none">
               JOUST<br/>
               <span className="text-primary text-[8px] tracking-[0.4em] font-bold">ADMIN</span>
@@ -353,7 +350,7 @@ export default function AdminDashboard() {
               className={`px-10 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
                 activeTab === tab 
                   ? "bg-[#111] border-white/20 text-primary pt-6" 
-                  : "bg-[#1B1B1B] border-white/5 text-white/30 hover:text-white hover:bg-white/5"
+                  : "bg-background border-white/5 text-white/30 hover:text-white hover:bg-white/5"
               }`}
             >
               {tab.replace("_", " ")}
@@ -367,6 +364,13 @@ export default function AdminDashboard() {
         {/* Main Folder Body */}
         <div className="bg-[#111] border-2 border-white/20 shadow-2xl relative z-10 flex flex-col min-h-[80vh]">
           <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10">
+        {isLoadingUsers ? (
+          <div className="space-y-6">
+            <SkeletonStatus label="Loading administration data" />
+            <Skeleton className="h-8 w-56" />
+            <SkeletonPanel rows={8} />
+          </div>
+        ) : (
         <AnimatePresence mode="wait">
           {activeTab === "DASHBOARD" ? (
             <motion.div 
@@ -398,7 +402,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Column 1: Master Management (Wide) */}
                 <div className="lg:col-span-8 space-y-8">
-                  <div className="bg-[#1B1B1B] border border-white/10 p-1">
+                  <div className="bg-background border border-white/10 p-1">
                     <UserRegistry       
                       users={users}             
                       onDelete={handleDeleteUser}
@@ -409,7 +413,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                   
-                  <div className="bg-[#1B1B1B] border border-white/10 p-1">
+                  <div className="bg-background border border-white/10 p-1">
                     <TournamentTable tournaments={tournaments} onForceComplete={handleForceComplete} />
                   </div>
                 </div>
@@ -422,7 +426,7 @@ export default function AdminDashboard() {
                       log-looking lines from them. */}
 
                   {/* Tournament Format Manager */}
-                  <div className="bg-[#1B1B1B] border border-white/10 p-6 space-y-6">
+                  <div className="bg-background border border-white/10 p-6 space-y-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Tournament Formats</h3>
                       {/* Switch the tab state directly. The old link pushed
@@ -455,7 +459,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-[#1B1B1B] border border-white/10 p-6">
+                  <div className="bg-background border border-white/10 p-6">
                     <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-6">External Gateways</h3>
                     <div className="grid grid-cols-1 gap-3">
                       <button 
@@ -494,7 +498,7 @@ export default function AdminDashboard() {
                 <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Format Presets</h1>
                 <p className="text-sm text-white/30 mt-4">Manage standardized tournament configurations and rulesets for organizers.</p>
               </div>
-              <div className="bg-[#1B1B1B] border border-white/10 p-10">
+              <div className="bg-background border border-white/10 p-10">
                 <PresetManager />
               </div>
             </motion.div>
@@ -508,15 +512,16 @@ export default function AdminDashboard() {
             >
               <div className="mb-12">
                 <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "DEV_TOOLS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Diagnostic Console</h1>
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Diagnostics</h1>
                 <p className="text-sm text-white/30 mt-4">System-level diagnostic tools for direct database state management.</p>
               </div>
-              <div className="bg-[#1B1B1B] border border-white/10 p-1">
+              <div className="bg-background border border-white/10 p-1">
                 <DevPanel tournaments={tournaments} onRefresh={fetchData} />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </main>
     </div>
   </div>

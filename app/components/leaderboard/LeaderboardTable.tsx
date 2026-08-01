@@ -1,27 +1,14 @@
 "use client";
+import { GlobalLeaderboardEntry } from "../../tournaments/types";
 import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { resolveImageUrl } from "../../utils/api";
 
-interface LeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  points: number;
-  tournamentsPlayed: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  matchWinPct: number;
-  omw: number;
-  oomw: number;
-  avatarUrl?: string | null;
-}
 
 interface LeaderboardTableProps {
-  entries: LeaderboardEntry[];
+  entries: GlobalLeaderboardEntry[];
   loading?: boolean;
   variant?: "default" | "bento";
   limit?: number;
@@ -37,7 +24,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
     return (
       <div className="w-full space-y-4 animate-pulse">
         {[...Array(variant === "bento" ? 3 : 8)].map((_, i) => (
-          <div key={i} className="h-16 bg-[#1B1B1B] border-2 border-white/10" />
+          <div key={i} className="h-16 bg-background border-2 border-white/10" />
         ))}
       </div>
     );
@@ -130,9 +117,14 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic">COMPETITOR</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">POINTS</th>
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-center">W / L / D</th>
-              {/* The OMW / OOMW column was removed: the backend never
-                  calculates those tiebreaker values (it always sends 0),
-                  so the column showed numbers that were not real. */}
+              {/* The OMW / OOMW column stays removed, but not for the reason
+                  originally noted here. The global leaderboard does not send 0
+                  for these: `leaderboard.service.ts:312-313` fills BOTH fields
+                  with the player's own `winRate`. That is worse than a zero —
+                  it is a plausible-looking number that is not opponent
+                  match-win at all, so rendering it would state something false.
+                  Per-tournament standings do compute the real values; only this
+                  global view substitutes. Restoring the column depends on 7.2. */}
               <th className="py-6 px-10 text-[10px] font-black text-white/40 uppercase tracking-[0.5em] font-poppins italic text-right">WIN RATE</th>
             </tr>
           </thead>
@@ -144,7 +136,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.03 }}
-                className="group hover:bg-primary/5 transition-colors bg-[#1B1B1B]"
+                className="group hover:bg-primary/5 transition-colors bg-background"
               >
                 <td className="py-8 px-10">
                   {/* Server rank instead of row position — see comment on

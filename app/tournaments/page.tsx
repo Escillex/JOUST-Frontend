@@ -48,7 +48,7 @@ export default function TournamentPage() {
         return (
             <HomeFrame className="py-40">
                 <div className="max-w-7xl mx-auto px-8 space-y-12 animate-pulse">
-                    <div className="h-[600px] w-full bg-[#1B1B1B] border-4 border-white/10" />
+                    <div className="h-[600px] w-full bg-background border-4 border-white/10" />
                 </div>
             </HomeFrame>
         );

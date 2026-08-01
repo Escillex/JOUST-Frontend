@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import React from "react";
 import { motion } from "motion/react";
 import { resolveImageUrl } from "../utils/api";
@@ -54,10 +55,12 @@ export default function ProductCard({ product, index }: ProductCardProps) {
     >
       <div className="relative aspect-[4/5] bg-zinc-900 border-4 border-white group-hover:border-primary group-hover:shadow-[12px_12px_0px_0px_#52B946] transition-all duration-500 overflow-hidden mb-10">
         {product.image && (
-          <img
+          <Image
             src={resolveImageUrl(product.image)}
             alt={product.name}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
         )}
         {/* Sensory Breathing Border */}

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { resolveImageUrl } from "../../utils/api";
@@ -37,7 +38,7 @@ export default function ImageUpload({
   // this component relies on while a new image is being uploaded.
   const displayUrl = currentUrl
     ? resolveImageUrl(currentUrl)
-    : "/placeholder.jpg";
+    : "/placeholder.png";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,8 +81,14 @@ export default function ImageUpload({
       <div
         className={`relative group overflow-hidden border-2 border-component-border hover:border-primary/50 transition-colors bg-component-background ${aspectRatio}`}
       >
-        {/* Current / preview image */}
+        {/* Current / preview image.
+            Deliberately a raw <img>, not next/image: while a new file is being
+            uploaded displayUrl is a "blob:" object URL, and next/image cannot
+            parse blob:/data: sources — it throws rather than rendering. The
+            local preview is the whole point of this component, so the
+            optimizer is traded away here and nowhere else. */}
         {currentUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={displayUrl}
             alt="Uploaded content"
@@ -92,10 +99,12 @@ export default function ImageUpload({
             {placeholder}
           </div>
         ) : (
-          <img
-            src="/placeholder.jpg"
+          <Image
+            src="/placeholder.png"
             alt="Uploaded content"
-            className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
           />
         )}
 

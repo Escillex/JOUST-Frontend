@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { io, Socket } from "socket.io-client";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, API_URL } from "../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, SOCKET_URL } from "../utils/api";
 import { useUser } from "./UserProvider";
 
 export interface AppNotification {
@@ -32,9 +32,7 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-// Same rule as useTournamentSocket: connect straight to the backend when the API
-// base is absolute, otherwise same-origin and let the reverse proxy route it.
-const SOCKET_URL = API_URL.startsWith("http") ? API_URL : undefined;
+// Socket origin is resolved centrally in utils/api.ts - see the comment there.
 
 // How often to re-fetch while the socket is down. The socket is the fast path;
 // this is the floor that keeps the bell honest on a flaky connection.

@@ -1,4 +1,5 @@
 "use client";
+import { isWinnersRound, isLosersRound, isGrandFinal, losersRoundIndex } from "../../roundNumbers";
 
 import React, { useState, useRef } from "react";
 import { Match, Round, LeaderboardEntry } from "../../types";
@@ -40,8 +41,8 @@ export default function DesktopRoundTable({
 
     const displayedRounds = React.useMemo(() => {
         if (!isDoubleElim) return sortedRounds;
-        if (bracketView === "WINNERS") return sortedRounds.filter(r => r.roundNumber < 101 || r.roundNumber >= 200);
-        return sortedRounds.filter(r => r.roundNumber >= 101 && r.roundNumber < 200);
+        if (bracketView === "WINNERS") return sortedRounds.filter(r => isWinnersRound(r.roundNumber) || isGrandFinal(r.roundNumber));
+        return sortedRounds.filter(r => isLosersRound(r.roundNumber));
     }, [sortedRounds, isDoubleElim, bracketView]);
 
     const currentRound: Round | undefined = sortedRounds.find(r => r.roundNumber === activeRound);
@@ -77,8 +78,8 @@ export default function DesktopRoundTable({
                 }
                 if (searchQuery.trim()) {
                     const query = searchQuery.toLowerCase().trim();
-                    const p1Name = (match.player1?.username || match.player1?.guestName || match.winnerName || "").toLowerCase();
-                    const p2Name = (match.player2?.username || match.player2?.guestName || match.winnerName || "").toLowerCase();
+                    const p1Name = (match.player1?.username || match.p1Name || "").toLowerCase();
+                    const p2Name = (match.player2?.username || match.p2Name || "").toLowerCase();
                     if (!p1Name.includes(query) && !p2Name.includes(query)) return false;
                 }
                 return true;
@@ -95,7 +96,7 @@ export default function DesktopRoundTable({
                             <button
                                 onClick={() => {
                                     setBracketView("WINNERS");
-                                    const first = sortedRounds.find(r => r.roundNumber < 101 || r.roundNumber >= 200);
+                                    const first = sortedRounds.find(r => isWinnersRound(r.roundNumber) || isGrandFinal(r.roundNumber));
                                     if (first && bracketView !== "WINNERS") setActiveRound(first.roundNumber);
                                 }}
                                 className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${bracketView === 'WINNERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
@@ -105,7 +106,7 @@ export default function DesktopRoundTable({
                             <button
                                 onClick={() => {
                                     setBracketView("LOSERS");
-                                    const first = sortedRounds.find(r => r.roundNumber >= 101 && r.roundNumber < 200);
+                                    const first = sortedRounds.find(r => isLosersRound(r.roundNumber));
                                     if (first && bracketView !== "LOSERS") setActiveRound(first.roundNumber);
                                 }}
                                 className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${bracketView === 'LOSERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
@@ -132,7 +133,7 @@ export default function DesktopRoundTable({
                             const n = round.roundNumber;
                             const fs = tournament?.format?.system;
                             if (n >= 200) return "Grand Finals";
-                            if (n >= 101) return `Losers Round ${n - 100}`;
+                            if (isLosersRound(n)) return `Losers Round ${losersRoundIndex(n)}`;
                             if (fs === "DOUBLE_ELIMINATION") return `Winners Round ${n}`;
                             return `Round ${n}`;
                         })()}

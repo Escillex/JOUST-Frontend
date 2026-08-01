@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Tournament } from "../../../tournaments/types";
+import { Tournament, FormatConfig } from "../../../tournaments/types";
 import { DragDropProvider, PointerSensor, DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 
@@ -63,7 +63,7 @@ function SortableParticipantCard({
   return (
     <div ref={ref} className="space-y-px">
       <div
-        className={`bg-[#000000] border transition-colors rounded flex items-center justify-between group h-12 px-4 ${isDragging ? 'border-[#52B946] bg-white/5' : 'border-white/20 hover:border-white/40'} ${isForfeited ? 'opacity-50' : ''}`}
+        className={`bg-[#000000] border transition-colors rounded flex items-center justify-between group h-12 px-4 ${isDragging ? 'border-primary bg-white/5' : 'border-white/20 hover:border-white/40'} ${isForfeited ? 'opacity-50' : ''}`}
       >
         <div className="flex items-center gap-4">
           {isAdmin && (
@@ -79,7 +79,7 @@ function SortableParticipantCard({
           <div className="flex items-center gap-3">
             <span className="text-[#888888] font-mono text-xs w-6 text-right">{idx + 1}.</span>
             <span className={`text-sm font-semibold truncate max-w-[120px] md:max-w-xs ${isForfeited ? 'text-[#888888] line-through' : 'text-white'}`}>
-              {p.user?.username || p.user?.guestName || "Unknown"}
+              {p.user?.username || "Unknown"}
             </span>
           </div>
           {p.user?.isGuest && (
@@ -132,7 +132,7 @@ function SortableParticipantCard({
           <select
             value={substituteUserId}
             onChange={(e) => { setSubstituteUserId(e.target.value); if (e.target.value) setGuestName(""); }}
-            className="flex-1 bg-[#1B1B1B] border border-white/20 rounded px-2 py-1.5 text-xs text-white focus:border-[#52B946] outline-none"
+            className="flex-1 bg-background border border-white/20 rounded px-2 py-1.5 text-xs text-white focus:border-primary outline-none"
           >
             <option value="">Select a registered player…</option>
             {substituteOptions.map(u => (
@@ -143,13 +143,13 @@ function SortableParticipantCard({
             value={guestName}
             onChange={(e) => { setGuestName(e.target.value); if (e.target.value) setSubstituteUserId(""); }}
             placeholder="…or a guest name"
-            className="flex-1 bg-[#1B1B1B] border border-white/20 rounded px-2 py-1.5 text-xs text-white placeholder:text-[#888888] focus:border-[#52B946] outline-none"
+            className="flex-1 bg-background border border-white/20 rounded px-2 py-1.5 text-xs text-white placeholder:text-[#888888] focus:border-primary outline-none"
           />
           <div className="flex gap-2">
             <button
               onClick={submitReplace}
               disabled={busy || (!substituteUserId && !guestName.trim())}
-              className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wide bg-[#52B946] text-black rounded disabled:opacity-40"
+              className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wide bg-primary text-black rounded disabled:opacity-40"
             >
               {busy ? "Replacing…" : "Confirm"}
             </button>
@@ -198,6 +198,18 @@ export default function RosterPanel({
   const participantIds = new Set(tournament.participants.map(p => p.userId));
   const substituteOptions = allUsers.filter(u => !participantIds.has(u.id));
 
+  // Whether the drag order below will actually be used. Mirrors the backend
+  // resolution in format-config.helper.ts: the per-tournament override replaces
+  // the preset config, and seedingMode is read from the root (not the phase1
+  // alias) because how the field is drawn belongs to the event, not to a
+  // HYBRID event's Swiss phase. Anything other than MANUAL means a random draw.
+  const presetConfig =
+    typeof tournament.format === "string" ? undefined : tournament.format?.config;
+  const rawConfig: FormatConfig & { phase1?: FormatConfig } =
+    tournament.config ?? presetConfig ?? {};
+  const manualSeeding =
+    (rawConfig.seedingMode ?? rawConfig.phase1?.seedingMode) === "MANUAL";
+
   return (
     <div className="lg:col-span-8 space-y-6">
       <div className="flex items-center gap-4">
@@ -206,6 +218,14 @@ export default function RosterPanel({
         </h2>
         <div className="h-[1px] flex-1 bg-white/10" />
       </div>
+
+      {isOpen && (
+        <p className="text-xs text-[#888888] leading-relaxed">
+          {manualSeeding
+            ? "Manual seeding is enabled: drag entrants to set the seed order used to build the bracket."
+            : "This tournament uses a random draw, so the order below does not affect the bracket. Enable manual seeding in the tournament rules to seed by hand."}
+        </p>
+      )}
 
       <DragDropProvider
         sensors={[PointerSensor]}

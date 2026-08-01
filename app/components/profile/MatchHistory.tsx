@@ -86,7 +86,7 @@ export default function MatchHistory({ activities: initialActivities = [], varia
                 activity.type === 'win' ? 'border-primary/40 hover:border-primary' :
                 activity.type === 'loss' ? 'border-red-500/40 hover:border-red-500' :
                 'border-component-border hover:border-white/30'
-              } transition-colors bg-component-background relative group overflow-hidden hover:shadow-[inset_0_0_30px_rgba(82,185,70,0.1)] hover:bg-[#52B946]/5`}
+              } transition-colors bg-component-background relative group overflow-hidden hover:shadow-[inset_0_0_30px_rgba(82,185,70,0.1)] hover:bg-primary/5`}
             >
               {/* Technical detail: bottom progress line */}
               <div className="absolute bottom-0 left-0 h-[1px] bg-primary/40 w-0 group-hover:w-full transition-all duration-700" />

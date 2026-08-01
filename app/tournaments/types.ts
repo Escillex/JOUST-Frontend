@@ -1,6 +1,25 @@
 export type TournamentFormat = "SINGLE_ELIMINATION" | "DOUBLE_ELIMINATION" | "SWISS" | "ROUND_ROBIN" | "HYBRID";
 export type GameTrackingMode = 'HP' | 'POINTS';
 
+/** Mirrors SeedingMode in server/src/Formats/format-config.helper.ts. */
+export type SeedingMode = 'RANDOM' | 'MANUAL';
+
+/** One editable rule on a tournament's config.
+ *  Mirrors ConfigField in server/src/Formats/config-fields.helper.ts. */
+export interface ConfigField {
+  key: string;
+  label: string;
+  placeholder: string;
+  defaultValue?: number | string | boolean | null;
+  min?: number;
+  max?: number;
+  type: 'number' | 'boolean' | 'select' | 'array' | 'string';
+  /** Permitted values when type is 'select'. */
+  options?: string[];
+  /** What this rule does, shown as help text next to the input. */
+  help?: string;
+}
+
 export interface MatchGameLog {
   id: string;
   matchId: string;
@@ -67,7 +86,6 @@ export interface Tournament {
       id: string;
       username: string;
       email: string;
-      guestName?: string;
       isGuest?: boolean;
     };
   }[];
@@ -80,21 +98,18 @@ export interface Tournament {
       player1?: {
         id: string;
         username?: string;
-        guestName?: string;
-        isGuest?: boolean;
+          isGuest?: boolean;
       } | null;
       player2?: {
         id: string;
         username?: string;
-        guestName?: string;
-        isGuest?: boolean;
+          isGuest?: boolean;
       } | null;
       winnerId?: string | null;
       winner?: {
         id: string;
         username?: string;
-        guestName?: string;
-        isGuest?: boolean;
+          isGuest?: boolean;
       } | null;
       status: string;
       isBye: boolean;
@@ -117,6 +132,11 @@ export interface FormatConfig {
   pointsThreshold?: number;
   bestOf?: number;
   allowDraw?: boolean;
+  /** How the field is placed into the bracket at start. RANDOM (the default)
+   *  draws the field at random; MANUAL honours the roster's seed order.
+   *  Lives at the config root, so on HYBRID it sits beside phase1/phase2 rather
+   *  than inside them. Resolved backend-side in format-config.helper.ts. */
+  seedingMode?: SeedingMode;
   tieBreakerOrder?: string[];
   progressionType?: string;
   // In-game tracker config
@@ -136,14 +156,12 @@ export interface FormatDefinition {
   id: string;
   label: string;
   description: string;
-  configFields: Array<{
-    key: string;
-    label: string;
-    placeholder: string;
-    defaultValue?: number | null;
-    min?: number;
-    max?: number;
-  }>;
+  /** Editable rules for this format's system, served by GET /tournament-formats.
+   *  Mirrors ConfigField in server/src/Formats/config-fields.helper.ts — the two
+   *  must agree (CLAUDE.md Core Rule 9). This was typed here for a long time
+   *  while nothing on the backend produced it, which silently disabled the whole
+   *  rules editor; that is now closed (plan 4.3 / 7.9). */
+  configFields: ConfigField[];
 }
 
 export interface TournamentTemplate {
@@ -166,4 +184,52 @@ export interface TournamentStaff {
   status: "PENDING" | "ACCEPTED" | "DECLINED";
   createdAt: string;
   user: { id: string; username: string; avatarUrl?: string | null };
+}
+
+/** An entry in the GLOBAL (cross-tournament) leaderboard.
+ *
+ *  Deliberately distinct from `LeaderboardEntry` in
+ *  `app/tournaments/[id]/bracket/types.ts`, which is the PER-TOURNAMENT
+ *  standings row. They were previously two same-named interfaces with different
+ *  shapes: this one carries `tournamentsPlayed`/`avatarUrl`, that one carries
+ *  `isGuest`. Collapsing them into one name would let a row from one endpoint be
+ *  passed where the other is expected, so they keep separate names.
+ *
+ *  Carries NO omw/oomw: those need an opponent graph, which only exists inside
+ *  a single tournament. The API used to send them filled with the player's own
+ *  winRate — two fields under opponent-strength names holding a number that was
+ *  not opponent strength. Removed on both sides in plan 7.2. */
+export interface GlobalLeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  points: number;
+  tournamentsPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  matchWinPct: number;
+  avatarUrl?: string | null;
+}
+
+/** Lifetime totals for one user, as shown on a profile. */
+export interface LeaderboardStats {
+  points: number;
+  tournamentsPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  matchWinPct: number;
+}
+
+/** The subset of a user record the profile screens render. `email` is only
+ *  present when the viewer is entitled to see it. */
+export interface UserProfile {
+  id: string;
+  username: string;
+  email?: string;
+  roles?: string[];
+  isGuest?: boolean;
+  avatarUrl?: string | null;
+  createdAt?: string;
 }

@@ -1,3 +1,4 @@
+"use client";
 import { Match, LeaderboardEntry } from "../../../tournaments/[id]/bracket/types";
 
 interface MatchCardProps {
@@ -32,26 +33,37 @@ export default function MatchCard({
   const isOngoing = match.status === 'ONGOING';
 
   // Status label
-  const statusLabel = isCompleted
-    ? 'FULL TIME'
-    : isOngoing
-      ? 'IN PROGRESS'
-      : 'PENDING';
+  // A draw is stored as COMPLETED with no winner. Without this branch the
+  // W/L test below resolves to 'L' for BOTH players, so a drawn match was
+  // displayed as if everyone had lost it.
+  const isDraw = isCompleted && !match.winnerId && !match.isBye;
+
+  const statusLabel = isDraw
+    ? 'DRAW'
+    : isCompleted
+      ? 'FULL TIME'
+      : isOngoing
+        ? 'IN PROGRESS'
+        : 'PENDING';
 
   // Score: show actual series game wins whenever they exist (both ongoing and completed)
   const hasSeriesScore = (match.player1Score ?? 0) > 0 || (match.player2Score ?? 0) > 0;
 
   const p1Score = hasSeriesScore
     ? String(match.player1Score ?? 0)
-    : isCompleted
-      ? (match.winnerId === match.player1?.id ? 'W' : 'L')
-      : '—';
+    : isDraw
+      ? 'D'
+      : isCompleted
+        ? (match.winnerId === match.player1?.id ? 'W' : 'L')
+        : '—';
 
   const p2Score = hasSeriesScore
     ? String(match.player2Score ?? 0)
-    : isCompleted
-      ? (match.winnerId === match.player2?.id ? 'W' : 'L')
-      : '—';
+    : isDraw
+      ? 'D'
+      : isCompleted
+        ? (match.winnerId === match.player2?.id ? 'W' : 'L')
+        : '—';
 
   return (
     <div

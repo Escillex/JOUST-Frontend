@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
@@ -78,10 +79,13 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
             className="lg:col-span-8 group"
           >
             <Link href={`/tournaments/${featured.id}`} className="block relative w-full h-[380px] md:h-auto md:aspect-[16/9] bg-zinc-900 border-4 border-white hover:border-primary hover:shadow-[16px_16px_0px_0px_#52B946] transition-all duration-300 overflow-hidden">
-              <img 
-                src={resolveImageUrl(featured.bannerUrl, "/placeholder.jpg")}
+              <Image
+                src={resolveImageUrl(featured.bannerUrl, "/placeholder.png")}
                 alt={featured.name}
-                className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 z-0"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 66vw"
+                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 z-0"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
               

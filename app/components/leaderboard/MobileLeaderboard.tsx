@@ -1,26 +1,13 @@
 "use client";
+import { GlobalLeaderboardEntry } from "../../tournaments/types";
 import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import { resolveImageUrl } from "../../utils/api";
 
-interface LeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  points: number;
-  tournamentsPlayed: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  matchWinPct: number;
-  omw: number;
-  oomw: number;
-  avatarUrl?: string | null;
-}
 
 interface Props {
-  entries: LeaderboardEntry[];
+  entries: GlobalLeaderboardEntry[];
   loading?: boolean;
   gameLabel?: string;
 }

@@ -137,7 +137,7 @@ export default function StaffPanel({ tournamentId, isCreator }: Props) {
                 <span
                   className={`text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded ${
                     member.status === "ACCEPTED"
-                      ? "bg-[#52B946]/15 text-[#52B946]"
+                      ? "bg-primary/15 text-primary"
                       : "bg-white/5 text-[#888888]"
                   }`}
                 >
@@ -163,7 +163,7 @@ export default function StaffPanel({ tournamentId, isCreator }: Props) {
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
-            className="flex-1 bg-[#1B1B1B] border border-white/20 rounded px-2 py-1.5 text-xs text-white focus:border-[#52B946] outline-none"
+            className="flex-1 bg-background border border-white/20 rounded px-2 py-1.5 text-xs text-white focus:border-primary outline-none"
           >
             <option value="">Select an organizer…</option>
             {invitable.map((u) => (
@@ -175,7 +175,7 @@ export default function StaffPanel({ tournamentId, isCreator }: Props) {
           <button
             onClick={handleInvite}
             disabled={!selectedUserId || !!busy}
-            className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wide bg-[#52B946] text-black rounded disabled:opacity-40"
+            className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wide bg-primary text-black rounded disabled:opacity-40"
           >
             Invite
           </button>

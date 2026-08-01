@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, UPLOAD_TIMEOUT_MS } from "../../utils/api";
 import { useToast } from "../../components/ui/Toast";
 import { useUser } from "../../components/UserProvider";
 import Hero from "../../components/Hero";
@@ -9,6 +9,7 @@ import Shop from "../../components/Shop";
 import ImageUpload from "../../components/ui/ImageUpload";
 import { motion, AnimatePresence } from "motion/react";
 import SectionDivider from "../../components/SectionDivider";
+import { Skeleton, SkeletonStatus } from "../../components/ui/Skeleton";
 
 interface SiteAsset {
   key: string;
@@ -100,6 +101,9 @@ export default function SiteVisualEditor() {
     const res = await authenticatedFetch(API_ENDPOINTS.IMAGES.UPSERT_ASSET(key), {
       method: "POST",
       body: formData,
+      // Hero images are the largest uploads in the app; the default request
+      // timeout would abort them on a slow link.
+      timeoutMs: UPLOAD_TIMEOUT_MS,
     });
     if (res.ok) fetchHeroAssets();
     setUploadingHeroKey(null);
@@ -145,6 +149,7 @@ export default function SiteVisualEditor() {
           const imgRes = await authenticatedFetch(API_ENDPOINTS.STORE.UPLOAD_IMAGE(created.id), {
             method: "POST",
             body: formData,
+            timeoutMs: UPLOAD_TIMEOUT_MS,
           });
           if (!imgRes.ok) toast("Product created, but the image upload failed", "error");
         }
@@ -202,6 +207,7 @@ export default function SiteVisualEditor() {
     const res = await authenticatedFetch(API_ENDPOINTS.STORE.UPLOAD_IMAGE(id), {
       method: "POST",
       body: formData,
+      timeoutMs: UPLOAD_TIMEOUT_MS,
     });
     if (res.ok) fetchProducts();
     setUploadingProductId(null);
@@ -267,12 +273,37 @@ export default function SiteVisualEditor() {
     return `hero_slide_${n}`;
   })();
 
-  // Render nothing for non-admins while the redirect above happens.
-  if (userLoading || !isAdminUser) return null;
+  // Render nothing for non-admins while the redirect above happens. Note this
+  // is deliberately split from the userLoading case below: blanking the screen
+  // is right for someone who is being redirected away, but wrong for an admin
+  // whose identity check is merely still in flight — they would see nothing at
+  // all on a slow connection.
+  if (!userLoading && !isAdminUser) return null;
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+  // Keeps the header — and with it the "← ADMIN" way out — on screen while the
+  // identity check or the editor content loads, rather than a blank page or a
+  // full-screen spinner.
+  if (userLoading || loading) return (
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col overflow-hidden">
+      <SkeletonStatus label="Loading editor" />
+      <header className="h-14 border-b border-white/10 flex items-center justify-between px-6 bg-[#111] z-50 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push("/admin")}
+            className="text-[10px] font-black text-white/40 hover:text-primary uppercase tracking-widest transition-colors"
+          >
+            ← ADMIN
+          </button>
+          <div className="h-4 w-px bg-white/10" />
+          <h1 className="text-[11px] font-black uppercase tracking-[0.3em]">
+            SITE VISUAL EDITOR
+          </h1>
+        </div>
+      </header>
+      <div className="flex-1 p-6 space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
     </div>
   );
 
@@ -316,7 +347,7 @@ export default function SiteVisualEditor() {
 
           <div className="w-full h-full overflow-auto flex items-center justify-center p-4">
             <div
-              className="pointer-events-none select-none bg-[#1B1B1B] border border-white/5 shadow-2xl"
+              className="pointer-events-none select-none bg-background border border-white/5 shadow-2xl"
               style={{ width: "1920px", transform: "scale(0.35)", transformOrigin: "center center", minHeight: "100vh" }}
             >
               {activePreview === "HERO" ? (

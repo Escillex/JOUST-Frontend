@@ -74,10 +74,10 @@ export default function HomePage() {
       <div className="max-w-7xl mx-auto px-6 md:px-8">
         {loading ? (
           <div className="grid grid-cols-4 gap-6 animate-pulse">
-            <div className="col-span-4 h-64 bg-[#1B1B1B] border-4 border-white/10" />
-            <div className="col-span-2 h-48 bg-[#1B1B1B] border-4 border-white/10" />
-            <div className="col-span-1 h-48 bg-[#1B1B1B] border-4 border-white/10" />
-            <div className="col-span-1 h-48 bg-[#1B1B1B] border-4 border-white/10" />
+            <div className="col-span-4 h-64 bg-background border-4 border-white/10" />
+            <div className="col-span-2 h-48 bg-background border-4 border-white/10" />
+            <div className="col-span-1 h-48 bg-background border-4 border-white/10" />
+            <div className="col-span-1 h-48 bg-background border-4 border-white/10" />
           </div>
         ) : (
           <HomeDashboard 

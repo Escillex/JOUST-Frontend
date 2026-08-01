@@ -1,4 +1,5 @@
 "use client";
+import { GlobalLeaderboardEntry } from "../tournaments/types";
 
 import React, { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
@@ -8,20 +9,6 @@ import LeaderboardTable from "../components/leaderboard/LeaderboardTable";
 import MobileLeaderboard from "../components/leaderboard/MobileLeaderboard";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";
 
-interface GlobalLeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  points: number;
-  tournamentsPlayed: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  matchWinPct: number;
-  omw: number;
-  oomw: number;
-  avatarUrl?: string | null;
-}
 
 export default function LeaderboardsPage() {
   const [leaderboard, setLeaderboard] = useState<GlobalLeaderboardEntry[]>([]);
@@ -131,7 +118,7 @@ export default function LeaderboardsPage() {
             )}
 
             {error ? (
-              <div className="p-20 border-4 border-red-500 bg-[#1B1B1B] text-center font-poppins shadow-[16px_16px_0px_0px_#ef4444]">
+              <div className="p-20 border-4 border-red-500 bg-background text-center font-poppins shadow-[16px_16px_0px_0px_#ef4444]">
                 <p className="text-red-500 text-xl font-black uppercase tracking-[0.3em] mb-8">{error}</p>
                 <button
                   onClick={() => fetchLeaderboard(selectedGame)}
@@ -141,7 +128,7 @@ export default function LeaderboardsPage() {
                 </button>
               </div>
             ) : leaderboard.length === 0 ? (
-              <div className="p-24 border-4 border-white/10 bg-[#1B1B1B] text-center font-poppins italic">
+              <div className="p-24 border-4 border-white/10 bg-background text-center font-poppins italic">
                 <p className="text-white/20 text-xl font-black uppercase tracking-[0.3em]">
                   {selectedGame ? `No leaderboard entries for ${selectedGame} yet` : "No leaderboard entries yet"}
                 </p>

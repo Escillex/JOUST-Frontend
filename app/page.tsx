@@ -72,7 +72,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="flex flex-col bg-[#1B1B1B] selection:bg-primary selection:text-black min-h-screen overflow-x-hidden">
+    <div className="flex flex-col bg-background selection:bg-primary selection:text-black min-h-screen overflow-x-hidden">
       <StaggerContainer>
         {/* Rhythmic Landing Sequence */}
         <FadeIn>
@@ -83,7 +83,10 @@ export default async function Home() {
           {/* Section 01 // STORE */}
           <SectionDivider label="STORE" />
           <FadeIn>
-            <Shop products={shopProducts.length > 0 ? shopProducts : undefined} />
+            {/* The real list, even when empty — Shop renders an empty state for that.
+              Passing `undefined` here fell back to the sample catalogue, which
+              advertised five nonexistent products on a fresh install (9.10). */}
+            <Shop products={shopProducts} />
           </FadeIn>
 
           {/* Section 02 // TOURNAMENTS */}

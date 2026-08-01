@@ -1,3 +1,4 @@
+"use client";
 import { TournamentStatus } from "../../tournaments/types";
 
 export interface AdminTournament {
@@ -16,7 +17,7 @@ interface Props {
 
 export default function TournamentTable({ tournaments, onForceComplete }: Props) {
   return (
-    <div className="bg-[#1B1B1B] border border-white/5 rounded-sm overflow-hidden flex flex-col h-full min-h-[400px]">
+    <div className="bg-background border border-white/5 rounded-sm overflow-hidden flex flex-col h-full min-h-[400px]">
       <div className="p-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
         <h2 className="text-[11px] font-bold uppercase tracking-widest text-white/80">Tournament Operations</h2>
         <span className="text-[10px] text-white/20 font-mono">{tournaments.length} Records</span>
@@ -24,7 +25,7 @@ export default function TournamentTable({ tournaments, onForceComplete }: Props)
       
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 bg-[#1B1B1B] border-b border-white/10 z-10 shadow-sm">
+          <thead className="sticky top-0 bg-background border-b border-white/10 z-10 shadow-sm">
             <tr>
               <th className="px-4 py-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">Identity / Name</th>
               <th className="px-4 py-3 text-[10px] font-bold text-white/40 uppercase tracking-widest">Status</th>

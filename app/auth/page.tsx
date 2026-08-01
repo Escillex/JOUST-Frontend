@@ -105,7 +105,7 @@ export default function AuthPage() {
                   <div className="space-y-4">
                     <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-[0.2em]">Registration<br/>Successful</h2>
                     <p className="text-xs md:text-sm text-white/50 uppercase tracking-widest leading-relaxed">
-                      Please hold while we sync your clearance.<br/>
+                      Please hold while we finish setting up your account.<br/>
                       You will be redirected to sign in momentarily.
                     </p>
                   </div>

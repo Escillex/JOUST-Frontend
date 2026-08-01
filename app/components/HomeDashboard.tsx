@@ -62,15 +62,22 @@ export default function HomeDashboard({ user, tournaments, leaderboard, stats, h
                             <span className="text-2xl font-black text-white/20">{stats?.draws || 0}</span>
                         </div>
                     </div>
-                    {/* OMW Card */}
-                    <div 
-                        className="bg-surface border border-white/5 p-6 flex flex-col justify-between group hover:border-primary/40 transition-all min-h-[120px] cursor-help"
-                        title="OMW (Opponent Match Win Rate) / OOMW (Opponent's Opponent Match Win Rate)"
-                    >
-                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">OMW // OOMW</span>
-                        <div className="flex flex-col">
-                            <div className="text-xl font-black text-white tracking-tighter">{(stats?.omw * 100 || 0).toFixed(1)}%</div>
-                            <div className="text-[10px] font-black text-white/20 tracking-tighter">{(stats?.oomw * 100 || 0).toFixed(1)}%</div>
+                    {/* Was an "OMW // OOMW" card. It was removed for the same
+                        reason the equivalent column and tiles were removed from
+                        LeaderboardTable and UserRankCard: this data comes from
+                        the GLOBAL leaderboard, where leaderboard.service.ts:312-313
+                        fills both omw and oomw with the player's own winRate.
+                        Verified live — winRate, omw and oomw come back byte
+                        identical. Labelling one number as two opponent-strength
+                        metrics states something false, and the tooltip defining
+                        the acronyms made it look authoritative. Win rate is the
+                        value that is actually real, so that is what is shown.
+                        Real OMW/OOMW exist per-tournament; restoring them
+                        globally is plan item 7.2. */}
+                    <div className="bg-surface border border-white/5 p-6 flex flex-col justify-between group hover:border-primary/40 transition-all min-h-[120px]">
+                        <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">WIN RATE</span>
+                        <div className="text-2xl font-black text-white tracking-tighter">
+                            {((stats?.matchWinPct ?? 0) * 100).toFixed(1)}%
                         </div>
                     </div>
                 </div>

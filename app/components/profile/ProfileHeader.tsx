@@ -1,17 +1,10 @@
 "use client";
+import { UserProfile } from "../../tournaments/types";
 
 import React from "react";
 import * as m from "motion/react";
 import { BentoBox } from "../ui/Bento";
 
-interface UserProfile {
-  id: string;
-  username: string;
-  roles?: string[];
-  isGuest?: boolean;
-  avatarUrl?: string | null;
-  createdAt?: string;
-}
 
 import Image from "next/image";
 import Link from "next/link";

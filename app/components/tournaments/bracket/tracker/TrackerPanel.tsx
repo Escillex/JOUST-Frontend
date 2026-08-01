@@ -6,13 +6,19 @@ import { Match } from '../../../../tournaments/[id]/bracket/types';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../../utils/api';
 import { usePolling } from '../../../../utils/usePolling';
 import { useTournamentSocket, TrackerUpdatePayload } from '../../../../utils/useTournamentSocket';
+import ConnectionPill from '../../../ui/ConnectionPill';
+import LastUpdated from '../../../ui/LastUpdated';
 import GameBar from './GameBar';
 import GameSeriesScore from './GameSeriesScore';
 import PlayerToolkit from './PlayerToolkit';
+import { canOfferDraw } from '../../../../utils/formatConfig';
 
 interface TrackerPanelProps {
   match: Match;
   formatConfig: FormatConfig;
+  /** Tournament system. Required to decide whether a draw is safe here — a
+   *  drawn result stalls or corrupts an elimination bracket. */
+  system?: string;
   isAdmin: boolean;
   currentUserId?: string;
   // Needed to subscribe to this tournament's real-time updates so the HP/points
@@ -23,9 +29,12 @@ interface TrackerPanelProps {
 
 type ConfirmState = { type: 'winner'; winnerId: string } | { type: 'draw' } | null;
 
-export default function TrackerPanel({ match, formatConfig, isAdmin, currentUserId, tournamentId, onMatchUpdated }: TrackerPanelProps) {
+export default function TrackerPanel({ match, formatConfig, system, isAdmin, currentUserId, tournamentId, onMatchUpdated }: TrackerPanelProps) {
   const [logs, setLogs] = useState<MatchGameLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // When the log list was last fetched. Live scoring is the screen where acting
+  // on stale values does real damage, so the age has to be visible.
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +80,8 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
         const data = await res.json();
         const newLogs = Array.isArray(data) ? data : [];
         setLogs(newLogs);
-        
+        setLastUpdated(new Date());
+
         const completedCount = newLogs.filter((l: any) => l.completedAt).length;
         if (prevCompletedCount.current !== -1 && completedCount > prevCompletedCount.current) {
           onMatchUpdated?.();
@@ -105,7 +115,7 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
     onTrackerUpdate: applyTrackerUpdate,
   });
 
-  // POLLING BLOCK - fallback behind the WebSocket connection
+  // temporary polling block - fallback behind the WebSocket connection
   // Uses the shared usePolling hook so this poll also pauses while the browser
   // tab is hidden. While the socket is connected it drops to a slow 60s
   // safety-net tick (the socket drives the live values); it returns to the fast
@@ -116,7 +126,7 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
   useEffect(() => {
     if (!match.isBye && seriesOver) fetchLogs();
   }, [match.isBye, seriesOver, fetchLogs]);
-  // END OF POLLING BLOCK
+  // end of temporary polling block
 
   // Bye matches: no tracker. This check used to sit above the hooks,
   // which breaks React's rule that hooks must run on every render in
@@ -259,8 +269,12 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#52b946]" />
             JOUST SPECTATOR FEED • STREAM ACTIVE
           </span>
-          <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">
-            CONNECTION STABLE
+          {/* This previously read a hardcoded "CONNECTION STABLE", which claimed
+              a healthy connection even while the socket was down. It now reports
+              the real state. */}
+          <span className="flex items-center gap-3">
+            <LastUpdated lastUpdated={lastUpdated} />
+            <ConnectionPill connected={connected} />
           </span>
         </div>
 
@@ -378,7 +392,7 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
         ) : (
           <div className="w-full py-8 border border-dashed border-white/10 flex flex-col items-center justify-center gap-1 bg-white/5">
             <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 animate-pulse">
-              {logs.length > 0 ? `GAME ${logs.length + 1} — AWAITING START` : 'STANDBY MODE'}
+              {logs.length > 0 ? `GAME ${logs.length + 1} — AWAITING START` : 'NOT STARTED'}
             </span>
             <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/10">
               ORGANIZER HAS NOT YET STARTED ACTIVE TRACKER
@@ -414,6 +428,14 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Connection state for the person actually entering scores. Without it a
+          dropped socket is invisible here, and the organizer can be typing into
+          a view that stopped updating minutes ago. */}
+      <div className="flex items-center justify-end gap-3">
+        <LastUpdated lastUpdated={lastUpdated} />
+        <ConnectionPill connected={connected} />
+      </div>
+
       {/* Error banner */}
       <AnimatePresence>
         {error && (
@@ -551,7 +573,11 @@ export default function TrackerPanel({ match, formatConfig, isAdmin, currentUser
                 >
                   {p2Name} Wins
                 </button>
-                {formatConfig?.allowDraw && (
+                {/* The system check is the point: on an elimination bracket a
+                    drawn result stalls (SE) or silently drops player 1 into the
+                    losers bracket (DE), so the control must not exist there even
+                    when allowDraw is set. See canOfferDraw. */}
+                {canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
                   <button
                     onClick={() => setConfirmState({ type: 'draw' })}
                     disabled={isUpdating}

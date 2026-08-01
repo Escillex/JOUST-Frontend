@@ -4,6 +4,25 @@ export const API_URL = (envApiUrl && envApiUrl.startsWith('http'))
   ? envApiUrl.replace(/\/$/, '') // Remove trailing slash
   : "/api/backend";
 
+// Where the browser opens its Socket.IO connection. This is deliberately separate
+// from API_URL, because the two have different requirements:
+//
+// REST can go through a same-origin proxy path ("/api/backend"), which Next.js
+// rewrites server-side — container-to-container in Docker, so it never depends on
+// a reachable LAN address. A socket cannot use that: Next.js does not forward
+// "/socket.io/", so a relative base means the browser tries the frontend's own
+// origin and every attempt 404s. That is why realtime never worked in the Docker
+// dev stack, where NEXT_PUBLIC_API_URL is set to the relative proxy path.
+//
+// Resolution order:
+//   1. NEXT_PUBLIC_SOCKET_URL  - set this in development to reach the backend directly
+//   2. API_URL when it is absolute - the plain host setup, where both already match
+//   3. undefined - same origin, which is correct in production where the reverse
+//      proxy routes /socket.io/ to the backend
+export const SOCKET_URL =
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  (API_URL.startsWith("http") ? API_URL : undefined);
+
 export async function safeJson(res: Response) {
   const contentType = res.headers.get("content-type");
   const text = await res.text();
@@ -29,7 +48,7 @@ export async function safeJson(res: Response) {
 // - full URLs (http...), in-memory previews (blob:) and inline images (data:)
 //   are already usable, return them unchanged
 // - backend uploads ("/uploads/...") need the API base URL in front
-// - anything else (like "/placeholder.jpg") is a file from this app's own
+// - anything else (like "/placeholder.png") is a file from this app's own
 //   public folder, return it unchanged
 export function resolveImageUrl(url?: string | null, fallback = ""): string {
   if (!url) return fallback;
@@ -54,27 +73,103 @@ function handleUnauthorized() {
   }
 }
 
-export async function authenticatedFetch(url: string, options: RequestInit = {}) {
+// How long a request may stall before we give up on it.
+//
+// This exists because `fetch` rejects when a connection *fails* but not when one
+// *stalls*, and stalling is the characteristic venue-Wi-Fi failure: the request
+// leaves, nothing comes back, and the promise never settles. Callers almost all
+// look like `try { ... } finally { setLoading(false) }`, so a promise that never
+// settles means `finally` never runs and the user is left on a spinner forever,
+// with no error and no way to retry. A timeout converts that dead end into the
+// same synthetic error every caller already handles.
+export const DEFAULT_TIMEOUT_MS = 8000;
+
+// Uploads move real bytes over the same bad link, so they get their own budget.
+// Pass `timeoutMs: 0` to opt out entirely.
+export const UPLOAD_TIMEOUT_MS = 60000;
+
+export interface AuthenticatedFetchOptions extends RequestInit {
+  /** Milliseconds before the request is aborted. Defaults to DEFAULT_TIMEOUT_MS;
+   *  0 disables the timeout. */
+  timeoutMs?: number;
+}
+
+/** The shape returned when a request could not be completed at all. Not a real
+ *  Response — `status: 0` is the sentinel every call site already branches on. */
+function networkErrorResponse(message: string, statusText: string): Response {
+  return {
+    ok: false,
+    status: 0,
+    statusText,
+    json: async () => ({ message }),
+    text: async () => statusText,
+  } as Response;
+}
+
+// Whether the backend is actually reachable, as opposed to whether the device
+// merely has a network interface.
+//
+// `navigator.onLine` answers the second question only: it is `true` on a venue
+// Wi-Fi that has stopped routing, on a captive portal, and whenever the backend
+// itself is down. Those are precisely the cases we need to tell the user about,
+// so reachability is inferred from what requests actually do. Only transitions
+// are announced, otherwise every request would fire an event.
+export const NETWORK_STATUS_EVENT = "network:status";
+
+let backendReachable = true;
+
+function reportReachability(reachable: boolean) {
+  if (typeof window === "undefined") return;
+  if (reachable === backendReachable) return;
+  backendReachable = reachable;
+  window.dispatchEvent(
+    new CustomEvent(NETWORK_STATUS_EVENT, { detail: { reachable } }),
+  );
+}
+
+export function isBackendReachable() {
+  return backendReachable;
+}
+
+export async function authenticatedFetch(
+  url: string,
+  options: AuthenticatedFetchOptions = {},
+) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  
-  const headers = new Headers(options.headers || {});
+
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...fetchOptions } = options;
+
+  const headers = new Headers(fetchOptions.headers || {});
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  
+
   // Build the full URL, handling slashes carefully
   let fullUrl = url;
   if (!url.startsWith('http')) {
     const cleanPath = url.startsWith('/') ? url : `/${url}`;
     fullUrl = `${API_URL}${cleanPath}`;
   }
-  
+
+  const controller = new AbortController();
+  const timer =
+    timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  // If a caller supplied its own signal (a component unmounting, say), honour it
+  // as well as the timeout — whichever fires first wins.
+  const forwardAbort = () => controller.abort();
+  callerSignal?.addEventListener('abort', forwardAbort);
+
   try {
     const response = await fetch(fullUrl, {
-      ...options,
+      ...fetchOptions,
       headers,
       credentials: 'include',
+      signal: controller.signal,
     });
+    // Any answer at all — including a 500 — proves the round trip works, so it
+    // clears an outstanding "no connection" state.
+    reportReachability(true);
     // A 401 means the session is no longer valid, so clean up the stale
     // token once, centrally, instead of every page handling it itself.
     if (response.status === 401) {
@@ -82,20 +177,40 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
     }
     return response;
   } catch (error) {
-    console.error("Critical Fetch Error:", {
+    // A caller-driven abort is not a failure — the component simply went away.
+    // Reporting it as a network error would flash an error state during normal
+    // navigation, so it gets its own quiet path and does not touch reachability.
+    if (callerSignal?.aborted) {
+      return networkErrorResponse('Request cancelled.', 'Aborted');
+    }
+
+    reportReachability(false);
+
+    const timedOut = error instanceof DOMException && error.name === 'AbortError';
+
+    console.error(timedOut ? 'Request Timed Out:' : 'Critical Fetch Error:', {
       url: fullUrl,
-      method: options.method || 'GET',
+      method: fetchOptions.method || 'GET',
+      timeoutMs,
       message: error instanceof Error ? error.message : String(error),
-      error
+      error,
     });
-    // Return a fake response object to prevent "res is undefined" crashes
-    return {
-      ok: false,
-      status: 0,
-      statusText: "Network Error",
-      json: async () => ({ message: "Connection to server lost. Check network connection." }),
-      text: async () => "Network Error",
-    } as Response;
+
+    // Both cases return status 0 so the ~90 existing call sites keep working
+    // unchanged; only the message differs, because "too slow" and "no
+    // connection" need different advice.
+    return timedOut
+      ? networkErrorResponse(
+          'The server took too long to respond. Check your connection and try again.',
+          'Timeout',
+        )
+      : networkErrorResponse(
+          'Connection to server lost. Check network connection.',
+          'Network Error',
+        );
+  } finally {
+    if (timer) clearTimeout(timer);
+    callerSignal?.removeEventListener('abort', forwardAbort);
   }
 }
 
@@ -106,9 +221,9 @@ export const API_ENDPOINTS = {
     SIGNUP: '/auth/signup',
     SIGNOUT: '/auth/signout',
     USERS: '/auth/users',
-    REGISTERED_USERS: '/auth/registered-users',
     ROLES: (id: string) => `/auth/roles/${id}`,
-    CREATE_GUEST: '/auth/createguest',
+    // Guests are created through TOURNAMENTS.JOIN_GUEST, which attaches them to
+    // a tournament in one call; there is no standalone guest-creation flow.
     CONVERT_GUEST: (id: string) => `/auth/convert-guest/${id}`,
     DELETE_USER: (id: string) => `/auth/users/${id}`,
     UPDATE_PROFILE: (id: string) => `/auth/users/${id}/profile`,
@@ -149,9 +264,12 @@ export const API_ENDPOINTS = {
     REPLACE: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/replace`,
     LEADERBOARD: (id: string) => `/tournaments/${id}/leaderboard`,
     GET_ONE: (id: string) => `/tournaments/${id}`,
+    // Same record without the rounds/matches tree (plan 7.1). Use this on any
+    // screen that does not draw a bracket: the full response is 7.7 KB at 8
+    // players but 106.8 KB at 128, and polling it re-ships all of that.
+    GET_ONE_SUMMARY: (id: string) => `/tournaments/${id}?view=summary`,
     ROUNDS: (id: string) => `/tournaments/${id}/rounds`,
     UPDATE_STATUS: (id: string) => `/tournaments/${id}/status`,
-    GENERATE_BRACKET: (id: string) => `/tournaments/${id}/generate-bracket`,
     INVITE: (token: string) => `/tournaments/invite/${token}`,
     CANCEL_CLEANUP: (id: string) => `/tournaments/${id}/cancel-cleanup`,
     RESOLVE_TIE: (id: string) => `/tournaments/${id}/resolve-tie`,
@@ -168,11 +286,12 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `/tournament-formats/${id}`,
   },
   MATCHES: {
+    // Draws are reported through SUBMIT with no winnerId. The server also
+    // exposes /matches/:id/draw, but that path validates less (it does not
+    // reject bestOf > 1 or a points threshold), so it is deliberately unused.
     SUBMIT:         (id: string) => `/matches/${id}/submit`,
     GAME_RESULT:    (id: string) => `/matches/${id}/game-result`,
-    DRAW:           (id: string) => `/matches/${id}/draw`,
     GET_ONE:        (id: string) => `/matches/${id}`,
-    BY_ROUND:       (roundId: string) => `/matches/round/${roundId}`,
     TRACKER_OPEN:   (id: string) => `/matches/${id}/tracker/open`,
     TRACKER_UPDATE: (id: string) => `/matches/${id}/tracker/update`,
     TRACKER_SUBMIT: (id: string) => `/matches/${id}/tracker/submit-game`,
@@ -184,10 +303,6 @@ export const API_ENDPOINTS = {
     BACKFILL_GAME_STATS: '/dev/backfill-game-stats',
     DELETE_TOURNAMENT: (id: string) => `/dev/tournament/${id}`,
   },
-  TEMPLATES: {
-    BASE: '/templates',
-    BY_ID: (id: string) => `/templates/${id}`,
-  },
   IMAGES: {
     UPLOAD_AVATAR: (userId: string) => `/images/avatar/${userId}`,
     DELETE_AVATAR: (userId: string) => `/images/avatar/${userId}`,
@@ -195,8 +310,9 @@ export const API_ENDPOINTS = {
     DELETE_BANNER: (tournamentId: string) => `/images/banner/${tournamentId}`,
     UPSERT_ASSET: (key: string) => `/images/assets/${key}`,
     DELETE_ASSET: (key: string) => `/images/assets/${key}`,
+    // Single assets are read out of the LIST_ASSETS response; the server has no
+    // GET /images/assets/:key route.
     LIST_ASSETS: '/images/assets',
-    GET_ASSET: (key: string) => `/images/assets/${key}`,
   },
   STORE: {
     LIST: '/store',

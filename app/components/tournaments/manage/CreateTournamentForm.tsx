@@ -5,7 +5,7 @@ import { TournamentFormatModel, TournamentTemplate } from "../../../tournaments/
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
-const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded appearance-none placeholder:text-white/20";
+const inputCls = "w-full h-10 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded appearance-none placeholder:text-white/20";
 const labelCls = "text-xs font-semibold text-[#888888] block mb-1";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
@@ -28,7 +28,7 @@ interface Props {
 }
 
 export default function CreateTournamentForm({ userId, userRoles = [], onSuccess, onDiscard }: Props) {
-  const [activeStep, setActiveStep] = useState<"IDENTITY" | "RULES" | "DEPLOYMENT">("IDENTITY");
+  const [activeStep, setActiveStep] = useState<"IDENTITY" | "RULES" | "SCHEDULE">("IDENTITY");
 
   // IDENTITY
   const [name, setName] = useState("");
@@ -42,6 +42,8 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   // RULES
   const [bestOf, setBestOf] = useState(1);
   const [allowDraw, setAllowDraw] = useState(false);
+  // Inherited from the chosen format preset, overridable per tournament.
+  const [seedingMode, setSeedingMode] = useState<"RANDOM" | "MANUAL">("RANDOM");
   const [prizePool, setPrizePool] = useState<number | "">("");
   const [swissRounds, setSwissRounds] = useState(3);
   const [swissPointsWin, setSwissPointsWin] = useState(3);
@@ -56,7 +58,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [placementTopCut, setPlacementTopCut] = useState(3);
   const [placementParticipation, setPlacementParticipation] = useState(1);
 
-  // DEPLOYMENT
+  // SCHEDULE
   const [venue, setVenue] = useState("");
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -132,6 +134,9 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     setFormat(fmt.system);
     setBestOf(c.bestOf ?? 1);
     setAllowDraw(c.allowDraw ?? false);
+    // Read from the raw root first, not the phase1 alias: how the field is drawn
+    // is a property of the event, not of a HYBRID preset's Swiss phase.
+    setSeedingMode((raw.seedingMode ?? c.seedingMode) === "MANUAL" ? "MANUAL" : "RANDOM");
     setPointsThreshold(c.pointsThreshold ?? 0);
     setStartingHp(c.startingHp ?? 0);
     if (fmt.system === "SWISS" || fmt.system === "HYBRID") {
@@ -148,15 +153,19 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     setPlacementParticipation(c.placementPointsParticipation ?? 1);
   };
 
+  // Draws are cleared for systems that cannot survive them. HYBRID is included
+  // in the permitted set because its phase 1 IS Swiss, where draws are the
+  // standard mechanic; the phase-2 top cut never offers the control (see
+  // canOfferDraw in utils/formatConfig.ts).
   useEffect(() => {
-    if (format !== "SWISS" && format !== "ROUND_ROBIN") {
+    if (format !== "SWISS" && format !== "ROUND_ROBIN" && format !== "HYBRID") {
       setAllowDraw(false);
     }
   }, [format]);
 
   const isIdentityValid = !!(name && !nameError && selectedFormatId && maxPlayers >= 2 && !isValidatingName);
   const isRulesValid = !!(bestOf >= 1);
-  const isDeploymentValid = !!(startNow || date);
+  const isScheduleValid = !!(startNow || date);
   const allStepsVisited = visitedSteps.size >= 3;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -164,7 +173,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (activeStep !== "DEPLOYMENT" || isSubmitting || !allStepsVisited || showSuccess) return;
+    if (activeStep !== "SCHEDULE" || isSubmitting || !allStepsVisited || showSuccess) return;
 
     setIsSubmitting(true);
     const finalDate = date ? (startTime ? `${date}T${startTime}` : `${date}T00:00:00`) : null;
@@ -187,10 +196,12 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       rules.swissPointsForDraw = swissPointsDraw;
       rules.swissPointsForLoss = swissPointsLoss;
     }
+    // seedingMode lives at the config root, never inside a phase, because the
+    // backend resolves it from the root first (see format-config.helper.ts).
     const config =
       format === "HYBRID"
-        ? { phase1: rules, phase2: { topCutSize } }
-        : rules;
+        ? { seedingMode, phase1: rules, phase2: { topCutSize } }
+        : { ...rules, seedingMode };
 
     const body = {
       name,
@@ -251,9 +262,9 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
               if (fmt) applyFormat(fmt);
             }}
           >
-            <option value="" disabled className="bg-[#1B1B1B]">Select a format...</option>
+            <option value="" disabled className="bg-background">Select a format...</option>
             {formats.map(fmt => (
-              <option key={fmt.id} value={fmt.id} className="bg-[#1B1B1B]">
+              <option key={fmt.id} value={fmt.id} className="bg-background">
                 {fmt.name} ({fmt.gameName || "General"})
               </option>
             ))}
@@ -269,12 +280,12 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
               onClick={() => applyFormat(fmt)}
               className={`p-4 border transition-colors rounded text-left ${
                 selectedFormatId === fmt.id 
-                  ? "bg-[#52B946]/10 border-[#52B946]" 
-                  : "bg-[#1B1B1B] border-white/10 hover:border-white/30"
+                  ? "bg-primary/10 border-primary" 
+                  : "bg-background border-white/10 hover:border-white/30"
               }`}
             >
               <div className="flex flex-col">
-                <span className={`text-sm font-semibold ${selectedFormatId === fmt.id ? "text-[#52B946]" : "text-white"}`}>{fmt.name}</span>
+                <span className={`text-sm font-semibold ${selectedFormatId === fmt.id ? "text-primary" : "text-white"}`}>{fmt.name}</span>
                 <span className="text-xs text-[#888888] mt-1">{fmt.gameName || "General"}</span>
               </div>
             </button>
@@ -345,7 +356,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     <div className="space-y-8">
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
         <h3 className="text-sm font-semibold text-white">Match &amp; Scoring Rules</h3>
-        <span className="px-2 py-1 bg-[#1B1B1B] text-[#888888] text-xs font-semibold rounded capitalize">
+        <span className="px-2 py-1 bg-background text-[#888888] text-xs font-semibold rounded capitalize">
           {format.replace(/_/g, " ")}
         </span>
       </div>
@@ -360,7 +371,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                   type="checkbox" 
                   checked={pointsThreshold > 0} 
                   onChange={e => setPointsThreshold(e.target.checked ? 1 : 0)} 
-                  className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+                  className="w-4 h-4 cursor-pointer accent-primary" 
                 />
                 <span className="text-sm text-white">Enable Victory Threshold</span>
               </label>
@@ -374,7 +385,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                   type="checkbox" 
                   checked={startingHp > 0} 
                   onChange={e => setStartingHp(e.target.checked ? 100 : 0)} 
-                  className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+                  className="w-4 h-4 cursor-pointer accent-primary" 
                 />
                 <span className="text-sm text-white">HP-Based Match System</span>
               </label>
@@ -403,14 +414,14 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                 className={inputCls} 
               />
             </Field>
-            {(format === "SWISS" || format === "ROUND_ROBIN") && (
-              <Field label="Allow Draws">
+            {(format === "SWISS" || format === "ROUND_ROBIN" || format === "HYBRID") && (
+              <Field label={format === "HYBRID" ? "Allow Draws (Swiss phase)" : "Allow Draws"}>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setAllowDraw(false)}
                     className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                      !allowDraw ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]" : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                      !allowDraw ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
                     }`}
                   >
                     Force Win
@@ -419,14 +430,59 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                     type="button"
                     onClick={() => setAllowDraw(true)}
                     className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                      allowDraw ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]" : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                      allowDraw ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
                     }`}
                   >
                     Permit Draws
                   </button>
                 </div>
+                {allowDraw && (bestOf > 1 || pointsThreshold > 0) && (
+                  /* The backend refuses a winnerless submit for a series or a
+                     threshold-scored match, so with these settings the Draw
+                     control never appears during scoring. Said plainly here
+                     rather than leaving the organizer to discover a setting
+                     that does nothing. */
+                  <p className="mt-2 text-[11px] text-[#FFB020] leading-relaxed">
+                    Draws will not be offered while this format uses{" "}
+                    {bestOf > 1 ? "a best-of series" : "point-threshold scoring"}.
+                    Set Best Of to 1{pointsThreshold > 0 ? " and clear the points threshold" : ""} to make them available.
+                  </p>
+                )}
+                {format === "HYBRID" && (
+                  <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
+                    Applies to the Swiss phase only. The top cut is single
+                    elimination, where a match must produce a winner.
+                  </p>
+                )}
               </Field>
             )}
+            <Field label="Seeding">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSeedingMode("RANDOM")}
+                  className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
+                    seedingMode === "RANDOM" ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
+                  }`}
+                >
+                  Random Draw
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSeedingMode("MANUAL")}
+                  className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
+                    seedingMode === "MANUAL" ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
+                  }`}
+                >
+                  Manual Seeding
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
+                {seedingMode === "RANDOM"
+                  ? "The field is drawn at random when the tournament starts. Any seed order set on the roster is ignored."
+                  : "The bracket follows the seed order you arrange on the roster. Unseeded entrants are placed last."}
+              </p>
+            </Field>
           </div>
         </div>
       </div>
@@ -487,7 +543,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     </div>
   );
 
-  const renderDeployment = () => (
+  const renderSchedule = () => (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-white border-b border-white/10 pb-2">Schedule & Accessibility</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -534,19 +590,19 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         {activeStep !== "IDENTITY" && (
           <button 
             type="button" 
-            onClick={() => setActiveStep(activeStep === "DEPLOYMENT" ? "RULES" : "IDENTITY")}
-            className="flex-1 md:flex-none px-6 py-2.5 bg-[#1B1B1B] text-white font-semibold text-sm rounded hover:bg-white/10 transition-colors"
+            onClick={() => setActiveStep(activeStep === "SCHEDULE" ? "RULES" : "IDENTITY")}
+            className="flex-1 md:flex-none px-6 py-2.5 bg-background text-white font-semibold text-sm rounded hover:bg-white/10 transition-colors"
           >
             Back
           </button>
         )}
         
-        {activeStep !== "DEPLOYMENT" ? (
+        {activeStep !== "SCHEDULE" ? (
           <button 
             type="button" 
-            onClick={() => setActiveStep(activeStep === "IDENTITY" ? "RULES" : "DEPLOYMENT")}
+            onClick={() => setActiveStep(activeStep === "IDENTITY" ? "RULES" : "SCHEDULE")}
             disabled={(activeStep === "IDENTITY" && !isIdentityValid) || (activeStep === "RULES" && !isRulesValid)}
-            className="flex-1 md:flex-none px-8 py-2.5 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale"
+            className="flex-1 md:flex-none px-8 py-2.5 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale"
           >
             Proceed
           </button>
@@ -555,8 +611,8 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             <button 
               type="button" 
               onClick={handleSubmit}
-              disabled={!isIdentityValid || !isRulesValid || !isDeploymentValid || uploading || !allStepsVisited}
-              className="w-full md:w-auto px-8 py-2.5 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+              disabled={!isIdentityValid || !isRulesValid || !isScheduleValid || uploading || !allStepsVisited}
+              className="w-full md:w-auto px-8 py-2.5 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
             >
               {uploading || isSubmitting ? "Finalizing..." : "Create Tournament"}
             </button>
@@ -572,13 +628,13 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const steps = [
     { id: "IDENTITY", label: "01. Identity", valid: isIdentityValid },
     { id: "RULES", label: "02. Rules", valid: isRulesValid },
-    { id: "DEPLOYMENT", label: "03. Schedule", valid: isDeploymentValid }
+    { id: "SCHEDULE", label: "03. Schedule", valid: isScheduleValid }
   ] as const;
 
   if (showSuccess) {
     return (
       <div className="bg-[#000000] border border-white/20 p-12 rounded flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 bg-[#52B946]/10 text-[#52B946] border border-[#52B946]/20 rounded-full flex items-center justify-center mb-6">
+        <div className="w-16 h-16 bg-primary/10 text-primary border border-primary/20 rounded-full flex items-center justify-center mb-6">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
         </div>
         <h2 className="text-xl font-semibold text-white mb-2">Tournament Initiated</h2>
@@ -591,14 +647,14 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     <>
       {/* MOBILE VIEW */}
       <div className="md:hidden space-y-4">
-        <div className="flex bg-[#1B1B1B] border border-white/20 rounded overflow-hidden">
+        <div className="flex bg-background border border-white/20 rounded overflow-hidden">
           {steps.map((step) => (
             <button
               key={step.id}
               type="button"
               onClick={() => setActiveStep(step.id as any)}
               className={`flex-1 py-3 text-xs font-semibold text-center border-r border-white/10 last:border-0 transition-colors ${
-                activeStep === step.id ? "bg-[#52B946]/10 text-[#52B946] border-b-2 border-b-[#52B946]" : "text-[#888888] hover:bg-white/5"
+                activeStep === step.id ? "bg-primary/10 text-primary border-b-2 border-b-[#52B946]" : "text-[#888888] hover:bg-white/5"
               }`}
             >
               {step.label.split(". ")[1]}
@@ -609,7 +665,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         <div className="bg-[#000000] border border-white/20 p-4 rounded">
           {activeStep === "IDENTITY" && renderIdentity()}
           {activeStep === "RULES" && renderRules()}
-          {activeStep === "DEPLOYMENT" && renderDeployment()}
+          {activeStep === "SCHEDULE" && renderSchedule()}
           {renderActions()}
         </div>
       </div>
@@ -623,11 +679,11 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
               type="button"
               onClick={() => setActiveStep(step.id as any)}
               className={`w-full flex items-center gap-3 p-3 rounded text-left transition-colors ${
-                activeStep === step.id ? "bg-[#1B1B1B] border border-white/20" : "hover:bg-[#1B1B1B]/50 border border-transparent"
+                activeStep === step.id ? "bg-background border border-white/20" : "hover:bg-background/50 border border-transparent"
               }`}
             >
               <div className={`w-3 h-3 rounded-full border transition-colors ${
-                step.valid && activeStep !== step.id ? "bg-[#52B946] border-[#52B946]" :
+                step.valid && activeStep !== step.id ? "bg-primary border-primary" :
                 activeStep === step.id ? "bg-white border-white" : "border-[#888888]"
               }`} />
               <div className="flex flex-col">
@@ -644,7 +700,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         <div className="flex-1 bg-[#000000] border border-white/20 p-8 rounded min-w-0">
           {activeStep === "IDENTITY" && renderIdentity()}
           {activeStep === "RULES" && renderRules()}
-          {activeStep === "DEPLOYMENT" && renderDeployment()}
+          {activeStep === "SCHEDULE" && renderSchedule()}
           {renderActions()}
         </div>
       </div>

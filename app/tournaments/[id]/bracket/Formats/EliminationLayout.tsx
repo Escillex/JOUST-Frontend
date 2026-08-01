@@ -1,4 +1,5 @@
 "use client";
+import { isWinnersRound, isLosersRound, losersRoundIndex } from "../roundNumbers";
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Match, Round, LeaderboardEntry } from "../types";
@@ -217,8 +218,8 @@ export default function EliminationLayout({
     const zoomOnPinch = !panOnScroll;
     const panOnScrollMode = (isShiftPressed ? "horizontal" : "vertical") as PanOnScrollMode;
 
-    const winnersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => r.roundNumber < 100).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
-    const losersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => r.roundNumber >= 100 && r.roundNumber < 200).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
+    const winnersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => isWinnersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
+    const losersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => isLosersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
     const grandFinals = useMemo(() => tournament?.rounds?.filter((r: Round) => r.roundNumber >= 200).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
 
     // Helper to find the round number of a match
@@ -452,7 +453,7 @@ export default function EliminationLayout({
                 type: 'champion',
                 position: { x: centerX, y: finalY + 220 },
                 data: {
-                    label: tournament?.winner?.username || tournament?.winner?.guestName || 'TBD',
+                    label: tournament?.winner?.username || 'TBD',
                     hasChampion: !!tournament?.winner
                 },
                 draggable: false
@@ -526,7 +527,7 @@ export default function EliminationLayout({
         // 2. Losers Bracket (Rendered below Winners)
         const losersVerticalOffset = (winnersRounds[0]?.matches?.length || 4) * BASE_MATCH_GAP + 400;
         losersRounds.forEach((round: Round, rIdx: number) => {
-            const losersRoundNum = round.roundNumber >= 101 ? round.roundNumber - 100 : rIdx + 1;
+            const losersRoundNum = isLosersRound(round.roundNumber) ? losersRoundIndex(round.roundNumber) : rIdx + 1;
             const losersRoundLabel = `ROUND ${losersRoundNum}`;
             nodes.push({
                 id: `header-round-${round.roundNumber}`,
@@ -628,7 +629,7 @@ export default function EliminationLayout({
                     type: 'champion',
                     position: { x: championX, y: championY - 35 },
                     data: { 
-                        label: tournament?.winner?.username || tournament?.winner?.guestName || 'TBD',
+                        label: tournament?.winner?.username || 'TBD',
                         hasChampion: !!tournament?.winner
                     },
                     draggable: false

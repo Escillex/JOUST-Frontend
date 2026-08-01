@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useState, useMemo } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
@@ -129,10 +130,12 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                     <Link href={`/tournaments/${t.id}`} className="flex flex-col h-full">
                                         <div className={`h-40 w-full overflow-hidden border-b-2 transition-colors bg-component-background relative ${t.status === 'COMPLETED' ? 'border-component-border' : 'border-component-border group-hover:border-primary'
                                             }`}>
-                                            <img
-                                                src={resolveImageUrl(t.bannerUrl, "/placeholder.jpg")}
+                                            <Image
+                                                src={resolveImageUrl(t.bannerUrl, "/placeholder.png")}
                                                 alt={t.name}
-                                                className={`w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700 ${t.status === 'COMPLETED' ? 'grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100' : ''
+                                                fill
+                                                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                                                className={`object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700 ${t.status === 'COMPLETED' ? 'grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100' : ''
                                                     }`}
                                             />
                                             <div className="absolute top-4 right-4 bg-component-background/80 border border-component-border px-3 py-1 text-[8px] font-black text-white uppercase tracking-widest">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React from "react";
 import Link from "next/link";
 import * as m from "motion/react";
@@ -50,12 +51,18 @@ export default function TournamentList({ tournaments, variant = "default", limit
       onMouseMove={handleMouseMove}
       onMouseLeave={() => { mouseX.set(0); mouseY.set(0); }}
     >
-      {/* Eager preloader to prevent dynamic image flashing on throttled connections */}
+      {/* Eager preloader to prevent dynamic image flashing on throttled
+          connections (CLAUDE.md Core Rule 8). Deliberately raw <img>, not
+          next/image: these render inside a 0x0 display:none container purely to
+          warm the browser cache, and next/image lazy-loads by default and needs
+          a sized positioned parent for `fill` — both of which defeat the point.
+          The visible image these preload IS a next/image. */}
       <div className="hidden aria-hidden pointer-events-none absolute w-0 h-0 overflow-hidden" style={{ display: 'none' }}>
         {sorted.map((t, idx) => (
+          // eslint-disable-next-line @next/next/no-img-element
           <img 
             key={idx}
-            src={resolveImageUrl(t.bannerUrl, "/placeholder.jpg")}
+            src={resolveImageUrl(t.bannerUrl, "/placeholder.png")}
             alt=""
             loading="eager"
           />
@@ -140,10 +147,12 @@ export default function TournamentList({ tournaments, variant = "default", limit
                     transformStyle: "preserve-3d"
                   }}
                 >
-                  <img 
-                    src={resolveImageUrl(currentTournament.bannerUrl, "/placeholder.jpg")}
+                  <Image
+                    src={resolveImageUrl(currentTournament.bannerUrl, "/placeholder.png")}
                     alt={currentTournament.name}
-                    className="w-full h-full object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700"
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className="object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-700"
                   />
                 </m.motion.div>
                 {isJoined && (

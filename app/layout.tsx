@@ -34,6 +34,7 @@ import MobileTopBar from "./components/mobile/MobileTopBar";
 import MobileBottomNav from "./components/mobile/MobileBottomNav";
 import InitialAppLoader from "./components/InitialAppLoader";
 import ServiceWorkerRegister from "./components/ServiceWorkerRegister";
+import OfflineBanner from "./components/ui/OfflineBanner";
 
 export default function RootLayout({
   children,
@@ -49,6 +50,9 @@ export default function RootLayout({
         {/* Enables on-device caching of build files and images
             (production only) and makes the site installable. */}
         <ServiceWorkerRegister />
+        {/* Sits above everything, including the navigation, because a stale
+            screen must never be able to look current. */}
+        <OfflineBanner />
         <UserProvider>
           <NotificationProvider>
           <ToastProvider>

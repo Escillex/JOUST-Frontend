@@ -1,3 +1,4 @@
+"use client";
 const inputCls = "h-12 bg-background border border-foreground/10 px-4 text-xs text-foreground focus:outline-none focus:border-primary transition-all rounded-xl";
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   onJoin: (userId: string) => void;
 }
 
-export default function DeploymentFooter({ tournament, allUsers, guestUsername, setGuestUsername, selectedUserId, setSelectedUserId, onAddGuest, onJoin }: Props) {
+export default function AddParticipantsFooter({ tournament, allUsers, guestUsername, setGuestUsername, selectedUserId, setSelectedUserId, onAddGuest, onJoin }: Props) {
   const available = allUsers.filter(u => !tournament.participants.some((p: any) => p.userId === u.id));
 
   return (
@@ -38,7 +39,7 @@ export default function DeploymentFooter({ tournament, allUsers, guestUsername, 
                 <option key={u.id} value={u.id}>{(u.username || "Unknown User").toUpperCase()}</option>
               ))}
             </select>
-            <button onClick={() => selectedUserId && onJoin(selectedUserId)} className="w-full h-12 bg-foreground/10 text-foreground font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-foreground hover:text-background transition-all font-poppins">Authorize</button>
+            <button onClick={() => selectedUserId && onJoin(selectedUserId)} className="w-full h-12 bg-foreground/10 text-foreground font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-foreground hover:text-background transition-all font-poppins">Add Player</button>
           </div>
         </div>
 

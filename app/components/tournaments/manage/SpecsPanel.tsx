@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { getTournamentConfig } from "../../../utils/formatConfig";
@@ -5,7 +6,7 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api"
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
-const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded";
+const inputCls = "w-full h-10 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded";
 
 interface EditState {
   name: string;
@@ -131,7 +132,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
         <h3 className="text-sm font-semibold text-white">Specifications</h3>
-        <button onClick={onToggleEdit} className="text-xs font-semibold text-[#52B946] hover:brightness-90 transition-colors">
+        <button onClick={onToggleEdit} className="text-xs font-semibold text-primary hover:brightness-90 transition-colors">
           {isEditing ? "Cancel" : "Edit Settings"}
         </button>
       </div>
@@ -227,7 +228,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             <button
               type="submit"
               disabled={!canEditDetails}
-              className="w-full h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+              className="w-full h-10 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
             >
               Save Specifications
             </button>
@@ -247,7 +248,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             ].map(({ label, value, highlight }) => (
               <div key={label} className="space-y-1">
                 <p className="text-xs font-semibold text-[#888888]">{label}</p>
-                <p className={`text-sm ${highlight ? "text-[#52B946]" : "text-white"}`}>{value}</p>
+                <p className={`text-sm ${highlight ? "text-primary" : "text-white"}`}>{value}</p>
               </div>
             ))}
           </div>
@@ -274,9 +275,9 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
                 <p className="text-xs font-semibold text-[#888888] mb-3">Placement Points</p>
                 <div className="space-y-1">
                   {rows.map(r => (
-                    <div key={r.label} className="flex items-center justify-between py-1.5 px-3 rounded bg-[#1B1B1B] border border-white/5">
+                    <div key={r.label} className="flex items-center justify-between py-1.5 px-3 rounded bg-background border border-white/5">
                       <span className="text-xs text-white">{r.label}</span>
-                      <span className="text-xs font-black text-[#52B946]">{r.pts} pts</span>
+                      <span className="text-xs font-black text-primary">{r.pts} pts</span>
                     </div>
                   ))}
                 </div>
@@ -289,7 +290,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
 
        {timeLeft !== null && timeLeft > 0 && (
-        <div className="mt-6 p-4 bg-[#1B1B1B] border border-[#FF4D4D]/20 rounded flex flex-col items-center gap-4">
+        <div className="mt-6 p-4 bg-background border border-[#FF4D4D]/20 rounded flex flex-col items-center gap-4">
            <div className="text-center">
              <p className="text-xs font-semibold text-[#FF4D4D] mb-1">Guest Data Cleanup Warning</p>
              <p className="text-xl font-mono text-[#FF4D4D]">
@@ -298,7 +299,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
            </div>
            <button 
              onClick={handleCancelCleanup}
-             className="w-full py-2 bg-[#1B1B1B] border border-[#FF4D4D]/50 text-[#FF4D4D] font-semibold text-xs rounded hover:bg-[#FF4D4D]/10 transition-colors"
+             className="w-full py-2 bg-background border border-[#FF4D4D]/50 text-[#FF4D4D] font-semibold text-xs rounded hover:bg-[#FF4D4D]/10 transition-colors"
            >
              Halt Cleanup
            </button>

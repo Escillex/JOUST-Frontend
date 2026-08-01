@@ -6,6 +6,7 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 import { Tournament } from "../types";
 import ManagerLayout from "../../components/manage/ManagerLayout";
 import ManagerTournamentTable from "../../components/tournaments/manage/ManagerTournamentTable";
+import { SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
 
 export default function ManageTournaments() {
   const router = useRouter();
@@ -62,13 +63,10 @@ export default function ManageTournaments() {
 
   if (isAuthorized === false) return null;
 
-  if (loading || isAuthorized === null) {
-    return (
-      <div className="min-h-screen bg-[#1B1B1B] flex items-center justify-center font-sans">
-        <div className="text-white/50 text-sm">Loading Organizer Dashboard...</div>
-      </div>
-    );
-  }
+  // The dashboard chrome — heading, refresh, "Create New" — renders immediately
+  // and only the table region is skeletoned, so the page is navigable while the
+  // tournament list is still in flight instead of being hidden behind a spinner.
+  const isLoadingList = loading || isAuthorized === null;
 
   return (
     <ManagerLayout breadcrumbs={[{ label: "TOURNAMENTS" }]}>
@@ -88,7 +86,7 @@ export default function ManageTournaments() {
                 await refresh();
                 setLoading(false);
               }}
-              className="px-4 py-2.5 bg-[#1B1B1B] border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors flex items-center justify-center group"
+              className="px-4 py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors flex items-center justify-center group"
               title="Refresh Data"
             >
               <svg className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,7 +96,7 @@ export default function ManageTournaments() {
 
             <Link 
               href="/tournaments/create"
-              className="flex-1 md:flex-none px-6 py-2.5 bg-[#52B946] text-black font-semibold text-xs rounded hover:brightness-90 transition-colors text-center flex items-center justify-center whitespace-nowrap"
+              className="flex-1 md:flex-none px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors text-center flex items-center justify-center whitespace-nowrap"
             >
               Create New +
             </Link>
@@ -106,16 +104,23 @@ export default function ManageTournaments() {
         </div>
 
         {message && (
-          <div className="p-3 bg-[#52B946]/10 border border-[#52B946]/20 rounded text-[#52B946] text-sm font-semibold">
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded text-primary text-sm font-semibold">
             {message}
           </div>
         )}
 
-        <ManagerTournamentTable
-          tournaments={tournaments}
-          onComplete={handleComplete}
-          completingId={completingId}
-        />
+        {isLoadingList ? (
+          <>
+            <SkeletonStatus label="Loading tournaments" />
+            <SkeletonPanel rows={6} />
+          </>
+        ) : (
+          <ManagerTournamentTable
+            tournaments={tournaments}
+            onComplete={handleComplete}
+            completingId={completingId}
+          />
+        )}
       </div>
     </ManagerLayout>
   );

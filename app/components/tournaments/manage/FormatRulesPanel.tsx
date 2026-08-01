@@ -1,7 +1,9 @@
+"use client";
 import { useState } from "react";
-import { Tournament, FormatConfig, TournamentTemplate } from "../../../tournaments/types";
+import { Tournament, FormatConfig, TournamentTemplate, ConfigField } from "../../../tournaments/types";
+import { getTrackerSettings } from "../../../utils/formatConfig";
 
-const inputCls = "w-full h-10 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded";
+const inputCls = "w-full h-10 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded";
 
 interface Props {
   tournament: Tournament;
@@ -14,19 +16,34 @@ interface Props {
   onSave: () => void;
 }
 
-function isBooleanField(field: any) {
-  return field.key === "allowDraw" || typeof field.defaultValue === "boolean";
+// The API now states each field's `type` outright. The key-name checks are kept
+// as a fallback so the panel still works against an older server that serves
+// the catalog without it.
+function isBooleanField(field: ConfigField) {
+  return (
+    field.type === "boolean" ||
+    field.key === "allowDraw" ||
+    typeof field.defaultValue === "boolean"
+  );
 }
 
-function isArrayField(field: any) {
-  return field.key === "tieBreakerOrder";
+function isArrayField(field: ConfigField) {
+  return field.type === "array" || field.key === "tieBreakerOrder";
 }
 
-function isStringField(field: any) {
-  return isArrayField(field) || field.key === "progressionType";
+function isSelectField(field: ConfigField) {
+  return field.type === "select" && Array.isArray(field.options);
 }
 
-function getDisplayValue(field: any, formatConfig: FormatConfig) {
+function isStringField(field: ConfigField) {
+  return (
+    isArrayField(field) ||
+    field.type === "string" ||
+    field.key === "progressionType"
+  );
+}
+
+function getDisplayValue(field: ConfigField, formatConfig: FormatConfig) {
   const rawValue = (formatConfig as any)[field.key];
   if (isBooleanField(field)) {
     return rawValue === true ? "Yes" : rawValue === false ? "No" : field.defaultValue === true ? "Yes" : "No";
@@ -47,10 +64,12 @@ export default function FormatRulesPanel({
   onRuleChange, 
   onSave
 }: Props) {
-  const fields = formatDefinitions.find((f) => f.id === tournament.formatId)?.configFields ?? [];
+  const fields: ConfigField[] =
+    formatDefinitions.find((f) => f.id === tournament.formatId)?.configFields ?? [];
   const hasFormat = !!tournament.formatId;
+  const tracker = getTrackerSettings(formatConfig);
 
-  const handleChange = (field: any, rawValue: string | boolean) => {
+  const handleChange = (field: ConfigField, rawValue: string | boolean) => {
     if (isBooleanField(field)) {
       onRuleChange(field.key, Boolean(rawValue));
       return;
@@ -86,7 +105,7 @@ export default function FormatRulesPanel({
         <div className="flex items-center gap-4">
           <h3 className="text-sm font-semibold text-white">Match & Scoring Rules</h3>
           {!isEditing && (
-            <button onClick={onToggleEdit} className="text-[#52B946] hover:text-white transition-colors p-1.5 bg-[#52B946]/10 rounded">
+            <button onClick={onToggleEdit} className="text-primary hover:text-white transition-colors p-1.5 bg-primary/10 rounded">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
@@ -107,7 +126,7 @@ export default function FormatRulesPanel({
       ) : isEditing ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {fields.map((field: any) => {
+            {fields.map((field) => {
               const rawValue = (formatConfig as any)[field.key];
               const value = isArrayField(field)
                 ? Array.isArray(rawValue)
@@ -125,8 +144,8 @@ export default function FormatRulesPanel({
                         onClick={() => handleChange(field, false)}
                         className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
                           !rawValue
-                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
-                            : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-background border-white/20 text-[#888888] hover:text-white"
                         }`}
                       >
                         Force Win
@@ -136,8 +155,8 @@ export default function FormatRulesPanel({
                         onClick={() => handleChange(field, true)}
                         className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
                           rawValue
-                            ? "bg-[#52B946]/10 border-[#52B946] text-[#52B946]"
-                            : "bg-[#1B1B1B] border-white/20 text-[#888888] hover:text-white"
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-background border-white/20 text-[#888888] hover:text-white"
                         }`}
                       >
                         Permit Draws
@@ -145,7 +164,7 @@ export default function FormatRulesPanel({
                     </div>
                   ) : isBooleanField(field) ? (
                     <label className="flex items-center gap-3 cursor-pointer group py-2">
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${Boolean(rawValue) ? "bg-[#52B946] border-[#52B946]" : "border-white/20 group-hover:border-[#52B946]"}`}>
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${Boolean(rawValue) ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary"}`}>
                         {Boolean(rawValue) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                       </div>
                       <input
@@ -156,14 +175,31 @@ export default function FormatRulesPanel({
                       />
                       <span className="text-sm text-[#E0E0E0]">{Boolean(rawValue) ? "Enabled" : "Disabled"}</span>
                     </label>
+                  ) : isSelectField(field) ? (
+                    <select
+                      value={String(rawValue ?? field.defaultValue ?? "")}
+                      onChange={(e) => handleChange(field, e.target.value)}
+                      className={inputCls}
+                    >
+                      {field.options!.map((opt) => (
+                        <option key={opt} value={opt} className="bg-background">
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
                     <input
                       type={isStringField(field) ? "text" : "number"}
                       value={value}
                       onChange={(e) => handleChange(field, e.target.value)}
-                      placeholder={field.defaultValue !== null ? String(field.defaultValue) : field.placeholder}
+                      placeholder={field.defaultValue !== null && field.defaultValue !== undefined ? String(field.defaultValue) : field.placeholder}
+                      min={field.min}
+                      max={field.max}
                       className={inputCls}
                     />
+                  )}
+                  {field.help && (
+                    <p className="text-[11px] text-[#888888] leading-relaxed">{field.help}</p>
                   )}
                 </div>
               );
@@ -180,7 +216,7 @@ export default function FormatRulesPanel({
                   const checked = e.target.checked;
                   onRuleChange('startingHp', checked ? 100 : 0);
                 }} 
-                className="w-4 h-4 cursor-pointer accent-[#52B946]" 
+                className="w-4 h-4 cursor-pointer accent-primary" 
               />
               <label htmlFor="enableHpSystem" className="text-sm text-white cursor-pointer select-none">HP-Based Match System</label>
             </div>
@@ -199,7 +235,7 @@ export default function FormatRulesPanel({
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-white/10">
-            <button onClick={onSave} className="flex-1 h-10 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors">
+            <button onClick={onSave} className="flex-1 h-10 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors">
               Save Rules
             </button>
           </div>
@@ -218,17 +254,23 @@ export default function FormatRulesPanel({
             <p className="col-span-full text-sm text-[#888888] italic">No specific config for this format</p>
           )}
           <div className="col-span-full border-t border-white/10 pt-4 grid grid-cols-2 gap-y-4 gap-x-4">
+            {/* Derived, not read off the config: these three are outputs of the
+                backend's resolveConfig and are never stored, so reading them
+                directly always produced undefined and the fallbacks below
+                reported the opposite of the truth (plan 9.7). */}
             <div className="space-y-1">
               <p className="text-xs font-semibold text-[#888888]">Tracking Mode</p>
-              <p className="text-sm text-white">
-                {(formatConfig as any).trackingMode ?? 'POINTS'}
-              </p>
+              <p className="text-sm text-white">{tracker.trackingMode}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-[#888888]">Starting Value</p>
               <p className="text-sm text-white">
-                {(formatConfig as any).defaultStartingValue ?? `Auto (${formatConfig?.bestOf ?? 1} wins)`}
+                {tracker.defaultStartingValue ?? `Auto (${formatConfig?.bestOf ?? 1} wins)`}
               </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-[#888888]">Live Tracker</p>
+              <p className="text-sm text-white">{tracker.useTracker ? 'Enabled' : 'Disabled'}</p>
             </div>
           </div>
         </div>

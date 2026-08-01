@@ -14,11 +14,14 @@ export default function InitialAppLoader({ children }: { children: React.ReactNo
       return;
     }
 
-    // List of critical assets to preload for the Hero section
+    // Critical assets to preload for the Hero section. hero-bg-1.jpg and
+    // hero-bg-2.jpg were listed here but have never existed in public/, so the
+    // loader spent every cold start waiting on two 404s before releasing the
+    // page. Only real assets are listed now; uploaded hero images are fetched
+    // by the Hero component itself.
     const assets = [
       "/hpluslogo.png",
-      "/hero-bg-1.jpg",
-      "/hero-bg-2.jpg",
+      "/placeholder.png",
       "/shp.png",
       "/laz.png"
     ];

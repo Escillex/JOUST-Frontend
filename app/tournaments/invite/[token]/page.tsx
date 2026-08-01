@@ -18,6 +18,7 @@ import {
 import { useUser } from "../../../components/UserProvider";
 import { useToast } from "../../../components/ui/Toast";
 import { Tournament } from "../../types";
+import { Skeleton, SkeletonStatus } from "../../../components/ui/Skeleton";
 
 export default function InvitePage() {
   const params = useParams();
@@ -117,10 +118,22 @@ export default function InvitePage() {
     }
   };
 
+  // An invite link is often the first thing a player opens, frequently on venue
+  // Wi-Fi, so it shows the shape of the invitation card immediately rather than
+  // a line of text that gives no sign the page is working.
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-black">
-        <p className="text-sm text-[#888888]">Loading invitation...</p>
+      <div className="min-h-[60vh] flex items-center justify-center bg-black px-4">
+        <div className="max-w-md w-full border border-white/20 rounded p-8 space-y-5">
+          <SkeletonStatus label="Loading invitation" />
+          <Skeleton className="h-6 w-3/4" />
+          <div className="space-y-3">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          <Skeleton className="h-10 w-full" />
+        </div>
       </div>
     );
   }
@@ -138,7 +151,7 @@ export default function InvitePage() {
           </p>
           <Link
             href="/"
-            className="inline-block px-6 py-2.5 bg-[#52B946] text-black font-semibold text-xs rounded hover:brightness-90 transition-colors"
+            className="inline-block px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors"
           >
             Go to Home
           </Link>
@@ -186,7 +199,7 @@ export default function InvitePage() {
     <div className="min-h-[80vh] bg-black px-4 py-10 flex justify-center">
       <div className="max-w-lg w-full space-y-6">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-[#52B946]">
+          <p className="text-xs font-semibold text-primary">
             Tournament Invitation
           </p>
           <h1 className="text-2xl font-semibold text-white">
@@ -218,7 +231,7 @@ export default function InvitePage() {
               </p>
               <Link
                 href={`/tournaments/${tournament.id}`}
-                className="inline-block px-6 py-2.5 bg-[#1B1B1B] border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors"
+                className="inline-block px-6 py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors"
               >
                 View Tournament
               </Link>
@@ -235,7 +248,7 @@ export default function InvitePage() {
                 </p>
                 <Link
                   href={`/tournaments/${tournament.id}`}
-                  className="inline-block px-6 py-2.5 bg-[#52B946] text-black font-semibold text-xs rounded hover:brightness-90 transition-colors"
+                  className="inline-block px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors"
                 >
                   View Tournament
                 </Link>
@@ -244,7 +257,7 @@ export default function InvitePage() {
               <button
                 onClick={handleJoin}
                 disabled={joining}
-                className="w-full h-11 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
+                className="w-full h-11 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
               >
                 {joining ? "Joining..." : `Join as ${user.username || "yourself"}`}
               </button>
@@ -263,12 +276,12 @@ export default function InvitePage() {
                     onChange={e => setGuestName(e.target.value)}
                     maxLength={40}
                     placeholder="Your display name (3-40 characters)"
-                    className="w-full h-11 bg-[#1B1B1B] border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-[#52B946] transition-colors rounded"
+                    className="w-full h-11 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded"
                   />
                   <button
                     onClick={handleGuestJoin}
                     disabled={joining}
-                    className="w-full h-11 bg-[#52B946] text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
+                    className="w-full h-11 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
                   >
                     {joining ? "Registering..." : "Enter as Guest"}
                   </button>
@@ -283,7 +296,7 @@ export default function InvitePage() {
                 )}
                 <Link
                   href="/auth"
-                  className="text-xs font-semibold text-[#52B946] hover:brightness-90 transition-colors"
+                  className="text-xs font-semibold text-primary hover:brightness-90 transition-colors"
                 >
                   Sign in to join with your account
                 </Link>

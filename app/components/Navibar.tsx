@@ -111,7 +111,7 @@ export default function Navibar() {
         <div className="flex items-center gap-6 min-w-[80px] justify-end">
           {loading ? (
             /* Stable greeble-style loading placeholder to prevent layout shifts */
-            <div className="w-10 h-10 border-2 border-white/10 bg-[#1B1B1B] animate-pulse" />
+            <div className="w-10 h-10 border-2 border-white/10 bg-background animate-pulse" />
           ) : user ? (
             <>
             <NotificationBell />

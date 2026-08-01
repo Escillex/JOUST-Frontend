@@ -86,7 +86,7 @@ export default function CropModal({
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="w-full max-w-4xl bg-[#1B1B1B] border-2 border-white/10 shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-4xl bg-background border-2 border-white/10 shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/50">

@@ -1,4 +1,5 @@
 "use client";
+import { LeaderboardStats, UserProfile } from "../../tournaments/types";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -9,27 +10,9 @@ import FadeIn, { StaggerContainer } from "../../components/FadeIn";
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import StatsGrid from "../../components/profile/StatsGrid";
 import MatchHistory from "../../components/profile/MatchHistory";
+import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
 
-interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  roles?: string[];
-  isGuest?: boolean;
-  avatarUrl?: string | null;
-  createdAt?: string;
-}
 
-interface LeaderboardStats {
-  points: number;
-  tournamentsPlayed: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  matchWinPct: number;
-  omw: number;
-  oomw: number;
-}
 
 function ProfileContent() {
   const router = useRouter();
@@ -100,8 +83,6 @@ function ProfileContent() {
               losses: basic?.losses ?? 0,
               draws: 0,
               matchWinPct: basic?.winRate ?? 0,
-              omw: 0,
-              oomw: 0,
             });
             // This endpoint does not include the username, so show a
             // neutral label instead of failing the whole page.
@@ -121,15 +102,28 @@ function ProfileContent() {
     fetchProfileData();
   }, [profileId, router]);
 
+  // Placeholders shaped like the profile itself — header block, then the two
+  // column panels — rather than a centred spinner, so the layout the user is
+  // about to see is already on screen while the request is in flight.
   if (loading && !user) {
     return (
-      <div className="min-h-screen w-full bg-background flex flex-col items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          {/* Reworded from "LOADING_PROFILE..." style codes to plain
-              language (project language rule). */}
-          <p className="text-primary font-black uppercase tracking-widest text-sm font-poppins">Loading profile...</p>
-        </div>
+      <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
+        <HomeFrame className="pt-32 pb-20" showPattern={false}>
+          <div className="w-full max-w-7xl mx-auto px-6 md:px-8 space-y-10">
+            <SkeletonStatus label="Loading profile" />
+            <div className="flex items-center gap-6">
+              <Skeleton className="w-24 h-24 rounded-full" />
+              <div className="space-y-3 flex-1">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <SkeletonPanel rows={5} />
+              <SkeletonPanel rows={5} />
+            </div>
+          </div>
+        </HomeFrame>
       </div>
     );
   }

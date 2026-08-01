@@ -1,19 +1,15 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Tournament } from '../../../tournaments/types';
-import { MatchGameLog } from '../../../tournaments/types';
-import { Round } from '../../../tournaments/[id]/bracket/types';
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from '../../../utils/api';
-import { usePolling } from '../../../utils/usePolling';
-import { useTournamentSocket, TrackerUpdatePayload } from '../../../utils/useTournamentSocket';
 import { getTournamentConfig } from '../../../utils/formatConfig';
+import { useLiveTournamentData } from './useLiveTournamentData';
 import LiveMatchGrid from '../../../components/tournaments/live/LiveMatchGrid';
 import TVOverlay from '../../../components/tournaments/live/TVOverlay';
 import Link from 'next/link';
 import ConnectionPill from '../../../components/ui/ConnectionPill';
-
-const POLL_INTERVAL = 4000;
+import LastUpdated from '../../../components/ui/LastUpdated';
+import { Skeleton, SkeletonStatus } from '../../../components/ui/Skeleton';
 
 function getWinsNeeded(tournament: Tournament): number {
   const config = getTournamentConfig(tournament);
@@ -29,90 +25,10 @@ export default function LivePage() {
   const tvMode = searchParams.get('tv') === 'true';
   const focusMatchId = searchParams.get('matchId');
 
-  const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [logs, setLogs] = useState<Record<string, MatchGameLog[]>>({});
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const fetchAll = useCallback(async () => {
-    try {
-      // 1. Fetch tournament
-      // This page used its own copy of the base-URL logic. It now uses
-      // the shared authenticatedFetch, which builds the URL the same way
-      // for the whole app (these endpoints also work while signed out).
-      const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId));
-      if (!tRes.ok) return;
-      const t: Tournament = await tRes.json();
-      setTournament(t);
-
-      // 2. Fetch rounds
-      const rRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.ROUNDS(tournamentId));
-      const roundData: Round[] = rRes.ok ? await rRes.json() : [];
-      setRounds(roundData);
-
-      // 3. For each ongoing match, fetch tracker logs
-      const ongoingMatches = roundData
-        .flatMap(r => r.matches)
-        .filter(m => m.status === 'ONGOING' && !m.isBye);
-
-      const logEntries = await Promise.all(
-        ongoingMatches.map(async m => {
-          try {
-            const lRes = await authenticatedFetch(API_ENDPOINTS.MATCHES.TRACKER_GET(m.id));
-            const logData: MatchGameLog[] = lRes.ok ? await lRes.json() : [];
-            return [m.id, Array.isArray(logData) ? logData : []] as const;
-          } catch {
-            return [m.id, []] as const;
-          }
-        })
-      );
-
-      setLogs(Object.fromEntries(logEntries));
-      setLastUpdated(new Date());
-    } catch {
-      // silent — next poll will retry
-    } finally {
-      setLoading(false);
-    }
-  }, [tournamentId]);
-
-  // Live tracker values arrive over the socket. Patch just the affected game
-  // log in place so the HP/points bars move without refetching every match.
-  const applyTrackerUpdate = useCallback((p: TrackerUpdatePayload) => {
-    setLogs(prev => {
-      const existing = prev[p.matchId];
-      // If this match is not currently on screen, ignore it; the coarse
-      // tournament:updated signal (and the fallback poll) will pick it up.
-      if (!existing) return prev;
-      return {
-        ...prev,
-        [p.matchId]: existing.map(l =>
-          l.gameNumber === p.gameNumber
-            ? { ...l, player1Value: p.player1Value, player2Value: p.player2Value }
-            : l,
-        ),
-      };
-    });
-    setLastUpdated(new Date());
-  }, []);
-
-  // Real-time updates. onTournamentUpdate triggers a full refetch; tracker
-  // values are applied directly above.
-  const { connected } = useTournamentSocket(tournamentId, {
-    onTournamentUpdate: fetchAll,
-    onTrackerUpdate: applyTrackerUpdate,
-  });
-
-  // temporary polling block
-  // Polling is now a fallback behind the WebSocket connection: while the socket
-  // is connected it drops to a slow 60s safety-net tick, and it returns to the
-  // fast 4s rate the moment the socket disconnects — so a dropped socket
-  // degrades to the old polling behaviour instead of a stale screen. The hook
-  // also pauses while the tab is hidden, and the "enabled" flag stops polling
-  // once the tournament is COMPLETED.
-  usePolling(fetchAll, connected ? 60000 : POLL_INTERVAL, tournament?.status !== 'COMPLETED');
-  // end of temporary polling block
+  // Data, socket and polling fallback all live in one hook now (plan 6.6), so
+  // this file is only concerned with rendering. See useLiveTournamentData.
+  const { tournament, rounds, logs, loading, lastUpdated, connected } =
+    useLiveTournamentData(tournamentId);
 
   useEffect(() => {
     if (tournament?.name) {
@@ -128,14 +44,35 @@ export default function LivePage() {
     return () => { document.body.style.overflow = ''; };
   }, [tvMode]);
 
+  // Renders the real page header while the data loads so the "Bracket" back
+  // link stays reachable — on a slow connection a spinner here trapped the user
+  // on a screen with no way out but the browser's own back button. TV mode has
+  // no chrome to keep, so it stays a bare placeholder.
   if (loading) {
     return (
-      <div className={`min-h-screen bg-black flex items-center justify-center ${tvMode ? 'fixed inset-0 z-50' : ''}`}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary/60 animate-pulse">
-            Loading Live View
-          </span>
+      <div className={`min-h-screen bg-black text-white ${tvMode ? 'fixed inset-0 overflow-auto z-50' : ''}`}>
+        <SkeletonStatus label="Loading live view" />
+        {!tvMode && (
+          <div className="sticky top-0 z-10 bg-black/95 border-b border-white/5 px-6 py-4 flex items-center justify-between backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/tournaments/${tournamentId}/bracket`}
+                className="text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all"
+              >
+                ← Bracket
+              </Link>
+              <div className="w-px h-4 bg-white/10" />
+              <div>
+                <span className="text-[9px] font-black uppercase tracking-[0.4em] text-primary/70 block">Live View</span>
+                <Skeleton className="h-4 w-40 mt-1" />
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="px-6 py-8 space-y-4 max-w-5xl mx-auto">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
       </div>
     );
@@ -318,7 +255,7 @@ export default function LivePage() {
           ) : (
             <div className="w-full max-w-5xl py-12 border border-dashed border-white/10 flex flex-col items-center justify-center gap-2">
               <span className="text-xs font-black uppercase tracking-[0.4em] text-white/30 animate-pulse">
-                {matchLogs.length > 0 ? `GAME ${matchLogs.length + 1} — AWAITING START` : 'STANDBY MODE'}
+                {matchLogs.length > 0 ? `GAME ${matchLogs.length + 1} — AWAITING START` : 'NOT STARTED'}
               </span>
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/15">
                 The organizer has not started live tracking for this match yet
@@ -394,11 +331,7 @@ export default function LivePage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {lastUpdated && (
-              <span className="text-[8px] font-black uppercase tracking-widest text-white/20">
-                Updated {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
+            <LastUpdated lastUpdated={lastUpdated} />
             <Link
               href={`/tournaments/${tournamentId}/live?tv=true${focusMatchId ? `&matchId=${focusMatchId}` : ''}`}
               className="px-3 py-2 border border-white/10 hover:border-primary text-[9px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-primary transition-all"

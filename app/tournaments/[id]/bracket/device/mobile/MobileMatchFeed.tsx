@@ -1,4 +1,5 @@
 "use client";
+import { isWinnersRound, isLosersRound, isGrandFinal, losersRoundIndex } from "../../roundNumbers";
 
 import React, { useState, useMemo } from "react";
 import { Match, Round, LeaderboardEntry } from "../../types";
@@ -39,7 +40,7 @@ export default function MobileMatchFeed({
         const num = round.roundNumber;
         const fs = tournament?.format?.system;
         if (num >= 200) return "Grand Finals";
-        if (num >= 101) return `Round ${num - 100}`;
+        if (isLosersRound(num)) return `Round ${losersRoundIndex(num)}`;
         if (fs === "DOUBLE_ELIMINATION") return `Round ${num}`;
         return `Round ${num}`;
     };
@@ -49,8 +50,8 @@ export default function MobileMatchFeed({
 
     const displayedRounds = useMemo(() => {
         if (!isDoubleElim) return sortedRounds;
-        if (bracketView === "WINNERS") return sortedRounds.filter(r => r.roundNumber < 101 || r.roundNumber >= 200);
-        return sortedRounds.filter(r => r.roundNumber >= 101 && r.roundNumber < 200);
+        if (bracketView === "WINNERS") return sortedRounds.filter(r => isWinnersRound(r.roundNumber) || isGrandFinal(r.roundNumber));
+        return sortedRounds.filter(r => isLosersRound(r.roundNumber));
     }, [sortedRounds, isDoubleElim, bracketView]);
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -87,8 +88,8 @@ export default function MobileMatchFeed({
                 }
                 if (searchQuery.trim() && isAdmin) {
                     const query = searchQuery.toLowerCase().trim();
-                    const p1Name = (match.player1?.username || match.player1?.guestName || match.winnerName || "").toLowerCase();
-                    const p2Name = (match.player2?.username || match.player2?.guestName || match.winnerName || "").toLowerCase();
+                    const p1Name = (match.player1?.username || match.p1Name || "").toLowerCase();
+                    const p2Name = (match.player2?.username || match.p2Name || "").toLowerCase();
                     if (!p1Name.includes(query) && !p2Name.includes(query)) return false;
                 }
                 return true;
@@ -99,14 +100,14 @@ export default function MobileMatchFeed({
         setActivePhase(idx);
         const round = sortedRounds[idx];
         if (round) {
-            addLog("ROUND_SHIFT", `NAVIGATED TO ${getRoundLabel(round).toUpperCase()}`);
+            addLog("ROUND CHANGED", `NAVIGATED TO ${getRoundLabel(round).toUpperCase()}`);
         }
         // Clear search when changing phases to avoid confusion
         setSearchQuery("");
     };
 
     const getChampionDisplay = () => {
-        if (tournament?.winner) return tournament.winner.username || tournament.winner.guestName;
+        if (tournament?.winner) return tournament.winner.username;
         if (tournament?.winnerName) return tournament.winnerName;
 
         // Fallback to searching rounds if status is completed
@@ -114,7 +115,7 @@ export default function MobileMatchFeed({
             const allMatches = sortedRounds.flatMap(r => r.matches);
             const finalMatch = allMatches.find(m => !m.nextMatchId && m.status === 'COMPLETED');
             if (finalMatch) {
-                return finalMatch.winner?.username || finalMatch.winner?.guestName || finalMatch.winnerName || "Unknown Champion";
+                return finalMatch.winner?.username || finalMatch.winnerName || "Unknown Champion";
             }
         }
 
@@ -157,7 +158,7 @@ export default function MobileMatchFeed({
                         <button
                             onClick={() => {
                                 setBracketView("WINNERS");
-                                const first = sortedRounds.find(r => r.roundNumber < 101 || r.roundNumber >= 200);
+                                const first = sortedRounds.find(r => isWinnersRound(r.roundNumber) || isGrandFinal(r.roundNumber));
                                 if (first && bracketView !== "WINNERS") setActivePhase(sortedRounds.indexOf(first));
                             }}
                             className={`flex-1 px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bracketView === 'WINNERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
@@ -167,7 +168,7 @@ export default function MobileMatchFeed({
                         <button
                             onClick={() => {
                                 setBracketView("LOSERS");
-                                const first = sortedRounds.find(r => r.roundNumber >= 101 && r.roundNumber < 200);
+                                const first = sortedRounds.find(r => isLosersRound(r.roundNumber));
                                 if (first && bracketView !== "LOSERS") setActivePhase(sortedRounds.indexOf(first));
                             }}
                             className={`flex-1 px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bracketView === 'LOSERS' ? 'bg-white/20 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}

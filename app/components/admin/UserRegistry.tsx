@@ -1,3 +1,4 @@
+"use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -45,7 +46,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
   };
 
   return (
-    <div className="bg-[#1B1B1B] border border-white/5 rounded-lg shadow-2xl flex flex-col h-[700px] overflow-hidden">
+    <div className="bg-background border border-white/5 rounded-lg shadow-2xl flex flex-col h-[700px] overflow-hidden">
       {/* Header */}
       <div className="p-6 border-b border-white/10 bg-white/[0.02] space-y-6">
         <div className="flex justify-between items-center">
@@ -104,7 +105,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto custom-scrollbar bg-[#1B1B1B]">
+      <div className="flex-1 overflow-auto custom-scrollbar bg-background">
         <table className="w-full text-left border-collapse table-fixed">
           <thead className="sticky top-0 bg-[#0A0A0A] border-b border-white/10 z-20 shadow-xl">
             <tr>
@@ -113,7 +114,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                   type="checkbox" 
                   checked={selectedIds.size === filteredUsers.length && filteredUsers.length > 0}
                   onChange={toggleSelectAll}
-                  className="w-4 h-4 bg-[#1B1B1B] border-2 border-white/20 rounded cursor-pointer accent-primary"
+                  className="w-4 h-4 bg-background border-2 border-white/20 rounded cursor-pointer accent-primary"
                 />
               </th>
               <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">User Identity</th>
@@ -137,7 +138,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                       type="checkbox" 
                       checked={isSelected}
                       onChange={() => toggleSelect(uid)}
-                      className="w-4 h-4 bg-[#1B1B1B] border-2 border-white/20 rounded cursor-pointer accent-primary"
+                      className="w-4 h-4 bg-background border-2 border-white/20 rounded cursor-pointer accent-primary"
                     />
                   </td>
                   <td className="px-6 py-4">
