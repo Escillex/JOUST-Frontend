@@ -1,0 +1,10 @@
+# ── Frontend, PROD mode ──────────────────────────────────────────────────────
+# Built standalone image; the Dockerfile CMD runs the bundled server.js, which
+# honours PORT/HOSTNAME env (set in the image to 3000 / 0.0.0.0). No mounts.
+services:
+  new:
+    build:
+      context: ./new
+      dockerfile: deploy/Dockerfile.prod
+    expose:
+      - "3000"

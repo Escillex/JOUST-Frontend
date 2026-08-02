@@ -1,0 +1,18 @@
+# ── Frontend, DEV mode ───────────────────────────────────────────────────────
+# Mounted source + hot reload via the existing dev Dockerfile.
+services:
+  new:
+    build:
+      context: ./new
+      dockerfile: Dockerfile
+    command: npm run dev -- -H 0.0.0.0 -p 3000
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      # Named hosts trusted for HMR / Server Actions (LAN IP, tunnel host, …).
+      - EXTRA_DEV_ORIGINS=${EXTRA_DEV_ORIGINS:-}
+    volumes:
+      - ./new:/app
+      - /app/node_modules
+      - /app/.next
+    expose:
+      - "3000"

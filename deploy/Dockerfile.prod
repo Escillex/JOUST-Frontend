@@ -1,0 +1,30 @@
+# ── Frontend production image (multi-stage, Next standalone) ──────────────────
+# Build context is the frontend repo root (compose sets `context: ./new`).
+# next.config.ts already sets `output: 'standalone'`, so the build emits a
+# self-contained server bundle we copy into a minimal runtime.
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+# Next compiles rewrites() INTO the standalone build (they are NOT re-read at
+# runtime, unlike `next start`). So BACKEND_URL must be present at BUILD time or
+# the /api/backend/* rewrite bakes the localhost fallback and 500s in-container.
+# `server` is always the compose service name, so this is correct for every
+# docker deploy; the pm2 path uses `next start` and reads BACKEND_URL at runtime.
+ARG BACKEND_URL=http://server:4000
+ENV BACKEND_URL=$BACKEND_URL
+# NEXT_PUBLIC_* stay UNSET → bundle uses relative /api/backend + same-origin sockets.
+RUN npm run build
+
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+# Standalone output: a minimal server + traced node_modules, plus static assets.
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]

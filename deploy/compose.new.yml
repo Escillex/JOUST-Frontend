@@ -1,0 +1,18 @@
+# ── Frontend service (mode-agnostic bits) ────────────────────────────────────
+# Container always listens on 3000 internally; the host port (FRONTEND_PORT) is
+# mapped in compose.publish.yml. build/command differ by mode.
+services:
+  new:
+    environment:
+      # API proxy is container-to-container over the compose network.
+      - BACKEND_URL=http://server:4000
+      - HOST_IP=${HOST_IP:-localhost}
+      # Relative → Next rewrites /api/backend/* to BACKEND_URL server-side.
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api/backend}
+      # The browser is off the compose network and Next doesn't forward
+      # /socket.io/. With no proxy, setup.sh sets this to the published backend
+      # (http://HOST_IP:BACKEND_PORT); behind a proxy it's left empty = same-origin.
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-}
+    depends_on:
+      - server
+    restart: unless-stopped
