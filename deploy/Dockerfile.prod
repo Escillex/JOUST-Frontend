@@ -1,5 +1,5 @@
 # ── Frontend production image (multi-stage, Next standalone) ──────────────────
-# Build context is the frontend repo root (compose sets `context: ./new`).
+# Build context is the frontend repo root (compose sets `context: ${JOUST_FRONTEND_DIR}`).
 # next.config.ts already sets `output: 'standalone'`, so the build emits a
 # self-contained server bundle we copy into a minimal runtime.
 FROM node:22-alpine AS build

@@ -4,7 +4,9 @@
 services:
   new:
     build:
-      context: ./new
+      # Absolute var (set in .env by setup.sh) → folder-name-agnostic; dockerfile
+      # is resolved relative to this context, i.e. <repo>/deploy/Dockerfile.prod.
+      context: ${JOUST_FRONTEND_DIR:-./new}
       dockerfile: deploy/Dockerfile.prod
     expose:
       - "3000"

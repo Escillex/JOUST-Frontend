@@ -3,7 +3,9 @@
 services:
   new:
     build:
-      context: ./new
+      # Absolute var (set in .env by setup.sh) → folder-name-agnostic
+      # (JOUST-Frontend, new, …); the fragment lives inside the frontend repo.
+      context: ${JOUST_FRONTEND_DIR:-./new}
       dockerfile: Dockerfile
     command: npm run dev -- -H 0.0.0.0 -p 3000
     user: "${UID:-1000}:${GID:-1000}"
@@ -11,7 +13,7 @@ services:
       # Named hosts trusted for HMR / Server Actions (LAN IP, tunnel host, …).
       - EXTRA_DEV_ORIGINS=${EXTRA_DEV_ORIGINS:-}
     volumes:
-      - ./new:/app
+      - ${JOUST_FRONTEND_DIR:-./new}:/app
       - /app/node_modules
       - /app/.next
     expose:
