@@ -12,6 +12,7 @@ import UserModal from "../components/admin/UserModal";
 import ConvertGuestModal from "../components/admin/ConvertGuestModal";
 import DevPanel from "../components/admin/DevPanel";
 import PresetManager from "../components/admin/PresetManager";
+import GameManager from "../components/admin/GameManager";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../components/ui/Skeleton";
 
 
@@ -59,7 +60,8 @@ interface Stats {
 export default function AdminDashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "DEV_TOOLS" | "PRESETS">("DASHBOARD");
+  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "DEV_TOOLS" | "PRESETS" | "GAMES">("DASHBOARD");
+  const [pendingGameRequests, setPendingGameRequests] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, registeredUsers: 0, guestUsers: 0, totalTournaments: 0, activeTournaments: 0, completedTournaments: 0 });
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -94,6 +96,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setMounted(true);
+    // Deep-link ?tab=GAMES so a GAME_REQUESTED notification lands on the queue.
+    // Read from window rather than useSearchParams to avoid the Suspense-boundary
+    // build requirement in a fully-client page.
+    const t = new URLSearchParams(window.location.search).get("tab")?.toUpperCase();
+    if (t === "GAMES" || t === "PRESETS" || t === "DEV_TOOLS") setActiveTab(t);
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -103,6 +110,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (mounted) fetchData();
   }, [mounted, router, activeTab]);
+
+  // Badge the GAMES tab with the pending request count, independent of whether the
+  // tab is open. GameManager keeps it live via onPendingCountChange after resolves.
+  useEffect(() => {
+    if (!mounted) return;
+    authenticatedFetch(API_ENDPOINTS.GAMES.REQUESTS)
+      .then(safeJson)
+      .then((d) => { if (Array.isArray(d)) setPendingGameRequests(d.length); })
+      .catch(() => {});
+  }, [mounted]);
 
   const fetchData = async () => {
     const startTime = performance.now();
@@ -343,7 +360,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          {(["DASHBOARD", "PRESETS", "DEV_TOOLS"] as const).map((tab) => (
+          {(["DASHBOARD", "GAMES", "PRESETS", "DEV_TOOLS"] as const).map((tab) => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -354,6 +371,11 @@ export default function AdminDashboard() {
               }`}
             >
               {tab.replace("_", " ")}
+              {tab === "GAMES" && pendingGameRequests > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center text-[8px] font-black text-black bg-primary rounded-full px-1.5 py-0.5 align-middle">
+                  {pendingGameRequests}
+                </span>
+              )}
               {activeTab === tab && (
                 <div className="absolute -bottom-[2px] left-0 right-0 h-[4px] bg-[#111] z-30" />
               )}
@@ -502,8 +524,25 @@ export default function AdminDashboard() {
                 <PresetManager />
               </div>
             </motion.div>
+          ) : activeTab === "GAMES" ? (
+            <motion.div
+              key="games"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto w-full pb-12"
+            >
+              <div className="mb-12">
+                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "GAMES" }]} />
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Game Catalog</h1>
+                <p className="text-sm text-white/30 mt-4">The games organizers can attach to tournaments. Requests from organizers arrive as notifications.</p>
+              </div>
+              <div className="bg-background border border-white/10 p-10">
+                <GameManager onPendingCountChange={setPendingGameRequests} />
+              </div>
+            </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="dev"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

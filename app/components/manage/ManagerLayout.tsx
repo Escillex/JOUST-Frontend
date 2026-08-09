@@ -43,9 +43,11 @@ export default function ManagerLayout({ children, breadcrumbs }: ManagerLayoutPr
     checkAuth();
   }, [router]);
 
+  // "CREATE NEW" is intentionally not a nav item: every manager page already
+  // surfaces a prominent primary "Create New +" button, so a second entry here
+  // was a redundant, less-visible duplicate.
   const navLinks = [
     { label: "DASHBOARD", href: "/tournaments/manage" },
-    { label: "CREATE NEW", href: "/tournaments/create" },
   ];
 
   if (user?.roles?.includes("ADMIN")) {

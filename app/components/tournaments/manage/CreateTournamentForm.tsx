@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
-import { TournamentFormatModel, TournamentTemplate } from "../../../tournaments/types";
+import { TournamentFormatModel, TournamentTemplate, Game } from "../../../tournaments/types";
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
@@ -38,6 +38,16 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [formats, setFormats] = useState<TournamentFormatModel[]>([]);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [selectedFormatId, setSelectedFormatId] = useState("");
+
+  // GAME — chosen on the tournament, independent of the format. The format may
+  // pre-fill it, but the tournament's choice wins (todo.md §5). Defaults to the
+  // built-in "General" so every tournament always has a game.
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState("");
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requesting, setRequesting] = useState(false);
+  const [requestMsg, setRequestMsg] = useState<string | null>(null);
 
   // RULES
   const [bestOf, setBestOf] = useState(1);
@@ -76,7 +86,6 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   // FULL RULE ENGINE
   const [pointsThreshold, setPointsThreshold] = useState(0);
   const [startingHp, setStartingHp] = useState(0);
-  const [gameName, setGameName] = useState("");
 
   useEffect(() => {
     setVisitedSteps(prev => new Set(prev).add(activeStep));
@@ -108,11 +117,12 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
 
   useEffect(() => {
     const loadInitialData = async () => {
-      const [formatsRes, tournamentsRes] = await Promise.all([
+      const [formatsRes, tournamentsRes, gamesRes] = await Promise.all([
         authenticatedFetch(API_ENDPOINTS.PRESETS.BASE),
         authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE),
+        authenticatedFetch(API_ENDPOINTS.GAMES.BASE),
       ]);
- 
+
       if (formatsRes.ok) {
         const data = await safeJson(formatsRes);
         setFormats(data ?? []);
@@ -121,13 +131,23 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         const data = await safeJson(tournamentsRes);
         setExistingNames(data?.map((t: any) => t.name) ?? []);
       }
+      if (gamesRes.ok) {
+        const data: Game[] = (await safeJson(gamesRes)) ?? [];
+        setGames(data);
+        // Default the selection to "General" (isBuiltin) so a tournament always
+        // has a game even if the organizer never touches the field.
+        const general = data.find((g) => g.isBuiltin) ?? data[0];
+        if (general) setSelectedGameId((prev) => prev || general.id);
+      }
     };
     loadInitialData();
   }, []);
 
   const applyFormat = (fmt: TournamentFormatModel) => {
     setSelectedFormatId(fmt.id);
-    setGameName(fmt.gameName || "");
+    // The preset may carry a default game; pre-fill it. The organizer can still
+    // change the game — the tournament's choice is what gets saved (todo.md §5).
+    if (fmt.gameId) setSelectedGameId(fmt.gameId);
     const raw = (fmt.config ?? {}) as Record<string, any>;
     // HYBRID presets nest the scoring rules under phase1 (mirrors backend resolveConfig)
     const c = raw.phase1 ?? raw;
@@ -207,6 +227,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       name,
       description: description || undefined,
       formatId: selectedFormatId,
+      gameId: selectedGameId || undefined,
       maxPlayers: Number(maxPlayers),
       prizePool: prizePool === "" ? null : Number(prizePool),
       venue,
@@ -247,6 +268,34 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     }
   };
 
+  // Organizers cannot create games (admin-owned catalog); they request one. The
+  // tournament still runs under General meanwhile (todo.md §5).
+  const handleRequestGame = async () => {
+    const trimmed = requestName.trim();
+    if (!trimmed || requesting) return;
+    setRequesting(true);
+    setRequestMsg(null);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.GAMES.REQUEST, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        setRequestMsg(`Requested "${trimmed}". An admin will add it; this tournament can run under General until then.`);
+        setRequestName("");
+        setRequestOpen(false);
+      } else {
+        const data = await safeJson(res);
+        setRequestMsg(data?.message || "Could not send the request.");
+      }
+    } catch {
+      setRequestMsg("Connection failed. Try again.");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   const renderIdentity = () => (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -265,7 +314,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             <option value="" disabled className="bg-background">Select a format...</option>
             {formats.map(fmt => (
               <option key={fmt.id} value={fmt.id} className="bg-background">
-                {fmt.name} ({fmt.gameName || "General"})
+                {fmt.name}{fmt.game?.name ? ` · ${fmt.game.name}` : ""}
               </option>
             ))}
           </select>
@@ -286,7 +335,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             >
               <div className="flex flex-col">
                 <span className={`text-sm font-semibold ${selectedFormatId === fmt.id ? "text-primary" : "text-white"}`}>{fmt.name}</span>
-                <span className="text-xs text-[#888888] mt-1">{fmt.gameName || "General"}</span>
+                <span className="text-xs text-[#888888] mt-1">{fmt.game?.name ? `Default game: ${fmt.game.name}` : "Pick a game next"}</span>
               </div>
             </button>
           ))}
@@ -317,6 +366,55 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             </div>
             <Field label="Maximum Participants" required>
               <input type="number" value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))} className={inputCls} required />
+            </Field>
+          </div>
+          <div className="pt-2">
+            <Field label="Game">
+              <select
+                value={selectedGameId}
+                onChange={(e) => setSelectedGameId(e.target.value)}
+                className={inputCls}
+              >
+                {games.map((g) => (
+                  <option key={g.id} value={g.id} className="bg-background">
+                    {g.name}{g.isBuiltin ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => { setRequestOpen((o) => !o); setRequestMsg(null); }}
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  Can&apos;t find your game? Request it
+                </button>
+              </div>
+              {requestOpen && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={requestName}
+                    onChange={(e) => setRequestName(e.target.value)}
+                    placeholder="Game name to request"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRequestGame}
+                    disabled={requesting || !requestName.trim()}
+                    className="px-4 h-10 shrink-0 bg-primary text-black text-xs font-semibold rounded hover:brightness-90 transition-colors disabled:opacity-50"
+                  >
+                    {requesting ? "Sending..." : "Request"}
+                  </button>
+                </div>
+              )}
+              {requestMsg && (
+                <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">{requestMsg}</p>
+              )}
+              <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
+                Determines which game leaderboard results count toward. Defaults to General.
+              </p>
             </Field>
           </div>
           <div className="pt-2">

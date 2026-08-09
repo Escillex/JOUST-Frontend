@@ -50,6 +50,45 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
   // to move an ongoing tournament forward from this panel.
   const canEditDetails = tournament.status === "OPEN";
 
+  // Game reassignment. Unlike the OPEN-only detail edits, the backend allows the
+  // game to change at any status (PATCH /tournaments/:id/game) — an admin often
+  // reassigns after creating a just-requested game (todo.md §5).
+  const [gameOptions, setGameOptions] = useState<{ id: string; name: string }[]>([]);
+  const [reassigning, setReassigning] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassignValue, setReassignValue] = useState<string>(tournament.gameId || "");
+
+  useEffect(() => {
+    let active = true;
+    authenticatedFetch(API_ENDPOINTS.GAMES.BASE)
+      .then(safeJson)
+      .then((data) => { if (active && Array.isArray(data)) setGameOptions(data); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const handleReassignGame = async () => {
+    if (!reassignValue || reassignValue === tournament.gameId || reassigning) return;
+    setReassigning(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.REASSIGN_GAME(tournamentId), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId: reassignValue }),
+      });
+      if (res.ok) {
+        setMessage("Game reassigned");
+        setReassignOpen(false);
+        fetchData();
+      } else {
+        const data = await safeJson(res);
+        setMessage(data?.message || "Failed to reassign game");
+      }
+    } finally {
+      setReassigning(false);
+    }
+  };
+
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
@@ -240,7 +279,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             {[
               { label: "Name", value: tournament.name },
               { label: "Description", value: tournament.description || "N/A" },
-              { label: "Game", value: (typeof tournament.format === 'object' ? tournament.format?.gameName : null) || "GENERAL" },
+              { label: "Game", value: tournament.game?.name || "General" },
               { label: "Format", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
               { label: "System", value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
               { label: "Capacity", value: `${tournament.participants.length} / ${tournament.maxPlayers}` },
@@ -251,6 +290,49 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
                 <p className={`text-sm ${highlight ? "text-primary" : "text-white"}`}>{value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Reassign game — available at any status */}
+          <div className="border-t border-white/10 pt-4">
+            {!reassignOpen ? (
+              <button
+                type="button"
+                onClick={() => { setReassignValue(tournament.gameId || ""); setReassignOpen(true); }}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Change game
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[#888888] block">Reassign Game</label>
+                <div className="flex gap-2">
+                  <select
+                    value={reassignValue}
+                    onChange={(e) => setReassignValue(e.target.value)}
+                    className={inputCls}
+                  >
+                    {gameOptions.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleReassignGame}
+                    disabled={reassigning || !reassignValue || reassignValue === tournament.gameId}
+                    className="px-4 h-10 shrink-0 bg-primary text-black text-xs font-semibold rounded hover:brightness-90 transition-colors disabled:opacity-50"
+                  >
+                    {reassigning ? "Saving..." : "Apply"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReassignOpen(false)}
+                    className="px-4 h-10 shrink-0 bg-background border border-white/20 text-white text-xs font-semibold rounded hover:bg-white/10 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Placement Points Table */}

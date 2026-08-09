@@ -270,6 +270,7 @@ export const API_ENDPOINTS = {
     GET_ONE_SUMMARY: (id: string) => `/tournaments/${id}?view=summary`,
     ROUNDS: (id: string) => `/tournaments/${id}/rounds`,
     UPDATE_STATUS: (id: string) => `/tournaments/${id}/status`,
+    REASSIGN_GAME: (id: string) => `/tournaments/${id}/game`,
     INVITE: (token: string) => `/tournaments/invite/${token}`,
     CANCEL_CLEANUP: (id: string) => `/tournaments/${id}/cancel-cleanup`,
     RESOLVE_TIE: (id: string) => `/tournaments/${id}/resolve-tie`,
@@ -284,6 +285,17 @@ export const API_ENDPOINTS = {
     BASE: '/tournament-formats',
     DETAILS: (id: string) => `/tournament-formats/${id}`,
     DELETE: (id: string) => `/tournament-formats/${id}`,
+  },
+  // The admin-managed game catalog. BASE is a public GET; POST/PATCH/DELETE are
+  // admin-only; REQUEST lets an organizer ask admins for a missing game (todo.md §5).
+  GAMES: {
+    BASE: '/games',
+    DETAILS: (id: string) => `/games/${id}`,
+    DELETE: (id: string) => `/games/${id}`,
+    REQUEST: '/games/request',
+    // Admin queue of organizer game requests, and resolve/dismiss.
+    REQUESTS: '/games/requests',
+    RESOLVE_REQUEST: (id: string) => `/games/requests/${id}`,
   },
   MATCHES: {
     // Draws are reported through SUBMIT with no winnerId. The server also

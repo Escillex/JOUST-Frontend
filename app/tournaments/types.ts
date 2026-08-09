@@ -36,11 +36,42 @@ export interface MatchGameLog {
 }
 export type TournamentStatus = "UPCOMING" | "PENDING" | "OPEN" | "ONGOING" | "COMPLETED";
 
+/** A game in the admin-managed catalog — the thing being played, distinct from the
+ *  bracket STRUCTURE and from a FORMAT preset. Every tournament has one; the
+ *  built-in "General" is the floor (todo.md §5 / server Game model). */
+export interface Game {
+  id: string;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  iconUrl?: string | null;
+  trackingMode?: "HP" | "POINTS";
+  isBuiltin: boolean;
+  /** Present on list/get responses. */
+  _count?: { tournaments: number };
+}
+
+/** An organizer's queued request for a game not yet in the catalog (todo.md §5). */
+export interface GameRequest {
+  id: string;
+  name: string;
+  note?: string | null;
+  status: "PENDING" | "RESOLVED" | "DISMISSED";
+  tournamentId?: string | null;
+  tournament?: { id: string; name: string; game?: { name: string } | null } | null;
+  requestedBy?: { id: string; username: string | null } | null;
+  createdAt: string;
+}
+
 export interface TournamentFormatModel {
   id: string;
   name: string;
   description?: string | null;
+  /** DEPRECATED free-text label; superseded by the `game` relation. */
   gameName?: string | null;
+  /** Optional default game this preset pre-fills at tournament creation. */
+  gameId?: string | null;
+  game?: Pick<Game, "id" | "name" | "iconUrl"> | null;
   system: TournamentFormat;
   config: any;
   isBuiltin: boolean;
@@ -73,6 +104,10 @@ export interface Tournament {
   };
   formatId: string;
   format: string | TournamentFormatModel;
+  /** The game being played. Every tournament has one (the "General" floor); it is
+   *  chosen at creation independent of the format (todo.md §5). */
+  gameId?: string | null;
+  game?: Pick<Game, "id" | "name" | "iconUrl"> | null;
   /** Per-tournament rules override; when set, fully replaces the format preset's config */
   config?: FormatConfig | null;
   participants: {
