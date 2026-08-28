@@ -30,7 +30,6 @@ export default function InvitePage() {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [guestName, setGuestName] = useState("");
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
@@ -81,37 +80,6 @@ export default function InvitePage() {
         router.push(`/tournaments/${tournament.id}/lobby`);
       } else {
         toast(data?.message || "Could not join the tournament", "error");
-      }
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const handleGuestJoin = async () => {
-    if (!tournament || joining) return;
-    const name = guestName.trim();
-    if (name.length < 3) {
-      toast("Guest name must be at least 3 characters", "error");
-      return;
-    }
-    setJoining(true);
-    try {
-      const res = await authenticatedFetch(
-        API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournament.id),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: name }),
-        },
-      );
-      const data = await safeJson(res);
-      if (res.ok) {
-        toast(`Welcome, ${name}. You are registered.`, "success");
-        // Guests have no account pages, so the bracket view is the most
-        // useful place to send them after entering.
-        router.push(`/tournaments/${tournament.id}/bracket`);
-      } else {
-        toast(data?.message || "Could not register as guest", "error");
       }
     } finally {
       setJoining(false);
@@ -263,44 +231,20 @@ export default function InvitePage() {
               </button>
             )
           ) : (
-            <div className="space-y-4">
-              {/* Private tournaments only accept registered accounts, so
-                  the guest form is hidden for them. */}
-              {!tournament.isPrivate && (
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-[#888888] block">
-                    Enter as Guest
-                  </label>
-                  <input
-                    value={guestName}
-                    onChange={e => setGuestName(e.target.value)}
-                    maxLength={40}
-                    placeholder="Your display name (3-40 characters)"
-                    className="w-full h-11 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded"
-                  />
-                  <button
-                    onClick={handleGuestJoin}
-                    disabled={joining}
-                    className="w-full h-11 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
-                  >
-                    {joining ? "Registering..." : "Enter as Guest"}
-                  </button>
-                </div>
-              )}
-              <div className="text-center">
-                {tournament.isPrivate && (
-                  <p className="text-sm text-white mb-2">
-                    This is a private tournament. An account is required to
-                    join.
-                  </p>
-                )}
-                <Link
-                  href="/auth"
-                  className="text-xs font-semibold text-primary hover:brightness-90 transition-colors"
-                >
-                  Sign in to join with your account
-                </Link>
-              </div>
+            // F7: online self-registration is for account holders only. Guests are
+            // registered on-site by the organizer, so a logged-out visitor is asked
+            // to sign in or create an account rather than entering as a guest.
+            <div className="space-y-3 text-center">
+              <p className="text-sm text-white">
+                An account is required to join. Guests are registered on-site by
+                the organizer.
+              </p>
+              <Link
+                href="/auth"
+                className="inline-block px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors"
+              >
+                Sign in or create an account
+              </Link>
             </div>
           )}
         </div>

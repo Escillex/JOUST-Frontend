@@ -11,6 +11,7 @@ import { Skeleton, SkeletonStatus } from '../../../components/ui/Skeleton';
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { Match, LeaderboardEntry, LogEntry } from "./types";
 import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, usesPointsStandings } from "../../../utils/formatConfig";
+import OddFieldStartModal, { shouldWarnOddField } from "../../../components/tournaments/OddFieldStartModal";
 import DesktopView from "./device/DesktopView";
 import MobileView from "./device/MobileView";
 import ScoringDrawer from "../../../components/tournaments/bracket/ScoringDrawer";
@@ -70,6 +71,7 @@ function BracketViewContent() {
   const [guestUsername, setGuestUsername]     = useState("");
   const [selectedUserId, setSelectedUserId]   = useState("");
   const [isStarting, setIsStarting]           = useState(false);
+  const [oddWarning, setOddWarning]           = useState<{ count: number; byeResult: string } | null>(null);
   const [isRegistering, setIsRegistering]     = useState(false);
   const [scoringMatch, setScoringMatch]       = useState<Match | null>(null);
   const [maximizedPanel, setMaximizedPanel]   = useState<"ACTIVITY" | "STANDINGS" | null>(null);
@@ -265,9 +267,10 @@ function BracketViewContent() {
     finally { if (!silent) setLoading(false); }
   };
 
-  const handleStartTournament = async () => {
+  const doStartTournament = async () => {
     if (isStarting) return;
     setIsStarting(true);
+    setOddWarning(null);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
       const data = await safeJson(res);
@@ -276,6 +279,20 @@ function BracketViewContent() {
     } finally {
       setIsStarting(false);
     }
+  };
+
+  // Same odd-field bye warning the manage page shows — an odd Swiss/round-robin
+  // field forces a bye every round. Shared modal/logic so the two start buttons
+  // cannot drift apart.
+  const handleStartTournament = () => {
+    if (isStarting) return;
+    const count = tournament?.participants?.length ?? 0;
+    if (shouldWarnOddField(getTournamentSystem(tournament), count)) {
+      const byeResult = String((getTournamentConfig(tournament) as any)?.byeResult ?? "WIN");
+      setOddWarning({ count, byeResult });
+      return;
+    }
+    void doStartTournament();
   };
 
   const handleJoin = async (userId: string) => {
@@ -664,8 +681,18 @@ function BracketViewContent() {
         )}
       </AnimatePresence>
 
-      <ScoringDrawer 
-        match={scoringMatch} 
+      {oddWarning && (
+        <OddFieldStartModal
+          count={oddWarning.count}
+          byeResult={oddWarning.byeResult}
+          isStarting={isStarting}
+          onCancel={() => setOddWarning(null)}
+          onConfirm={() => void doStartTournament()}
+        />
+      )}
+
+      <ScoringDrawer
+        match={scoringMatch}
         formatConfig={getTournamentConfig(tournament)}
         system={getTournamentSystem(tournament)}
         isAdmin={activeAdmin}

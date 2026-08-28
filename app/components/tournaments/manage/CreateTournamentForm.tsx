@@ -234,7 +234,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       date: finalDate,
       isPrivate,
       startNow,
-      createdById: userId,
+      // createdById is set server-side from the auth token (F3) — not sent from here.
       config,
     };
 

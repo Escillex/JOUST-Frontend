@@ -89,6 +89,17 @@ export default function AdminDashboard() {
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
   const [guestToConvert, setGuestToConvert] = useState<AdminUser | null>(null);
 
+  // F6. Deleting a user who is still active in a live tournament is refused by the
+  // backend. This drives a two-step confirm: (1) you must forfeit them first,
+  // (2) are you sure? — forfeit is irreversible. On confirm we forfeit them from
+  // each live tournament, then delete.
+  const [forfeitPrompt, setForfeitPrompt] = useState<{
+    userId: string;
+    tournaments: { id: string; name: string }[];
+    step: 1 | 2;
+  } | null>(null);
+  const [forfeitBusy, setForfeitBusy] = useState(false);
+
   const [formats, setFormats] = useState<any[]>([]);
   const [isCreatingFormat, setIsCreatingFormat] = useState(false);
 
@@ -249,12 +260,47 @@ export default function AdminDashboard() {
           toast("User deleted", "success");
         } else {
           const data = await safeJson(res);
-          toast(data?.message || "Failed to delete user", "error");
+          // F6: user is in a live tournament — open the forfeit-then-delete flow
+          // instead of just erroring.
+          if (data?.code === "ACTIVE_IN_LIVE_TOURNAMENT" && Array.isArray(data?.tournaments)) {
+            setForfeitPrompt({ userId, tournaments: data.tournaments, step: 1 });
+          } else {
+            toast(data?.message || "Failed to delete user", "error");
+          }
         }
       } catch {
         toast("Network error while deleting user", "error");
       }
     });
+
+  // F6 step 2 → confirmed: forfeit the user from each live tournament, then delete.
+  const confirmForfeitAndDelete = async () => {
+    if (!forfeitPrompt) return;
+    const { userId, tournaments: liveTournaments } = forfeitPrompt;
+    setForfeitBusy(true);
+    try {
+      for (const t of liveTournaments) {
+        await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.FORFEIT(t.id, userId), {
+          method: "POST",
+        });
+      }
+      const res = await authenticatedFetch(API_ENDPOINTS.AUTH.DELETE_USER(userId), { method: "DELETE" });
+      if (res.ok) {
+        const updatedUsers = users.filter(u => u.id !== userId && u.sub !== userId);
+        setUsers(updatedUsers);
+        updateStats(updatedUsers, tournaments);
+        toast("User forfeited and deleted", "success");
+        setForfeitPrompt(null);
+      } else {
+        const data = await safeJson(res);
+        toast(data?.message || "Failed to delete after forfeit", "error");
+      }
+    } catch {
+      toast("Network error during forfeit-and-delete", "error");
+    } finally {
+      setForfeitBusy(false);
+    }
+  };
 
   // Same pattern as handleDeleteUser: no confirm() popup, block double
   // clicks with withBusy, show the outcome with a toast. The backend
@@ -348,6 +394,70 @@ export default function AdminDashboard() {
 
   return (
     <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col p-4 md:p-12 gap-0`}>
+      {forfeitPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+          <div className="bg-[#1B1B1B] border border-white/20 rounded max-w-md w-full p-6 space-y-4 shadow-[0_0_40px_rgba(0,0,0,1)]">
+            {forfeitPrompt.step === 1 ? (
+              <>
+                <h3 className="text-sm font-semibold text-white">Forfeit required before deletion</h3>
+                <p className="text-[13px] text-[#B0B0B0] leading-relaxed">
+                  This user is an active participant in{" "}
+                  <span className="text-white font-semibold">{forfeitPrompt.tournaments.length}</span>{" "}
+                  live tournament(s):{" "}
+                  <span className="text-white">{forfeitPrompt.tournaments.map(t => t.name).join(", ")}</span>.
+                  They must be forfeited from those before the account can be deleted.
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setForfeitPrompt(null)}
+                    className="flex-1 h-10 text-xs font-semibold border border-white/20 text-[#B0B0B0] hover:text-white transition-colors rounded"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setForfeitPrompt({ ...forfeitPrompt, step: 2 })}
+                    className="flex-1 h-10 text-xs font-semibold bg-primary text-black rounded hover:brightness-90 transition-colors"
+                  >
+                    Forfeit &amp; continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-[#FF4D4D] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold text-white">Are you sure?</h3>
+                    <p className="text-[13px] text-[#B0B0B0] leading-relaxed">
+                      This will forfeit the user (awarding their pending matches to their
+                      opponents) and then permanently delete the account. This is{" "}
+                      <span className="text-white font-semibold">irreversible</span>.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setForfeitPrompt(null)}
+                    disabled={forfeitBusy}
+                    className="flex-1 h-10 text-xs font-semibold border border-white/20 text-[#B0B0B0] hover:text-white transition-colors rounded disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void confirmForfeitAndDelete()}
+                    disabled={forfeitBusy}
+                    className="flex-1 h-10 text-xs font-semibold bg-[#FF4D4D] text-white rounded hover:brightness-90 transition-colors disabled:opacity-50"
+                  >
+                    {forfeitBusy ? "Working…" : "Forfeit & delete"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto w-full flex flex-col">
         {/* Tactical Folder Tabs */}
         <div className="flex items-end gap-1 px-4">

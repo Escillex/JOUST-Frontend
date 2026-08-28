@@ -301,6 +301,7 @@ export const API_ENDPOINTS = {
     // Draws are reported through SUBMIT with no winnerId. The server also
     // exposes /matches/:id/draw, but that path validates less (it does not
     // reject bestOf > 1 or a points threshold), so it is deliberately unused.
+    START:          (id: string) => `/matches/${id}/start`,
     SUBMIT:         (id: string) => `/matches/${id}/submit`,
     GAME_RESULT:    (id: string) => `/matches/${id}/game-result`,
     GET_ONE:        (id: string) => `/matches/${id}`,

@@ -241,6 +241,28 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
     }
   };
 
+  // Organizer-driven start: a match is PENDING until the organizer starts it, which
+  // sets it live and notifies both players. Nothing auto-activates any more.
+  const handleStartMatch = async (matchId: string) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setMessage("Starting match...");
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.START(matchId), { method: "POST" });
+      if (res.ok) {
+        setMessage("Match started — players notified.");
+        await fetchData();
+      } else {
+        const data = await safeJson(res);
+        setMessage(data?.message || "Failed to start match.");
+      }
+    } catch (err) {
+      setMessage("Failed to start match.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getPlayerDisplayName = (player: any, placeholder: string) => {
     if (!player) return placeholder;
     // Plan 9.4. This read `player.guestName` for guests — a column dropped from
@@ -308,6 +330,16 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
 
                 <div className="flex items-center gap-3 self-stretch md:self-auto justify-between md:justify-end flex-wrap">
                   <div className="flex gap-1 flex-wrap">
+                    {match.status === "PENDING" && (
+                      <button
+                        onClick={() => handleStartMatch(match.id)}
+                        disabled={isProcessing}
+                        className="px-3 py-1 bg-primary/10 border border-primary text-primary hover:bg-primary/20 text-xs font-semibold rounded transition-colors disabled:opacity-50"
+                        title="Start this match and notify both players"
+                      >
+                        Start
+                      </button>
+                    )}
                     <button
                       onClick={() => handleResolveMatch(match.id, "PLAYER1", match.player1Id || match.player1?.id, match.player2Id || match.player2?.id)}
                       disabled={isProcessing}

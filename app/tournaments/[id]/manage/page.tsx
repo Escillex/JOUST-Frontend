@@ -5,6 +5,7 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api"
 import { usePolling } from "../../../utils/usePolling";
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { getRawTournamentConfig, ruleView, writeRuleValue, RawConfig } from "../../../utils/formatConfig";
+import OddFieldStartModal, { shouldWarnOddField } from "../../../components/tournaments/OddFieldStartModal";
 import { Tournament } from "../../types";
 import { useToast } from "../../../components/ui/Toast";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../../components/ui/Skeleton";
@@ -54,6 +55,9 @@ function ControlRoomContent() {
   const [selectedUserId, setSelectedUserId]   = useState("");
   const [batchLoading, setBatchLoading]       = useState(false);
   const [isStarting, setIsStarting]           = useState(false);
+  // Set when Start is pressed on an odd Swiss/round-robin field: holds the data
+  // for the bye warning so the organizer confirms before starting.
+  const [oddWarning, setOddWarning]           = useState<{ count: number; byeResult: string } | null>(null);
   const [isAddingGuest, setIsAddingGuest]     = useState(false);
   const [isInviting, setIsInviting]           = useState(false);
   // userId currently being forfeited or replaced, so that row can show a busy
@@ -357,9 +361,13 @@ function ControlRoomContent() {
     else { const d = await safeJson(res); toast(d?.message || "Failed to open registration", "error"); }
   };
 
-  const handleStartTournament = async () => {
+  // The actual start call. Split from the gate below so the confirm modal can
+  // trigger it directly, bypassing the odd-field check the organizer has just
+  // acknowledged.
+  const doStartTournament = async () => {
     if (isStarting) return;
     setIsStarting(true);
+    setOddWarning(null);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.START(tournamentId!), { method: "POST" });
       if (res.ok) { toast("Tournament started", "success"); fetchData(); }
@@ -367,6 +375,22 @@ function ControlRoomContent() {
     } finally {
       setIsStarting(false);
     }
+  };
+
+  // Gate: an odd field in a points-scored system (Swiss / round robin) means one
+  // player is unpaired every round and takes a bye. Byes are normal in elimination
+  // (bracket padding), so those start straight away. Warn the organizer first, with
+  // wording that reflects how their format scores a bye.
+  const handleStartTournament = () => {
+    if (isStarting) return;
+    const count = tournament?.participants?.length ?? 0;
+    const sys = typeof tournament?.format === "string" ? tournament.format : tournament?.format?.system;
+    if (shouldWarnOddField(sys, count)) {
+      const byeResult = String((ruleView(formatConfig) as any)?.byeResult ?? "WIN");
+      setOddWarning({ count, byeResult });
+      return;
+    }
+    void doStartTournament();
   };
 
   const handleSaveRules = async () => {
@@ -429,6 +453,15 @@ function ControlRoomContent() {
 
   return (
     <div className="min-h-screen w-full bg-background font-sans overflow-x-hidden text-[#E0E0E0]">
+      {oddWarning && (
+        <OddFieldStartModal
+          count={oddWarning.count}
+          byeResult={oddWarning.byeResult}
+          isStarting={isStarting}
+          onCancel={() => setOddWarning(null)}
+          onConfirm={() => void doStartTournament()}
+        />
+      )}
       <div className="w-full px-4 md:px-8 py-8 max-w-[1600px] mx-auto">
         <ControlRoomHeader
           tournament={tournament}

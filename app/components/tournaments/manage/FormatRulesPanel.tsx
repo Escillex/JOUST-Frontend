@@ -95,6 +95,15 @@ export default function FormatRulesPanel({
       return;
     }
 
+    // Select fields (seedingMode, byeResult, …) carry string option values, not
+    // numbers. Without this they hit the numeric fallback below and Number("DRAW")
+    // becomes NaN, silently discarding the choice.
+    if (isSelectField(field)) {
+      const text = String(rawValue).trim();
+      onRuleChange(field.key, text === "" ? null : text);
+      return;
+    }
+
     const value = String(rawValue).trim();
     onRuleChange(field.key, value === "" ? null : Number(value));
   };
@@ -163,18 +172,26 @@ export default function FormatRulesPanel({
                       </button>
                     </div>
                   ) : isBooleanField(field) ? (
+                    // Fall back to the field's default when the config key is absent,
+                    // so a default-true boolean (e.g. grandFinalReset) shows checked
+                    // rather than reading undefined as "off".
+                    (() => {
+                      const boolVal = Boolean(rawValue ?? field.defaultValue);
+                      return (
                     <label className="flex items-center gap-3 cursor-pointer group py-2">
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${Boolean(rawValue) ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary"}`}>
-                        {Boolean(rawValue) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${boolVal ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary"}`}>
+                        {boolVal && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                       </div>
                       <input
                         type="checkbox"
-                        checked={Boolean(rawValue)}
+                        checked={boolVal}
                         onChange={(e) => handleChange(field, e.target.checked)}
                         className="hidden"
                       />
-                      <span className="text-sm text-[#E0E0E0]">{Boolean(rawValue) ? "Enabled" : "Disabled"}</span>
+                      <span className="text-sm text-[#E0E0E0]">{boolVal ? "Enabled" : "Disabled"}</span>
                     </label>
+                      );
+                    })()
                   ) : isSelectField(field) ? (
                     <select
                       value={String(rawValue ?? field.defaultValue ?? "")}

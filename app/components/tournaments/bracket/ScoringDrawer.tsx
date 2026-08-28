@@ -48,6 +48,23 @@ export default function ScoringDrawer({
   const [mode, setMode] = useState<DrawerMode>(hasTrackerCapability ? 'tracker' : 'quick');
   const [isSubmittingGame, setIsSubmittingGame] = useState(false);
   const [gameError, setGameError] = useState<string | null>(null);
+  const [isStartingMatch, setIsStartingMatch] = useState(false);
+
+  // A match is PENDING until the organizer starts it (nothing auto-activates any
+  // more). The tracker can only open on an ONGOING match, so a PENDING one must be
+  // started first — this is the call that does it and notifies both players.
+  const handleStartMatch = async () => {
+    if (!match || isStartingMatch) return;
+    setIsStartingMatch(true);
+    setGameError(null);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.START(match.id), { method: 'POST' });
+      if (res.ok) { onMatchUpdated?.(); }
+      else { const d = await safeJson(res); setGameError(d?.message || 'Failed to start match'); }
+    } finally {
+      setIsStartingMatch(false);
+    }
+  };
 
   useEffect(() => {
     if (hasTrackerCapability && mode !== 'tracker') {
@@ -126,6 +143,24 @@ export default function ScoringDrawer({
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
+
+          {/* ── START GATE ─────────────────────────────────────────────────── */}
+          {isAdmin && match.status === 'PENDING' && !match.isBye &&
+            (match.player1Id || match.player1?.id) && (match.player2Id || match.player2?.id) && (
+            <div className="mb-6 p-4 bg-primary/5 border border-primary/30 rounded-sm flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <div>
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest">Match not started</p>
+                <p className="text-[11px] text-white/40 mt-1">Start the match to make it live and notify both players before scoring.</p>
+              </div>
+              <button
+                onClick={handleStartMatch}
+                disabled={isStartingMatch}
+                className="px-5 py-2.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-sm hover:brightness-90 transition-all disabled:opacity-50 whitespace-nowrap"
+              >
+                {isStartingMatch ? 'Starting…' : 'Start Match'}
+              </button>
+            </div>
+          )}
 
           {/* ── TRACKER MODE ───────────────────────────────────────────────── */}
           {mode === 'tracker' && hasTrackerCapability ? (
