@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Tournament, FormatConfig } from "../../../tournaments/types";
+import { Tournament } from "../../../tournaments/types";
+import { isManualSeeding } from "../../../utils/formatConfig";
 import { DragDropProvider, PointerSensor, DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 
@@ -198,17 +199,10 @@ export default function RosterPanel({
   const participantIds = new Set(tournament.participants.map(p => p.userId));
   const substituteOptions = allUsers.filter(u => !participantIds.has(u.id));
 
-  // Whether the drag order below will actually be used. Mirrors the backend
-  // resolution in format-config.helper.ts: the per-tournament override replaces
-  // the preset config, and seedingMode is read from the root (not the phase1
-  // alias) because how the field is drawn belongs to the event, not to a
-  // HYBRID event's Swiss phase. Anything other than MANUAL means a random draw.
-  const presetConfig =
-    typeof tournament.format === "string" ? undefined : tournament.format?.config;
-  const rawConfig: FormatConfig & { phase1?: FormatConfig } =
-    tournament.config ?? presetConfig ?? {};
-  const manualSeeding =
-    (rawConfig.seedingMode ?? rawConfig.phase1?.seedingMode) === "MANUAL";
+  // Whether the drag order below will actually be used. Shared with
+  // BracketPreview via isManualSeeding so the two cannot disagree — anything
+  // other than MANUAL means a random draw at start.
+  const manualSeeding = isManualSeeding(tournament);
 
   return (
     <div className="lg:col-span-8 space-y-6">

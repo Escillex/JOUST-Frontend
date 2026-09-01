@@ -22,6 +22,21 @@ export function getTournamentConfig(t: TournamentLike): FormatConfig {
   return ((raw.phase1 as Record<string, any>) ?? raw) as FormatConfig;
 }
 
+/** Whether the bracket is seeded by hand rather than drawn at random.
+ *
+ *  Mirrors the backend's resolution in `format-config.helper.ts`: `seedingMode`
+ *  is read from the config ROOT first (how the field is drawn belongs to the
+ *  event, not to a HYBRID event's Swiss phase), falling back to the phase1
+ *  alias. Anything other than the literal "MANUAL" means a random draw at start,
+ *  so the on-screen seed order — and any concrete bracket preview built from it —
+ *  is not the matchup that will actually be played. Shared so RosterPanel and
+ *  BracketPreview cannot disagree about it. */
+export function isManualSeeding(t: TournamentLike): boolean {
+  const raw = getRawTournamentConfig(t);
+  const mode = raw.seedingMode ?? (raw.phase1 as Record<string, any>)?.seedingMode;
+  return mode === "MANUAL";
+}
+
 /** Whether a drawn result is survivable under this tournament system.
  *
  *  This is a correctness gate, not a preference. A draw is stored as COMPLETED

@@ -46,6 +46,15 @@ export default function Navibar() {
     { name: "Leaderboards", href: "/leaderboards" }
   );
 
+  // Organizers and admins reach the management dashboard from the same unified
+  // navbar the rest of the app uses — this mirrors the "Organizer Portal" entry
+  // the mobile menu already offers, so the manage zone is no longer a place with
+  // its own separate navigation.
+  const isOrganizer = user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
+  if (isOrganizer) {
+    navLinks.push({ name: "Manage", href: "/tournaments/manage" });
+  }
+
   const isAdmin = user?.roles?.includes('ADMIN');
   if (isAdmin) {
     navLinks.push({ name: "Admin", href: "/admin" });

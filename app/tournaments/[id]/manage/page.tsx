@@ -17,8 +17,7 @@ import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
-
-const randomGuestName = () => `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+import { uniqueGuestNames } from "../../../utils/guestName";
 
 function ControlRoomContent() {
   const router = useRouter();
@@ -244,10 +243,15 @@ function ControlRoomContent() {
     const countToAdd = Math.min(Number(batchGuestCount), tournament.maxPlayers - tournament.participants.length);
     if (countToAdd <= 0) { toast("Tournament at maximum capacity", "error"); return; }
     setBatchLoading(true);
+    // Generate all the names up front so they are distinct from one another and
+    // from the players already on the roster — independent random draws could
+    // otherwise hand two guests the same "Adjective Animal" pair.
+    const existingNames = tournament.participants.map((p) => p.user.username);
+    const names = uniqueGuestNames(countToAdd, existingNames);
     let added = 0;
     for (let i = 0; i < countToAdd; i++) {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: randomGuestName() }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: names[i] }),
       });
       if (res.ok) added++;
     }

@@ -84,7 +84,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     // The server places this socket in its private user room during the
     // handshake, using the same cookie, so there is nothing to subscribe to here.
-    socket.on("connect", () => setConnected(true));
+    socket.on("connect", () => {
+      setConnected(true);
+      // Resync on every (re)connect. A notification emitted while this socket
+      // was down went to a room we were not in, so the live handler below never
+      // saw it — the push is not replayed on reconnect. Without this refetch a
+      // phone that slept through a disconnect shows a stale bell until the next
+      // fallback poll or a manual reload (the reported symptom).
+      void refreshRef.current();
+    });
     socket.on("disconnect", () => setConnected(false));
     socket.on("notification:new", (payload: AppNotification) => {
       setItems((prev) => [{ ...payload, read: false }, ...prev].slice(0, MAX_ITEMS));
@@ -103,6 +111,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const timer = setInterval(() => void refreshRef.current(), FALLBACK_POLL_MS);
     return () => clearInterval(timer);
   }, [hasInbox, connected]);
+
+  // Refetch when the tab returns to the foreground. Mobile browsers suspend a
+  // backgrounded tab — freezing both the socket and the poll above — so when the
+  // user unlocks the phone or re-opens the app the bell can be stale by exactly
+  // the notifications that arrived while it slept. Resyncing on the visibility
+  // change makes it correct the moment it is looked at, instead of waiting out
+  // the poll interval or forcing a reload.
+  useEffect(() => {
+    if (!hasInbox) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [hasInbox]);
 
   // Both mark-read paths update local state first so the badge responds
   // instantly; the request is fire-and-forget because a failure only means the

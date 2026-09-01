@@ -35,8 +35,6 @@ const BracketPreview = dynamic(
   },
 );
 
-const randomGuestName = () => `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
-
 const findMatchInTournament = (t: any, matchId: string): Match | null => {
   if (!t || !t.rounds) return null;
   for (const round of t.rounds) {
@@ -81,8 +79,99 @@ function BracketViewContent() {
   const [activeAdminMatchNotification, setActiveAdminMatchNotification] = useState<Match | null>(null);
   const [dismissedPopups, setDismissedPopups] = useState<Set<string>>(new Set());
   const knownCompletedLogsCount = useRef<Record<string, number>>({});
+  // Debug mode: a real-ADMIN-only, per-viewer toggle (persisted in
+  // localStorage) that surfaces insta-win / random-advance shortcuts to
+  // fast-forward a bracket while testing. Deliberately NOT available to
+  // organizers — it bypasses the whole start/tracker flow. See handleAutoResolve
+  // and the debug block in ScoringDrawer.
+  const [debugMode, setDebugMode]             = useState(false);
+  const [autoResolving, setAutoResolving]     = useState(false);
 
   const activeAdmin = isAdmin && isEditMode;
+  // The real platform ADMIN role, not the tournament-level "can manage" flag
+  // (which co-organizers also get). Debug tools gate on this.
+  const isRealAdmin = !!currentUser?.roles?.includes("ADMIN");
+
+  // Load the persisted debug preference once the identity is known, and only for
+  // real admins — a non-admin can never turn it on.
+  useEffect(() => {
+    let enabled = false;
+    if (isRealAdmin) {
+      try { enabled = localStorage.getItem("joust_debug_mode") === "1"; } catch { /* storage unavailable */ }
+    }
+    setDebugMode(enabled);
+  }, [isRealAdmin]);
+
+  const toggleDebugMode = () => {
+    const next = !debugMode;
+    setDebugMode(next);
+    try { localStorage.setItem("joust_debug_mode", next ? "1" : "0"); } catch { /* ignore */ }
+    addLog("DEBUG", `DEBUG MODE ${next ? "ENABLED" : "DISABLED"}`);
+  };
+
+  // One pass of random-advance: fetch the tournament fresh and force-complete
+  // every currently-resolvable match (a non-bye match with both players that is
+  // not already done) with a random winner. That set is exactly the round(s)
+  // ready to play right now, so a single pass = "advance the current round".
+  // Uses the same /submit endpoint as a normal result — a winnerId force-
+  // completes a match regardless of best-of, points threshold, or whether it was
+  // ever started (backend submitResult only refuses an already-COMPLETED match),
+  // so it skips start + tracker entirely. Returns how many it resolved (0 means
+  // nothing was ready / the tournament is over).
+  const resolvePass = async (): Promise<number> => {
+    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!));
+    if (!res.ok) return 0;
+    const t = await safeJson(res);
+    if (!t || t.status === "COMPLETED") return 0;
+    const resolvable = (t.rounds || [])
+      .flatMap((r: any) => r.matches)
+      .filter((m: any) =>
+        m.status !== "COMPLETED" &&
+        !m.isBye &&
+        (m.player1Id || m.player1?.id) &&
+        (m.player2Id || m.player2?.id),
+      );
+    for (const m of resolvable) {
+      const p1 = m.player1Id || m.player1?.id;
+      const p2 = m.player2Id || m.player2?.id;
+      const winnerId = Math.random() < 0.5 ? p1 : p2;
+      await authenticatedFetch(API_ENDPOINTS.MATCHES.SUBMIT(m.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ winnerId }),
+      });
+    }
+    return resolvable.length;
+  };
+
+  // scope 'round' advances just the matches that are ready now; 'all' keeps
+  // going through freshly-generated rounds until the tournament finishes (or a
+  // safety cap, so a bug in advancement can never spin forever).
+  const handleAutoResolve = async (scope: "round" | "all") => {
+    if (autoResolving || !isRealAdmin) return;
+    setAutoResolving(true);
+    addLog("DEBUG", `AUTO-RESOLVE (${scope.toUpperCase()}) STARTED`);
+    let resolved = 0;
+    try {
+      if (scope === "round") {
+        resolved = await resolvePass();
+      } else {
+        let passes = 0;
+        while (passes < 50) {
+          const n = await resolvePass();
+          if (n === 0) break;
+          resolved += n;
+          passes++;
+        }
+      }
+      addLog("DEBUG", `AUTO-RESOLVE COMPLETE — ${resolved} MATCH(ES)`);
+    } catch {
+      addLog("ERROR", "AUTO-RESOLVE FAILED");
+    } finally {
+      setAutoResolving(false);
+      await fetchTournamentData();
+    }
+  };
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -479,6 +568,43 @@ function BracketViewContent() {
                 {isStarting ? "Starting..." : "Start Tournament"}
               </button>
             )}
+
+            {/* Debug tools — real ADMIN only, never organizers. */}
+            {isRealAdmin && (
+              <button
+                onClick={toggleDebugMode}
+                title="Insta-win / random-advance shortcuts for testing"
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-2 ${
+                  debugMode
+                    ? "bg-amber-500/15 border-amber-500 text-amber-400 hover:bg-amber-500/25"
+                    : "bg-foreground/5 border-foreground/10 text-foreground/40 hover:text-foreground"
+                }`}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${debugMode ? "bg-amber-400 animate-pulse shadow-[0_0_8px_#f59e0b]" : "bg-foreground/20"}`} />
+                {debugMode ? "Debug: ON" : "Debug: OFF"}
+              </button>
+            )}
+
+            {isRealAdmin && debugMode && tournament?.status === "ONGOING" && (
+              <>
+                <button
+                  onClick={() => handleAutoResolve("round")}
+                  disabled={autoResolving}
+                  title="Force-complete only the matches ready now (the current round) with random winners"
+                  className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {autoResolving ? "Resolving..." : "⚡ Resolve Round"}
+                </button>
+                <button
+                  onClick={() => handleAutoResolve("all")}
+                  disabled={autoResolving}
+                  title="Force-complete every match with random winners, round by round, until the tournament finishes"
+                  className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-amber-500/25 bg-amber-500/5 text-amber-400/80 hover:bg-amber-500/15 flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {autoResolving ? "Resolving..." : "⚡ Resolve All"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -696,6 +822,7 @@ function BracketViewContent() {
         formatConfig={getTournamentConfig(tournament)}
         system={getTournamentSystem(tournament)}
         isAdmin={activeAdmin}
+        debugMode={debugMode && isRealAdmin}
         currentUserId={currentUser?.sub || currentUser?.id}
         tournamentId={tournamentId}
         tournamentStatus={tournament?.status}

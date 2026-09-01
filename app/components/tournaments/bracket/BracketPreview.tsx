@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { authenticatedFetch, API_ENDPOINTS } from "../../../utils/api";
+import { isManualSeeding } from "../../../utils/formatConfig";
 import { 
   ReactFlow, 
   Background, 
@@ -415,6 +416,10 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
   const participants: RawParticipant[] = tournament?.participants ?? [];
   const format: string = tournament?.format?.system || (typeof tournament?.format === 'string' ? tournament.format : "SINGLE_ELIMINATION");
   const isElimination = format === "SINGLE_ELIMINATION" || format === "DOUBLE_ELIMINATION";
+  // With a random draw the bracket is decided at start, so a concrete seeded
+  // preview would show matchups that will not actually be played. Suppress it in
+  // favour of a clear note (see the early return below the hooks).
+  const randomDraw = !isManualSeeding(tournament);
 
   const nodeTypes = useMemo(() => ({
     match: PreviewMatchNode,
@@ -541,6 +546,35 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
 
       return { nodes, edges, rounds: computedRounds };
   }, [participants, format, isElimination, isAdmin, currentUserId, trackedUserId, handleSwap, getMatchY]);
+
+  // Random draw: no meaningful preview exists until the tournament starts, so
+  // show the reason rather than a misleading fixed bracket. Placed after every
+  // hook above so the hook order stays stable.
+  if (randomDraw) {
+    return (
+      <div className="h-full flex items-center justify-center bg-[#0a0a0a] p-10">
+        <div className="max-w-md w-full text-center border border-white/10 bg-black/40 rounded-2xl px-8 py-12 space-y-4">
+          <div className="mx-auto w-10 h-10 rounded-full border border-primary/30 bg-primary/5 flex items-center justify-center text-primary text-lg">
+            ⚄
+          </div>
+          <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">
+            Random Draw
+          </h3>
+          <p className="text-[11px] text-white/45 leading-relaxed">
+            This tournament&apos;s matchups are drawn at random when it starts, so there is no
+            bracket to preview yet. The {format?.replace(/_/g, " ").toLowerCase()} bracket for{" "}
+            {participants.length} participant{participants.length === 1 ? "" : "s"} will appear here
+            once the tournament begins.
+          </p>
+          {isAdmin && (
+            <p className="text-[10px] text-white/30 leading-relaxed">
+              Want a fixed, previewable bracket? Switch seeding to manual in the tournament rules.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 h-full flex flex-col bg-[#0a0a0a]">

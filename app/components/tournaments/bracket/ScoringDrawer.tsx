@@ -21,6 +21,11 @@ interface Props {
   onClose: () => void;
   onScore: (winnerId: string | null) => void;
   isAdmin?: boolean;
+  /** Real-ADMIN-only debug mode: shows a one-tap insta-win that force-completes
+   *  the match (skipping start + tracker). The parent only ever passes this true
+   *  for a platform admin with debug mode on, so this component need not re-check
+   *  the role. */
+  debugMode?: boolean;
   currentUserId?: string;
   onMatchUpdated?: () => void;
   tournamentId?: string;
@@ -38,6 +43,7 @@ export default function ScoringDrawer({
   onClose,
   onScore,
   isAdmin = false,
+  debugMode = false,
   currentUserId,
   onMatchUpdated,
   tournamentId,
@@ -159,6 +165,34 @@ export default function ScoringDrawer({
               >
                 {isStartingMatch ? 'Starting…' : 'Start Match'}
               </button>
+            </div>
+          )}
+
+          {/* Debug insta-win — real-ADMIN-only (parent gates the prop). Placed
+              above the mode branches so it shows whether the drawer is in tracker
+              or quick mode. Skips match-start and the tracker entirely: a direct
+              winnerId force-completes the match on the backend regardless of
+              best-of or PENDING/ONGOING status. Amber-marked so it is never
+              mistaken for a real, played result. */}
+          {debugMode && !match.winnerId && (match.player1 || match.player2) && (
+            <div className="mb-6 bg-amber-500/5 border border-amber-500/30 p-4 space-y-3">
+              <span className="text-[9px] font-black text-amber-400 uppercase tracking-[0.2em] block">Debug · Insta-Win (skips start &amp; tracker)</span>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => onScore(match.player1?.id || null)}
+                  disabled={!match.player1}
+                  className="py-3 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-widest rounded-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Win: {p1Name}
+                </button>
+                <button
+                  onClick={() => onScore(match.player2?.id || null)}
+                  disabled={!match.player2}
+                  className="py-3 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-widest rounded-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Win: {p2Name}
+                </button>
+              </div>
             </div>
           )}
 

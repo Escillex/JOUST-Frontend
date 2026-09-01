@@ -211,15 +211,32 @@ export default function MobileMatchFeed({
                             <div className="flex justify-between items-center px-1">
                                 <span className="text-[7px] font-black text-foreground/20 uppercase tracking-widest">#{i+1}</span>
                             </div>
-                            <MatchCard 
-                                match={match}
-                                onOpenScoring={() => onOpenScoring(match)}
-                                isAdmin={isAdmin}
-                                isUpdating={updating === match.id}
-                                leaderboard={leaderboard}
-                                currentUserId={currentUserId}
-                                showPoints={tournament?.format === "SWISS"}
-                            />
+                            {/* Tapping the card opens the live-tracker pop-out.
+                                MatchCard's own click handler only fires for
+                                admins (canScore = isAdmin), which left players
+                                — including a participant of the match who is
+                                allowed to self-score — with no way to open the
+                                tracker on mobile. Desktop already routes the
+                                open through an outer wrapper (DesktopRoundTable),
+                                so this mirrors it: the wrapper opens the drawer
+                                for anyone, and the drawer decides which controls
+                                each viewer gets (admin, own-slot player, or
+                                read-only spectator). The inner card gets a no-op
+                                to avoid a double open for admins. */}
+                            <div
+                                onClick={() => onOpenScoring(match)}
+                                className="cursor-pointer [&>div]:w-full"
+                            >
+                                <MatchCard
+                                    match={match}
+                                    onOpenScoring={() => {}}
+                                    isAdmin={isAdmin}
+                                    isUpdating={updating === match.id}
+                                    leaderboard={leaderboard}
+                                    currentUserId={currentUserId}
+                                    showPoints={tournament?.format === "SWISS"}
+                                />
+                            </div>
                         </div>
                     ))}
                     
