@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import * as m from "motion/react";
 import { BentoBox } from "../ui/Bento";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl, profileHref } from "../../utils/api";
 
 interface Activity {
   id: string;
@@ -134,7 +134,7 @@ export default function MatchHistory({ activities: initialActivities = [], varia
                         </div>
                         {activity.player1.id ? (
                            <Link 
-                             href={`/profile/${activity.player1.id}`} 
+                             href={profileHref(activity.player1)}
                              className="text-base min-w-0 font-black uppercase tracking-tight text-white hover:text-primary transition-colors truncate font-poppins"
                              title={activity.player1.name}
                            >
@@ -165,7 +165,7 @@ export default function MatchHistory({ activities: initialActivities = [], varia
                       <div className="flex items-center gap-4 w-[35%] justify-end text-right min-w-0">
                         {activity.player2.id ? (
                            <Link 
-                             href={`/profile/${activity.player2.id}`} 
+                             href={profileHref(activity.player2)}
                              className="text-base min-w-0 font-black uppercase tracking-tight text-white hover:text-primary transition-colors truncate font-poppins"
                              title={activity.player2.name}
                            >

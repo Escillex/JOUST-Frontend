@@ -193,8 +193,19 @@ export type RawConfig = Record<string, unknown> & {
   phase2?: Record<string, unknown>;
 };
 
+// Utility-permission keys live at the config root (like seedingMode) — they
+// belong to the event, not a hybrid Swiss phase, and resolveConfig reads them
+// root-first on the backend.
+const UTILITY_KEYS = new Set([
+  'utilitiesEnabled',
+  'utilityCoinWho',
+  'utilityDiceWho',
+  'utilityTimerWho',
+]);
+
 export function configValueLocation(key: string): ConfigLocation {
   if (key === 'seedingMode') return 'root';
+  if (UTILITY_KEYS.has(key)) return 'root';
   if (key === 'topCutSize') return 'phase2';
   return 'phase1';
 }
@@ -220,6 +231,11 @@ export function ruleView(
       ? { topCutSize: raw.phase2.topCutSize }
       : {}),
     ...(raw.seedingMode !== undefined ? { seedingMode: raw.seedingMode } : {}),
+    ...Object.fromEntries(
+      [...UTILITY_KEYS]
+        .filter((k) => raw[k] !== undefined)
+        .map((k) => [k, raw[k]]),
+    ),
   } as FormatConfig;
 }
 

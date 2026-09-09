@@ -484,8 +484,17 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
       )}
 
       <div className="mb-4">
-        {/* Match Utilities Toolkit - always accessible */}
-        <PlayerToolkit />
+        {/* Match Utilities Toolkit — shared/live per match. */}
+        <PlayerToolkit
+          matchId={match.id}
+          tournamentId={tournamentId}
+          currentUserId={currentUserId}
+          isStaff={isAdmin}
+          players={[
+            { id: (match.player1?.id || match.player1Id) as string, name: p1Name },
+            { id: (match.player2?.id || match.player2Id) as string, name: p2Name },
+          ].filter((p) => !!p.id)}
+        />
       </div>
 
       {/* Active game tracker */}

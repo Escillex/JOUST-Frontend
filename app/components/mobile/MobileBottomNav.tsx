@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "../UserProvider";
+import { profileHref } from "../../utils/api";
 
 /**
  * MobileBottomNav - Persistent bottom navigation for mobile viewports.
@@ -147,7 +148,7 @@ export default function MobileBottomNav() {
           {/* The signed-in user object can carry the ID as "sub" (from
               the login token) or as "id", so check both — project rule. */}
           <Link
-            href={`/profile/${user.sub || user.id}`}
+            href={profileHref(user)}
             onClick={() => setIsMenuOpen(false)}
             className={`flex items-center gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-widest border transition-all rounded-xl font-poppins ${
               pathname.startsWith("/profile")
@@ -178,6 +179,25 @@ export default function MobileBottomNav() {
               <path d="M16 21V14" />
             </svg>
             LEADERBOARDS
+          </Link>
+
+          {/* Community */}
+          <Link
+            href="/community"
+            onClick={() => setIsMenuOpen(false)}
+            className={`flex items-center gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-widest border transition-all rounded-xl font-poppins ${
+              pathname === "/community"
+                ? "bg-primary/10 border-primary text-primary"
+                : "bg-foreground/5 border-foreground/5 text-white/60 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 shrink-0">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            COMMUNITY
           </Link>
 
           {/* Organizer Control Dashboard */}

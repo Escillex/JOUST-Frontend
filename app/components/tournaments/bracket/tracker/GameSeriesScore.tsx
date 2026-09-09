@@ -18,9 +18,17 @@ function WinPips({ wins, total, reverse }: { wins: number; total: number; revers
           key={i}
           className="w-2 h-2 border border-white/20"
           animate={{
-            backgroundColor: i < wins ? '#52B946' : 'transparent',
+            // rgba(...,0), NOT 'transparent': Framer resolves the initial to
+            // "rgba(0,0,0,0)" and cannot interpolate that against the keyword
+            // 'transparent' (it warns "not an animatable value"). A zero-alpha
+            // rgba is the same colour and animates cleanly.
+            backgroundColor: i < wins ? '#52B946' : 'rgba(82,185,70,0)',
             borderColor: i < wins ? '#52B946' : 'rgba(255,255,255,0.2)',
-            boxShadow: i < wins ? '0 0 6px rgba(82,185,70,0.6)' : 'none',
+            // A transparent zero-spread shadow, NOT 'none': Framer can't
+            // interpolate a shadow string against the keyword 'none' (it warns
+            // "not an animatable value"), but it happily fades between two real
+            // shadow strings — so the glow animates cleanly on/off.
+            boxShadow: i < wins ? '0 0 6px rgba(82,185,70,0.6)' : '0 0 0px rgba(82,185,70,0)',
           }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         />

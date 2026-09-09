@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { resolveImageUrl } from "../utils/api";
+import { resolveImageUrl, profileHref } from "../utils/api";
 import { useUser } from "./UserProvider";
 import NotificationBell from "./NotificationBell";
 
@@ -43,7 +43,8 @@ export default function Navibar() {
   }
   navLinks.push(
     { name: "Tournaments", href: "/tournaments" },
-    { name: "Leaderboards", href: "/leaderboards" }
+    { name: "Leaderboards", href: "/leaderboards" },
+    { name: "Community", href: "/community" }
   );
 
   // Organizers and admins reach the management dashboard from the same unified
@@ -174,7 +175,7 @@ export default function Navibar() {
                   
                   <div className="divide-y divide-white/10">
                     <Link
-                      href={`/profile/${user.id || user.sub}`}
+                      href={profileHref(user)}
                       onClick={() => setIsProfileMenuOpen(false)}
                       className="flex items-center gap-6 px-8 py-4 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary hover:bg-white/5 transition-all font-poppins"
                     >

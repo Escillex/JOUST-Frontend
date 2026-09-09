@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { resolveImageUrl } from "../../utils/api";
+import { resolveImageUrl, profileHref } from "../../utils/api";
 
 
 interface LeaderboardTableProps {
@@ -68,7 +68,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <Link href={`/profile/${entry.userId}`} className="text-sm font-black uppercase tracking-tight text-white font-poppins italic hover:text-primary transition-colors truncate">
+                    <Link href={profileHref(entry)} className="text-sm font-black uppercase tracking-tight text-white font-poppins italic hover:text-primary transition-colors truncate">
                       {entry.username}
                     </Link>
                     <span className="text-[7px] font-black text-white/20 uppercase tracking-widest truncate">
@@ -161,7 +161,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                       )}
                     </div>
                     <div className="min-w-0">
-                      <Link href={`/profile/${entry.userId}`} className="text-2xl font-black uppercase tracking-tight text-white hover:text-primary transition-colors block font-poppins italic truncate">
+                      <Link href={profileHref(entry)} className="text-2xl font-black uppercase tracking-tight text-white hover:text-primary transition-colors block font-poppins italic truncate">
                         {entry.username}
                       </Link>
                       <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-poppins block truncate">

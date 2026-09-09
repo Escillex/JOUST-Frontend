@@ -1,5 +1,5 @@
 "use client";
-import { LeaderboardStats, UserProfile } from "../../tournaments/types";
+import { LeaderboardStats, UserProfile, ProfileTournamentResult } from "../../tournaments/types";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import FadeIn, { StaggerContainer } from "../../components/FadeIn";
 import ProfileHeader from "../../components/profile/ProfileHeader";
 import StatsGrid from "../../components/profile/StatsGrid";
 import MatchHistory from "../../components/profile/MatchHistory";
+import TournamentHistory from "../../components/profile/TournamentHistory";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
 
 
@@ -21,6 +22,7 @@ function ProfileContent() {
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<LeaderboardStats | null>(null);
+  const [tournaments, setTournaments] = useState<ProfileTournamentResult[]>([]);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   // Sign-out logic now lives in one place: UserProvider.logout.
@@ -31,74 +33,69 @@ function ProfileContent() {
     const fetchProfileData = async () => {
       try {
         const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
-        let myData = null;
-        if (meRes.ok) {
-          myData = await meRes.json();
+        const myData = meRes.ok ? await meRes.json() : null;
+
+        // The URL segment is now a username handle (slug), but old UUID links
+        // still work — the backend resolves either. Falls back to the signed-in
+        // user's own handle when the route has none.
+        const handle =
+          profileId || (myData ? myData.slug || myData.id || myData.sub : null);
+        if (!handle) {
+          router.push("/auth");
+          return;
         }
 
-        const targetId = profileId || (myData ? (myData.id || myData.sub) : null);
-        
-        if (!targetId) {
-            router.push("/auth");
-            return;
+        // One call now returns identity, lifetime stats, and recent tournament
+        // results (with placement) — resolved by slug or id. This replaces the
+        // old leaderboard-entry + basic-stats dance.
+        const profRes = await authenticatedFetch(
+          API_ENDPOINTS.AUTH.USER_PROFILE(handle),
+        );
+        if (!profRes.ok) {
+          setUser(null);
+          return;
         }
+        const bundle = await profRes.json();
 
-        const isMe = myData && (myData.id === targetId || myData.sub === targetId);
-        setIsOwnProfile(!!isMe);
+        const isMe = !!(
+          myData &&
+          (myData.id === bundle.id || myData.sub === bundle.id)
+        );
+        setIsOwnProfile(isMe);
 
-        if (isMe) {
-          setUser(myData);
-        }
+        setUser(
+          isMe
+            ? { ...myData, ...bundle, id: bundle.id }
+            : {
+                id: bundle.id,
+                username: bundle.username,
+                slug: bundle.slug,
+                avatarUrl: bundle.avatarUrl,
+                isGuest: bundle.isGuest,
+                roles: bundle.roles,
+                createdAt: bundle.memberSince,
+              },
+        );
 
-        // Ask the backend for this one user's stats directly.
-        // The old code downloaded the ENTIRE global leaderboard and
-        // searched it in the browser. That was wasteful, and worse:
-        // any real user without a leaderboard entry (someone who has
-        // not finished a tournament yet) was shown as "user not found".
-        const statsRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.USER_STATS(targetId));
-        // The endpoint returns null (not an error) when the user has
-        // no leaderboard entry yet.
-        const entry = statsRes.ok ? await statsRes.json() : null;
-
-        if (entry) {
-          setStats(entry);
-          if (!isMe) {
-            setUser({
-              id: entry.userId,
-              username: entry.username,
-              avatarUrl: entry.avatarUrl,
-            });
-          }
-        } else if (!isMe) {
-          // No leaderboard entry. The user may still exist, so check
-          // the basic stats endpoint: it returns 404 only when the
-          // user account really does not exist.
-          const basicRes = await authenticatedFetch(API_ENDPOINTS.AUTH.USER_BASIC_STATS(targetId));
-          if (basicRes.ok) {
-            const basic = await basicRes.json();
-            setStats({
-              points: 0,
-              tournamentsPlayed: basic?.tournamentsPlayed ?? 0,
-              wins: basic?.wins ?? 0,
-              losses: basic?.losses ?? 0,
-              draws: 0,
-              matchWinPct: basic?.winRate ?? 0,
-            });
-            // This endpoint does not include the username, so show a
-            // neutral label instead of failing the whole page.
-            setUser({ id: targetId, username: "Player" });
-          } else {
-            // The account truly does not exist.
-            setUser(null);
-          }
-        }
+        const s = bundle.stats;
+        setStats({
+          points: s?.globalPoints ?? 0,
+          tournamentsPlayed: s?.tournamentsPlayed ?? 0,
+          wins: s?.wins ?? 0,
+          losses: s?.losses ?? 0,
+          draws: s?.draws ?? 0,
+          matchWinPct: s?.winRate ?? 0,
+        });
+        setTournaments(
+          Array.isArray(bundle.recentTournaments) ? bundle.recentTournaments : [],
+        );
       } catch {
         // Silently fail or handle error if needed
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchProfileData();
   }, [profileId, router]);
 
@@ -173,6 +170,10 @@ function ProfileContent() {
                 </div>
               </FadeIn>
             </div>
+
+            <FadeIn>
+              <TournamentHistory results={tournaments} />
+            </FadeIn>
           </StaggerContainer>
         </div>
       </HomeFrame>

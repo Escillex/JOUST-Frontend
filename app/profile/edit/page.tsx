@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import HomeFrame from "../../components/HomeFrame";
 import FadeIn from "../../components/FadeIn";
 import ImageUpload from "../../components/ui/ImageUpload";
-import { authenticatedFetch, API_ENDPOINTS, API_URL, UPLOAD_TIMEOUT_MS } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, API_URL, UPLOAD_TIMEOUT_MS, profileHref } from "../../utils/api";
 import { useUser } from "../../components/UserProvider";
 import { motion } from "motion/react";
 
@@ -84,7 +84,7 @@ export default function ProfileEditPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => router.push(`/profile/${user?.id || user?.sub}`)}
+                  onClick={() => router.push(profileHref(user))}
                   className="px-8 py-3 border-2 border-component-border text-white/40 text-[10px] font-black uppercase tracking-widest hover:text-white hover:border-white/20 transition-all font-poppins"
                 >
                   BACK TO PROFILE

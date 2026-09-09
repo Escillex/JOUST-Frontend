@@ -58,6 +58,20 @@ export function resolveImageUrl(url?: string | null, fallback = ""): string {
   return `${API_URL}${url}`;
 }
 
+// Builds a profile link, preferring the username handle (slug) over the raw
+// UUID. The backend resolves either, so a missing slug still links correctly —
+// it's just less pretty. Centralized so the ~8 link sites can't drift on which
+// id field to read (slug / id / sub / userId all appear across payloads).
+export function profileHref(
+  u:
+    | { slug?: string | null; id?: string | null; sub?: string | null; userId?: string | null }
+    | null
+    | undefined,
+): string {
+  const handle = u?.slug || u?.id || u?.sub || u?.userId || "";
+  return `/profile/${handle}`;
+}
+
 // Called when any request comes back as 401 (not signed in / session
 // expired). The stored token is useless at that point, so remove it and
 // tell the rest of the app (UserProvider listens for this event) so the
@@ -233,6 +247,14 @@ export const API_ENDPOINTS = {
     // this returns 404 only when the user really does not exist, so it
     // can be used to check that a user account is real.
     USER_BASIC_STATS: (id: string) => `/users/${id}/stats`,
+    // Public profile bundle resolved by slug OR legacy UUID: identity, lifetime
+    // stats, and recent tournaments with placement (top-3 showcase).
+    USER_PROFILE: (handle: string) => `/users/${handle}/profile`,
+  },
+  // Unified fuzzy search (people + tournaments) and the Community discovery feed.
+  SEARCH: {
+    QUERY: (q: string) => `/search?q=${encodeURIComponent(q)}`,
+    SPOTLIGHT: '/search/spotlight',
   },
   NOTIFICATIONS: {
     LIST: '/notifications',
@@ -309,6 +331,11 @@ export const API_ENDPOINTS = {
     TRACKER_UPDATE: (id: string) => `/matches/${id}/tracker/update`,
     TRACKER_SUBMIT: (id: string) => `/matches/${id}/tracker/submit-game`,
     TRACKER_GET:    (id: string) => `/matches/${id}/tracker`,
+    // Shared match utilities (timer / coin / dice) — live-broadcast per match.
+    UTILITY_GET:    (id: string) => `/matches/${id}/utility`,
+    UTILITY_COIN:   (id: string) => `/matches/${id}/utility/coin`,
+    UTILITY_DICE:   (id: string) => `/matches/${id}/utility/dice`,
+    UTILITY_TIMER:  (id: string) => `/matches/${id}/utility/timer`,
   },
   DEV: {
     BATCH_GUESTS: (tournamentId: string) => `/dev/batch-guests/${tournamentId}`,

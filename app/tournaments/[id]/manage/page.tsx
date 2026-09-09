@@ -307,6 +307,37 @@ function ControlRoomContent() {
       setLoading(false);
     }
   };
+  // Manual-seeding convenience: assign a fresh random seed order to the current
+  // roster, then let the organizer hand-tweak by dragging. Reuses UPDATE_SEED —
+  // the same path handleReorder writes — so there is no new contract. Only
+  // meaningful under manual seeding (a random-draw tournament re-randomizes at
+  // start regardless); the button that calls this is gated accordingly.
+  const handleShuffleSeeds = async () => {
+    if (!tournament || tournament.participants.length < 2) return;
+    setLoading(true);
+    // Fisher–Yates over the participant ids, then write seeds 1..N in that order.
+    const order = tournament.participants.map(p => p.userId);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    try {
+      for (let i = 0; i < order.length; i++) {
+        await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.UPDATE_SEED(tournamentId!, order[i]), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seed: i + 1 }),
+        });
+      }
+      await fetchData();
+      toast("Roster order randomized", "success");
+    } catch {
+      toast("Failed to randomize roster", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRemoveParticipant = async (userId: string) => {
     const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEAVE(tournamentId!), {
       method: "DELETE",
@@ -484,6 +515,7 @@ function ControlRoomContent() {
             tournament={tournament}
             allUsers={allUsers}
             onReorder={handleReorder}
+            onShuffle={handleShuffleSeeds}
             onRemove={handleRemoveParticipant}
             onForfeit={handleForfeit}
             onReplace={handleReplace}

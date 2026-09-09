@@ -9,6 +9,8 @@ interface Props {
   tournament: Tournament;
   allUsers: { id: string; username: string }[];
   onReorder: (activeUserId: string, newIndex: number) => void;
+  /** Randomize the seed order (manual seeding only). */
+  onShuffle: () => void;
   onRemove: (userId: string) => void;
   onForfeit: (userId: string) => void;
   onReplace: (userId: string, body: { substituteUserId?: string; guestName?: string }) => void;
@@ -168,7 +170,7 @@ function SortableParticipantCard({
 }
 
 export default function RosterPanel({
-  tournament, allUsers, onReorder, onRemove, onForfeit, onReplace, actingOn,
+  tournament, allUsers, onReorder, onShuffle, onRemove, onForfeit, onReplace, actingOn,
 }: Props) {
   const handleDragEnd = (event: DragEndEvent) => {
     const { source, target } = event.operation;
@@ -211,6 +213,22 @@ export default function RosterPanel({
           Participant Roster <span className="text-[#888888] ml-2 font-normal text-sm">[{tournament.participants.length} / {tournament.maxPlayers}]</span>
         </h2>
         <div className="h-[1px] flex-1 bg-white/10" />
+        {/* Randomize order: only under manual seeding (a random draw already
+            shuffles at start) and only pre-start, when the seed order is still
+            editable. */}
+        {isOpen && manualSeeding && tournament.participants.length >= 2 && (
+          <button
+            onClick={onShuffle}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 text-[11px] font-semibold uppercase tracking-widest text-primary border border-primary/30 hover:border-primary hover:bg-primary/10 rounded transition-colors"
+            title="Assign a random seed order — you can still drag to adjust afterwards"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+              <path d="M16 3h5v5" /><path d="M4 20 21 3" />
+              <path d="M21 16v5h-5" /><path d="M15 15l6 6" /><path d="M4 4l5 5" />
+            </svg>
+            Randomize
+          </button>
+        )}
       </div>
 
       {isOpen && (

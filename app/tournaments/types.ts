@@ -262,9 +262,22 @@ export interface LeaderboardStats {
 export interface UserProfile {
   id: string;
   username: string;
+  slug?: string | null;
   email?: string;
   roles?: string[];
   isGuest?: boolean;
   avatarUrl?: string | null;
   createdAt?: string;
+}
+
+/** A past tournament result shown on a profile. `placement` is 1-based
+ *  (1 = champion); null means the tournament predates placement persistence. */
+export interface ProfileTournamentResult {
+  id: string;
+  name: string;
+  slug?: string | null;
+  date: string;
+  placement: number | null;
+  format?: string | null;
+  game?: string | null;
 }

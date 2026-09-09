@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, profileHref } from "../utils/api";
 
 export default function ProfileRedirect() {
   const router = useRouter();
@@ -12,9 +12,8 @@ export default function ProfileRedirect() {
         const res = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
         if (res.ok) {
           const user = await safeJson(res);
-          const myId = user?.sub || user?.id;
-          if (myId) {
-            router.replace(`/profile/${myId}`);
+          if (user?.slug || user?.sub || user?.id) {
+            router.replace(profileHref(user));
             return;
           }
         }
