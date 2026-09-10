@@ -83,12 +83,13 @@ export function BentoBox({
         x: -6,
         transition: { type: "spring", stiffness: 300, damping: 15 }
       }}
-      whileTap={{ 
-        scale: 0.98, 
-        x: 0, 
-        y: 0,
-        transition: { type: "spring", stiffness: 500, damping: 30 }
-      }}
+      /* No whileTap. It fired on a press ANYWHERE inside the panel — a carousel
+         arrow, a dot, a link — and did two jarring things at once: scaled the
+         whole bento to 0.98 and reset x/y to 0, cancelling the hover lift, so
+         paging through tournaments made the entire box shrink and jump 6px on
+         every click. Press feedback belongs on the control being pressed, not on
+         its container (and see the design system: no layout-shifting animations
+         on cards). */
       className={`h-full relative overflow-hidden flex flex-col group transition-all duration-300 ${themes[theme]} ${noPadding ? "" : "p-8"} ${className}`}
     >
       {/* Material Expressive Corner Accents */}

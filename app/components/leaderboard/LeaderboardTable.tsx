@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { resolveImageUrl, profileHref } from "../../utils/api";
+import { resolveImageUrl, profileHref, displayNameOf, handleOf } from "../../utils/api";
 
 
 interface LeaderboardTableProps {
@@ -34,20 +34,29 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
   if (variant === "bento") {
     return (
       <div className="h-full flex flex-col bg-surface border border-white/5 overflow-hidden">
-        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-surface shrink-0">
+        <div className="p-6 border-b border-white/5 flex items-center justify-between gap-4 bg-surface shrink-0">
            <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-primary font-poppins italic">LEADERBOARD</h3>
-           <div className="text-[8px] font-black text-white/30 uppercase tracking-widest font-poppins">LIVE FEED</div>
+           {/* The board being shown rotates, so it has to name itself. */}
+           <div className="text-[8px] font-black text-white/30 uppercase tracking-widest font-poppins truncate">
+             {gameLabel || "LIVE FEED"}
+           </div>
         </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        {/* A visible scrollbar, matching the Recent Activity panel beside it:
+            the list is taller than the fixed bento, and a hidden scrollbar gives
+            no hint that there is anything below the fold. */}
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
           <div className="divide-y-2 divide-white/5">
             {displayEntries.map((entry, idx) => (
               <motion.div 
                 key={entry.userId}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="p-5 flex items-center justify-between group hover:bg-white/[0.03] transition-colors"
+                className="p-5 flex items-center justify-between gap-3 group hover:bg-white/[0.03] transition-colors"
               >
-                <div className="flex items-center gap-4">
+                {/* min-w-0 here, not only on the text column: without it this
+                    flex child refuses to shrink, so the child's `truncate` never
+                    engages and long names are cut mid-glyph with no ellipsis. */}
+                <div className="flex items-center gap-4 min-w-0">
                   {/* Show the rank number sent by the server, not the row
                       position. When players are tied, the server gives them
                       the same rank, and counting rows would hide that. */}
@@ -68,15 +77,15 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <Link href={profileHref(entry)} className="text-sm font-black uppercase tracking-tight text-white font-poppins italic hover:text-primary transition-colors truncate">
-                      {entry.username}
+                    <Link href={profileHref(entry)} className="text-sm font-black uppercase tracking-tight text-white font-poppins italic hover:text-primary transition-colors truncate pr-1">
+                      {displayNameOf(entry)}
                     </Link>
                     <span className="text-[7px] font-black text-white/20 uppercase tracking-widest truncate">
-                      ID // {entry.userId.slice(0, 6)}
+                      {handleOf(entry) || `ID // ${entry.userId.slice(0, 6)}`}
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end">
+                <div className="flex flex-col items-end shrink-0">
                   <span className="text-xl font-black text-white font-poppins">{entry.points}</span>
                   <span className="text-[7px] font-black text-primary uppercase tracking-widest">POINTS</span>
                 </div>
@@ -162,10 +171,10 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
                     </div>
                     <div className="min-w-0">
                       <Link href={profileHref(entry)} className="text-2xl font-black uppercase tracking-tight text-white hover:text-primary transition-colors block font-poppins italic truncate">
-                        {entry.username}
+                        {displayNameOf(entry)}
                       </Link>
                       <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-poppins block truncate">
-                        VERIFIED ID // {entry.userId.slice(0, 8)}
+                        {handleOf(entry) || `VERIFIED ID // ${entry.userId.slice(0, 8)}`}
                       </span>
                     </div>
                   </div>

@@ -26,6 +26,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
   const mouseX = m.useMotionValue(0);
   const mouseY = m.useMotionValue(0);
 
+
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left - rect.width / 2;
@@ -36,6 +37,7 @@ export default function TournamentList({ tournaments, variant = "default", limit
 
   const next = () => setCurrentIndex((prev) => (prev + 1) % sorted.length);
   const prev = () => setCurrentIndex((prev) => (prev - 1 + sorted.length) % sorted.length);
+
 
   const rotateX = m.useTransform(mouseY, [-300, 300], [10, -10]);
   const rotateY = m.useTransform(mouseX, [-500, 500], [-10, 10]);

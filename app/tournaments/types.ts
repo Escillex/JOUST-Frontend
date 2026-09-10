@@ -38,7 +38,7 @@ export type TournamentStatus = "UPCOMING" | "PENDING" | "OPEN" | "ONGOING" | "CO
 
 /** A game in the admin-managed catalog — the thing being played, distinct from the
  *  bracket STRUCTURE and from a FORMAT preset. Every tournament has one; the
- *  built-in "General" is the floor (todo.md §5 / server Game model). */
+ *  catalog is admin-managed and starts empty (todo.md §5 / server Game model). */
 export interface Game {
   id: string;
   name: string;
@@ -99,13 +99,23 @@ export interface Tournament {
   guestCleanupAt: string | null;
   createdAt: string;
   createdById: string;
+  /** The owner. `slug` powers the profile link; both are served by every
+   *  tournament listing (`getAllTournaments`). */
   createdBy?: {
+    id?: string;
     username: string;
+    displayName?: string | null;
+    slug?: string | null;
   };
+  /** Accepted co-organizers only — pending invitations are not listed. */
+  organizers?: {
+    user: { id?: string; username: string; displayName?: string | null; slug?: string | null };
+  }[];
   formatId: string;
   format: string | TournamentFormatModel;
-  /** The game being played. Every tournament has one (the "General" floor); it is
-   *  chosen at creation independent of the format (todo.md §5). */
+  /** The game being played, chosen at creation independent of the format and
+   *  required — there is no fallback game. Nullable only for legacy rows that
+   *  predate the catalog or still sit on the retired placeholder (todo.md §5). */
   gameId?: string | null;
   game?: Pick<Game, "id" | "name" | "iconUrl"> | null;
   /** Per-tournament rules override; when set, fully replaces the format preset's config */
@@ -119,7 +129,9 @@ export interface Tournament {
     status?: "ACTIVE" | "FORFEITED";
     user: {
       id: string;
+      /** The `@handle`. Render people via `displayNameOf()`, not this. */
       username: string;
+      displayName?: string | null;
       email: string;
       isGuest?: boolean;
     };
@@ -133,17 +145,20 @@ export interface Tournament {
       player1?: {
         id: string;
         username?: string;
+        displayName?: string | null;
           isGuest?: boolean;
       } | null;
       player2?: {
         id: string;
         username?: string;
+        displayName?: string | null;
           isGuest?: boolean;
       } | null;
       winnerId?: string | null;
       winner?: {
         id: string;
         username?: string;
+        displayName?: string | null;
           isGuest?: boolean;
       } | null;
       status: string;
@@ -237,7 +252,11 @@ export interface TournamentStaff {
 export interface GlobalLeaderboardEntry {
   rank: number;
   userId: string;
+  /** The `@handle` — unique, no spaces. Render via `handleOf()`. */
   username: string;
+  /** The human name ("Mira Calder"). Optional; render via `displayNameOf()`,
+   *  which falls back to the handle. */
+  displayName?: string | null;
   points: number;
   tournamentsPlayed: number;
   wins: number;
@@ -262,6 +281,7 @@ export interface LeaderboardStats {
 export interface UserProfile {
   id: string;
   username: string;
+  displayName?: string | null;
   slug?: string | null;
   email?: string;
   roles?: string[];

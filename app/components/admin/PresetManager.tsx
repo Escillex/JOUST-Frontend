@@ -254,7 +254,7 @@ export default function PresetManager() {
                   }}
                   className={inputCls}
                 >
-                  <option value="" className="bg-background text-white">None (General)</option>
+                  <option value="" className="bg-background text-white">None</option>
                   {gameOptions.map(g => (
                     <option key={g} value={g} className="bg-background text-white">{g}</option>
                   ))}

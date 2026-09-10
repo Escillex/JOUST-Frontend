@@ -3,7 +3,7 @@ import { GlobalLeaderboardEntry } from "../../tournaments/types";
 import React from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { resolveImageUrl } from "../../utils/api";
+import { resolveImageUrl, displayNameOf } from "../../utils/api";
 
 
 interface Props {
@@ -76,7 +76,7 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
               {entry.avatarUrl ? (
                 <Image
                   src={resolveImageUrl(entry.avatarUrl)}
-                  alt={entry.username}
+                  alt={displayNameOf(entry)}
                   fill
                   className="object-cover"
                   unoptimized
@@ -89,7 +89,7 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
             {/* Name + sub */}
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-black uppercase tracking-tight truncate ${isTop3 ? "text-white" : "text-white/60"}`}>
-                {entry.username}
+                {displayNameOf(entry)}
               </p>
               <p className="text-[9px] font-black text-white/20 uppercase tracking-widest">
                 {entry.wins}W {entry.losses}L — {(entry.matchWinPct * 100).toFixed(0)}% win rate

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
@@ -14,6 +14,15 @@ export default function ManageTournaments() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [message, setMessage] = useState("");
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+
+  // Filters. Applied client-side over the list already fetched — the manage list
+  // is the caller's own tournaments (everything, for an admin), so there is
+  // nothing to page through on the server and a round trip per keystroke would
+  // be worse on a venue connection than filtering an array (Core Rule 8).
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [gameFilter, setGameFilter] = useState("ALL");
+  const [organizerFilter, setOrganizerFilter] = useState("ALL");
 
   const refresh = async () => {
     // Only what this user can actually manage: an organizer has no rights over
@@ -68,6 +77,41 @@ export default function ManageTournaments() {
   // tournament list is still in flight instead of being hidden behind a spinner.
   const isLoadingList = loading || isAuthorized === null;
 
+  const gameOf = (t: Tournament) =>
+    t.game?.name || (typeof t.format === "object" ? t.format?.gameName : null) || "Not set";
+  // Anyone on the staff counts, owner or co-organizer: "show me what Ada is
+  // involved in" is the question being asked, not "what did Ada create".
+  const staffOf = (t: Tournament) => [
+    t.createdBy?.username,
+    ...(t.organizers ?? []).map((o) => o.user?.username),
+  ].filter(Boolean) as string[];
+
+  const games = useMemo(
+    () => [...new Set(tournaments.map(gameOf))].sort((a, b) => a.localeCompare(b)),
+    [tournaments],
+  );
+  const organizers = useMemo(
+    () => [...new Set(tournaments.flatMap(staffOf))].sort((a, b) => a.localeCompare(b)),
+    [tournaments],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tournaments.filter((t) => {
+      if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
+      if (gameFilter !== "ALL" && gameOf(t) !== gameFilter) return false;
+      if (organizerFilter !== "ALL" && !staffOf(t).includes(organizerFilter)) return false;
+      if (!q) return true;
+      // Id included so a tournament can be found by the id the table prints.
+      return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+    });
+  }, [tournaments, query, statusFilter, gameFilter, organizerFilter]);
+
+  const filtersActive =
+    query.trim() !== "" || statusFilter !== "ALL" || gameFilter !== "ALL" || organizerFilter !== "ALL";
+  const selectCls =
+    "h-9 bg-background border border-white/20 text-white text-xs rounded px-2 focus:outline-none focus:border-primary transition-colors";
+
   return (
     <ManagerLayout breadcrumbs={[{ label: "TOURNAMENTS" }]}>
       <div className="space-y-8 font-sans">
@@ -115,11 +159,53 @@ export default function ManageTournaments() {
             <SkeletonPanel rows={6} />
           </>
         ) : (
-          <ManagerTournamentTable
-            tournaments={tournaments}
-            onComplete={handleComplete}
-            completingId={completingId}
-          />
+          <>
+            {/* One filter row above the table it scopes. */}
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name or ID"
+                aria-label="Search tournaments"
+                className="flex-1 h-9 bg-background border border-white/20 text-white text-xs rounded px-3 placeholder:text-white/30 focus:outline-none focus:border-primary transition-colors"
+              />
+              <select aria-label="Filter by status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
+                <option value="ALL">All statuses</option>
+                {["UPCOMING", "OPEN", "ONGOING", "COMPLETED"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <select aria-label="Filter by game" value={gameFilter} onChange={(e) => setGameFilter(e.target.value)} className={selectCls}>
+                <option value="ALL">All games</option>
+                {games.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <select aria-label="Filter by organizer" value={organizerFilter} onChange={(e) => setOrganizerFilter(e.target.value)} className={selectCls}>
+                <option value="ALL">All organizers</option>
+                {organizers.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {filtersActive && (
+                <button
+                  onClick={() => { setQuery(""); setStatusFilter("ALL"); setGameFilter("ALL"); setOrganizerFilter("ALL"); }}
+                  className="h-9 px-3 border border-white/20 text-white/60 hover:text-white text-xs rounded transition-colors whitespace-nowrap"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {filtersActive && (
+              <p className="text-xs text-[#888888]">
+                Showing {filtered.length} of {tournaments.length}
+              </p>
+            )}
+
+            <ManagerTournamentTable
+              tournaments={filtered}
+              onComplete={handleComplete}
+              completingId={completingId}
+            />
+          </>
         )}
       </div>
     </ManagerLayout>

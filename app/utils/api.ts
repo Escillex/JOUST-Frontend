@@ -72,6 +72,33 @@ export function profileHref(
   return `/profile/${handle}`;
 }
 
+/** Identity has two halves, Twitter/Steam style: a stable `@handle` you are
+ *  addressed by, and a free-form display name you are known as.
+ *
+ *  Every payload that carries `username` now carries `displayName` too, but not
+ *  every one is populated — a display name is optional, and older accounts have
+ *  one only because the migration moved their spaced username into it. So this
+ *  falls back to the handle rather than rendering an empty label.
+ *
+ *  Centralised because ~30 components render a person, and any that drift back
+ *  to raw `.username` will silently show `mira-calder` where the rest of the app
+ *  shows "Mira Calder". */
+export function displayNameOf(
+  u: { displayName?: string | null; username?: string | null; p1Name?: string | null } | null | undefined,
+  fallback = "Unknown",
+): string {
+  return u?.displayName?.trim() || u?.username?.trim() || fallback;
+}
+
+/** The `@handle` form, for the secondary line under a display name. Returns an
+ *  empty string when there is no handle, so callers can skip the element rather
+ *  than print a bare "@". */
+export function handleOf(
+  u: { username?: string | null } | null | undefined,
+): string {
+  return u?.username ? `@${u.username}` : "";
+}
+
 // Called when any request comes back as 401 (not signed in / session
 // expired). The stored token is useless at that point, so remove it and
 // tell the rest of the app (UserProvider listens for this event) so the
@@ -310,6 +337,12 @@ export const API_ENDPOINTS = {
   },
   // The admin-managed game catalog. BASE is a public GET; POST/PATCH/DELETE are
   // admin-only; REQUEST lets an organizer ask admins for a missing game (todo.md §5).
+  // Admin-only aggregate analytics for the ANALYTICS tab. One payload, counted
+  // server-side — the dashboard's older figures were derived by downloading the
+  // whole user and tournament tables into the browser.
+  ADMIN: {
+    ANALYTICS: '/admin/analytics',
+  },
   GAMES: {
     BASE: '/games',
     DETAILS: (id: string) => `/games/${id}`,

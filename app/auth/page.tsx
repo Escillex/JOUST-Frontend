@@ -16,13 +16,133 @@ export default function AuthPage() {
   const { refreshUser } = useUser();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [showSignupSuccess, setShowSignupSuccess] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Sign-in is two steps now. `challenge` is the short-lived token the server
+  // hands back after the password: it proves that step and nothing else, so it
+  // is held in state and never stored as a session.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [challengeKind, setChallengeKind] = useState<"signin" | "verify">("signin");
+  const [code, setCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [usingRecovery, setUsingRecovery] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
+  // Mirrors USERNAME_PATTERN in server/src/auth/dto/auth.dto.ts. Sign-IN is not
+  // checked against it on purpose: the identifier there may be an email, or one
+  // of the accounts that predates the rule and still has a space in its name.
+  const usernameRule = /^[A-Za-z0-9._-]+$/;
+  const signupNameError =
+    mode === "signup" && identifier.length > 0 && !usernameRule.test(identifier)
+      ? identifier.includes(" ")
+        ? "Usernames cannot contain spaces."
+        : "Use letters, numbers, dots, underscores or hyphens only."
+      : "";
+
+  /** Step two: submit the emailed code. On a first-time verification the server
+   *  also returns recovery codes, which are shown once and never again. */
+  const submitCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy || !challenge) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}/auth/2fa/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ challenge, code, rememberDevice }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "That code did not work."}`);
+        return;
+      }
+      if (data?.token) localStorage.setItem("token", data.token);
+      if (data?.recoveryCodes?.length) {
+        // Held on screen until acknowledged: this is the only time they exist
+        // in plaintext, and they are the way back in if the inbox dies.
+        setRecoveryCodes(data.recoveryCodes);
+        await refreshUser();
+        return;
+      }
+      await refreshUser();
+      setMessage("Success: Signed in");
+      setTimeout(() => router.push("/home"), 600);
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy || !challenge) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}/auth/2fa/recovery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ challenge, recoveryCode }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "That recovery code is not valid."}`);
+        return;
+      }
+      if (data?.token) localStorage.setItem("token", data.token);
+      await refreshUser();
+      setMessage("Success: Signed in");
+      setTimeout(() => router.push("/home"), 600);
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (busy || !challenge) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_URL}/auth/2fa/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ challenge }),
+      });
+      const data = await safeJson(response);
+      setMessage(response.ok ? "A new code is on its way." : `Error: ${data?.message || "Could not resend."}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Abandon the half-finished attempt and go back to the password form. */
+  const cancelChallenge = () => {
+    setChallenge(null);
+    setCode("");
+    setRecoveryCode("");
+    setUsingRecovery(false);
+    setMessage("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
+    if (signupNameError) {
+      setMessage(`Error: ${signupNameError}`);
+      return;
+    }
 
     const endpoint = mode === "login" ? API_ENDPOINTS.AUTH.SIGNIN : API_ENDPOINTS.AUTH.SIGNUP;
 
@@ -31,12 +151,29 @@ export default function AuthPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify(
+          mode === "signup"
+            ? { identifier, email, password, ...(displayName.trim() ? { displayName: displayName.trim() } : {}) }
+            : { identifier, password },
+        ),
       });
 
       const data = await safeJson(response);
 
       if (response.ok) {
+        // A challenge means the password was right but the account still owes a
+        // second factor (or a first-time address verification). No session yet.
+        if (data?.challenge) {
+          setChallenge(data.challenge);
+          setChallengeKind(data.verificationRequired ? "verify" : "signin");
+          setCode("");
+          setMessage(
+            data.emailSent === false
+              ? `Error: ${data.emailError || "We could not send the code. Try again shortly."}`
+              : "",
+          );
+          return;
+        }
         if (mode === "login") {
           setMessage("Success: Signed in");
           if (data?.token) {
@@ -161,20 +298,188 @@ export default function AuthPage() {
                     </button>
                   </div>
 
+              {/* One-time recovery codes. Shown after the first verification and
+                  never again, so the flow stops here until acknowledged. */}
+              {recoveryCodes && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-primary font-poppins">
+                      Save your recovery codes
+                    </h3>
+                    <p className="text-xs text-white/50 mt-2 leading-relaxed">
+                      Each code works once, in place of an emailed code. They are the only way
+                      into your account if you lose access to your email. This is the one time
+                      they are shown.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 border-4 border-white/10 p-4 font-mono text-sm text-white">
+                    {recoveryCodes.map((rc) => (
+                      <span key={rc}>{rc}</span>
+                    ))}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(recoveryCodes.join("\n"))}
+                      className="flex-1 h-12 border-4 border-white text-white font-black text-xs uppercase tracking-widest hover:border-primary hover:text-primary transition-colors"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/home")}
+                      className="flex-1 h-12 bg-primary text-black font-black text-xs uppercase tracking-widest hover:brightness-90 transition-all"
+                    >
+                      I have saved them
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step two: the emailed code. */}
+              {!recoveryCodes && challenge && (
+                <form onSubmit={usingRecovery ? submitRecovery : submitCode} className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-white font-poppins">
+                      {challengeKind === "verify" ? "Verify your email" : "Check your email"}
+                    </h3>
+                    <p className="text-xs text-white/50 mt-2 leading-relaxed">
+                      {usingRecovery
+                        ? "Enter one of the recovery codes you saved."
+                        : challengeKind === "verify"
+                          ? "We sent a 6-digit code to confirm your address. It expires in 15 minutes."
+                          : "We sent a 6-digit code to your email. It expires in 10 minutes."}
+                    </p>
+                  </div>
+
+                  {usingRecovery ? (
+                    <input
+                      type="text"
+                      value={recoveryCode}
+                      onChange={(e) => setRecoveryCode(e.target.value)}
+                      placeholder="XXXXX-XXXXX"
+                      autoFocus
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white font-mono placeholder:text-white/10 focus:outline-none focus:border-primary transition-all"
+                      required
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="000000"
+                      autoFocus
+                      className="w-full h-16 bg-transparent border-4 border-white px-6 text-3xl tracking-[0.5em] text-center text-white font-mono placeholder:text-white/10 focus:outline-none focus:border-primary transition-all"
+                      required
+                    />
+                  )}
+
+                  {!usingRecovery && (
+                    <label className="flex items-center gap-3 text-xs text-white/50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rememberDevice}
+                        onChange={(e) => setRememberDevice(e.target.checked)}
+                        className="w-4 h-4 accent-[#52B946]"
+                      />
+                      Remember this browser for 30 days
+                    </label>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="w-full h-14 bg-primary text-black font-black text-sm uppercase tracking-[0.3em] hover:brightness-90 transition-all disabled:opacity-50"
+                  >
+                    {busy ? "Checking…" : "Continue"}
+                  </button>
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <button type="button" onClick={cancelChallenge} className="text-white/40 hover:text-white transition-colors">
+                      ← Back
+                    </button>
+                    <div className="flex gap-4">
+                      {!usingRecovery && (
+                        <button type="button" onClick={resendCode} disabled={busy} className="text-primary hover:underline disabled:opacity-40">
+                          Resend code
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { setUsingRecovery(!usingRecovery); setMessage(""); }}
+                        className="text-white/40 hover:text-white transition-colors"
+                      >
+                        {usingRecovery ? "Use emailed code" : "Use a recovery code"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {!recoveryCodes && !challenge && (
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="relative">
                   <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
-                    Email or Username
+                    {mode === "signup" ? "Handle" : "Email or Username"}
                   </span>
                   <input
                     type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Enter your email or username"
-                    className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                    placeholder={mode === "signup" ? "paul" : "Enter your email or username"}
+                    aria-invalid={!!signupNameError}
+                    className={`w-full h-14 bg-transparent border-4 px-6 text-base text-white placeholder:text-white/10 focus:outline-none transition-all font-poppins ${
+                      signupNameError ? "border-[#FF4D4D] focus:border-[#FF4D4D]" : "border-white focus:border-primary"
+                    }`}
                     required
                   />
+                  {mode === "signup" && (
+                    <p className={`mt-2 text-[11px] ${signupNameError ? "text-[#FF4D4D]" : "text-white/30"}`}>
+                      {signupNameError || "Your @handle. Letters, numbers, dots, underscores and hyphens — no spaces."}
+                    </p>
+                  )}
                 </div>
+
+                {mode === "signup" && (
+                  <div className="relative">
+                    <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                      Display Name
+                    </span>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Paul Scholes"
+                      maxLength={50}
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                    />
+                    <p className="mt-2 text-[11px] text-white/30">
+                      Optional. How your name appears to others — spaces are fine here.
+                      Your @handle above is what people use to find you.
+                    </p>
+                  </div>
+                )}
+
+                {mode === "signup" && (
+                  <div className="relative">
+                    <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      required
+                    />
+                    <p className="mt-2 text-[11px] text-white/30">
+                      We send a code here to confirm it, and again whenever you sign in from a new browser.
+                    </p>
+                  </div>
+                )}
 
                 <div className="relative">
                   <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
@@ -226,6 +531,7 @@ export default function AuthPage() {
                   <span>→</span>
                 </button>
               </form>
+              )}
 
               <div className="mt-10 flex justify-center">
                 <Link 

@@ -1,15 +1,56 @@
 "use client";
 
-/** True when starting this field will force a bye every round: an odd player count
- *  in a points-scored system (Swiss / round robin). Elimination byes are normal
- *  bracket padding and are not warned about. Shared so the manage page and the
- *  bracket page — both of which can start a tournament — cannot drift apart. */
-export function shouldWarnOddField(
+/** What kind of bye problem starting this field creates, or null when it creates
+ *  none. Every system is checked (2026-09-10): an earlier version warned only for
+ *  Swiss and round robin, on the reasoning that elimination byes are ordinary
+ *  bracket padding — but an organizer filling a 6-player single elimination still
+ *  deserves to know two people advance without playing.
+ *
+ *  Note the two systems fail differently, so this is NOT one odd/even test:
+ *   - points systems (Swiss, round robin, and HYBRID — whose phase 1 *is* Swiss,
+ *     `initHybrid` calls `initSwiss`) pair everyone each round, so only an ODD
+ *     field leaves someone out, and it does so every single round;
+ *   - elimination needs a power-of-two bracket, so 6 players is even and still
+ *     hands out 2 first-round byes.
+ *
+ *  Shared so the manage page and the bracket page — both of which can start a
+ *  tournament — cannot drift apart. */
+export interface ByeWarning {
+  /** EVERY_ROUND: one player sits out each round. FIRST_ROUND: the bracket is
+   *  padded once, at the start. */
+  kind: "EVERY_ROUND" | "FIRST_ROUND";
+  /** Players entered. */
+  count: number;
+  /** How many byes are handed out (per round, or in round one). */
+  byes: number;
+  /** Elimination only: the full bracket size this field is padded up to. */
+  bracketSize?: number;
+}
+
+const POINTS_SYSTEMS = ["SWISS", "ROUND_ROBIN", "HYBRID"];
+const ELIMINATION_SYSTEMS = ["SINGLE_ELIMINATION", "DOUBLE_ELIMINATION"];
+
+export function byeWarningFor(
   system: string | undefined,
   participantCount: number,
-): boolean {
-  const pointsSystem = system === "SWISS" || system === "ROUND_ROBIN";
-  return pointsSystem && participantCount % 2 === 1;
+): ByeWarning | null {
+  if (!system || participantCount < 2) return null;
+
+  if (POINTS_SYSTEMS.includes(system)) {
+    return participantCount % 2 === 1
+      ? { kind: "EVERY_ROUND", count: participantCount, byes: 1 }
+      : null;
+  }
+
+  if (ELIMINATION_SYSTEMS.includes(system)) {
+    const bracketSize = 2 ** Math.ceil(Math.log2(participantCount));
+    const byes = bracketSize - participantCount;
+    return byes > 0
+      ? { kind: "FIRST_ROUND", count: participantCount, byes, bracketSize }
+      : null;
+  }
+
+  return null;
 }
 
 /** Phrase describing what a bye is worth, matching the configured `byeResult`. */
@@ -20,7 +61,7 @@ function byePhrase(byeResult: string): string {
 }
 
 interface Props {
-  count: number;
+  warning: ByeWarning;
   byeResult: string;
   isStarting: boolean;
   onCancel: () => void;
@@ -30,12 +71,15 @@ interface Props {
 /** Inline confirmation shown when an organizer starts a Swiss/round-robin
  *  tournament with an odd field. Not a `window.confirm` (Core Rule 5). */
 export default function OddFieldStartModal({
-  count,
+  warning,
   byeResult,
   isStarting,
   onCancel,
   onConfirm,
 }: Props) {
+  const { kind, count, byes, bracketSize } = warning;
+  const title =
+    kind === "EVERY_ROUND" ? "Odd number of players" : "Bracket is not full";
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -58,16 +102,31 @@ export default function OddFieldStartModal({
             />
           </svg>
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-white">
-              Odd number of players
-            </h3>
-            <p className="text-[13px] text-[#B0B0B0] leading-relaxed">
-              You have <span className="text-white font-semibold">{count}</span>{" "}
-              players. In each round one player can&apos;t be paired and receives a{" "}
-              <span className="text-white font-semibold">bye</span> — which will{" "}
-              {byePhrase(byeResult)}. Add or remove a player for even pairings, or
-              start anyway.
-            </p>
+            <h3 className="text-sm font-semibold text-white">{title}</h3>
+            {kind === "EVERY_ROUND" ? (
+              <p className="text-[13px] text-[#B0B0B0] leading-relaxed">
+                You have <span className="text-white font-semibold">{count}</span>{" "}
+                players. In each round one player can&apos;t be paired and receives a{" "}
+                <span className="text-white font-semibold">bye</span> — which will{" "}
+                {byePhrase(byeResult)}. Add or remove a player for even pairings, or
+                start anyway.
+              </p>
+            ) : (
+              <p className="text-[13px] text-[#B0B0B0] leading-relaxed">
+                You have <span className="text-white font-semibold">{count}</span>{" "}
+                players, which pads up to a{" "}
+                <span className="text-white font-semibold">{bracketSize}</span>-player
+                bracket.{" "}
+                <span className="text-white font-semibold">
+                  {byes} {byes === 1 ? "player" : "players"}
+                </span>{" "}
+                will receive a first-round{" "}
+                <span className="text-white font-semibold">bye</span> and advance
+                without playing — the top seeds. Add{" "}
+                {(bracketSize ?? count) - count} more for a full bracket, or start
+                anyway.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex gap-3 pt-2">

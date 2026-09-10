@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { TournamentFormatModel, TournamentTemplate, Game } from "../../../tournaments/types";
+import { byeWarningFor } from "../OddFieldStartModal";
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
 
@@ -40,9 +41,11 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [selectedFormatId, setSelectedFormatId] = useState("");
 
   // GAME — chosen on the tournament, independent of the format. The format may
-  // pre-fill it, but the tournament's choice wins (todo.md §5). Defaults to the
-  // built-in "General" so every tournament always has a game.
+  // pre-fill it, but the tournament's choice wins (todo.md §5). Required: there
+  // is no fallback game, so an empty catalog blocks creation until an admin adds
+  // one (the backend rejects with NO_GAMES_CONFIGURED / NO_GAME_SELECTED).
   const [games, setGames] = useState<Game[]>([]);
+  const [gamesLoaded, setGamesLoaded] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestName, setRequestName] = useState("");
@@ -134,10 +137,9 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       if (gamesRes.ok) {
         const data: Game[] = (await safeJson(gamesRes)) ?? [];
         setGames(data);
-        // Default the selection to "General" (isBuiltin) so a tournament always
-        // has a game even if the organizer never touches the field.
-        const general = data.find((g) => g.isBuiltin) ?? data[0];
-        if (general) setSelectedGameId((prev) => prev || general.id);
+        // No default is pre-selected. The organizer names the game deliberately;
+        // auto-filling one would put results on a leaderboard nobody chose.
+        setGamesLoaded(true);
       }
     };
     loadInitialData();
@@ -183,7 +185,14 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     }
   }, [format]);
 
-  const isIdentityValid = !!(name && !nameError && selectedFormatId && maxPlayers >= 2 && !isValidatingName);
+  // The catalog is empty until an admin adds a game, and a tournament cannot be
+  // created without one — surface that on the first step rather than letting the
+  // organizer fill in three steps and hit a 400 at the end.
+  const noGamesConfigured = gamesLoaded && games.length === 0;
+  // Same helper the start-time modal uses, so the advice given at creation and
+  // the warning given at start can never contradict each other.
+  const capacityWarning = byeWarningFor(format, Number(maxPlayers));
+  const isIdentityValid = !!(name && !nameError && selectedFormatId && selectedGameId && maxPlayers >= 2 && !isValidatingName);
   const isRulesValid = !!(bestOf >= 1);
   const isScheduleValid = !!(startNow || date);
   const allStepsVisited = visitedSteps.size >= 3;
@@ -268,8 +277,8 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
     }
   };
 
-  // Organizers cannot create games (admin-owned catalog); they request one. The
-  // tournament still runs under General meanwhile (todo.md §5).
+  // Organizers cannot create games (admin-owned catalog); they request one. With
+  // no fallback game, the tournament waits until an admin creates it (todo.md §5).
   const handleRequestGame = async () => {
     const trimmed = requestName.trim();
     if (!trimmed || requesting) return;
@@ -282,7 +291,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         body: JSON.stringify({ name: trimmed }),
       });
       if (res.ok) {
-        setRequestMsg(`Requested "${trimmed}". An admin will add it; this tournament can run under General until then.`);
+        setRequestMsg(`Requested "${trimmed}". An administrator has to add it to the catalog before a tournament can be created for it.`);
         setRequestName("");
         setRequestOpen(false);
       } else {
@@ -366,21 +375,43 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
             </div>
             <Field label="Maximum Participants" required>
               <input type="number" value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))} className={inputCls} required />
+              {/* A capacity note, not a blocker: this is the cap, and the field
+                  that actually turns up decides the real pairing. It says what
+                  happens if the tournament fills exactly, using the same helper
+                  the start-time warning uses so the two can't disagree. */}
+              {capacityWarning && (
+                <p className="mt-2 text-[11px] text-[#F5A623] leading-relaxed">
+                  {capacityWarning.kind === "EVERY_ROUND"
+                    ? `An odd capacity: filled exactly, one player sits out every round with a bye.`
+                    : `Not a full bracket: filled exactly, ${capacityWarning.byes} ${capacityWarning.byes === 1 ? "player gets" : "players get"} a first-round bye. ${capacityWarning.bracketSize} would fill it.`}
+                </p>
+              )}
             </Field>
           </div>
           <div className="pt-2">
-            <Field label="Game">
+            <Field label="Game" required>
               <select
                 value={selectedGameId}
                 onChange={(e) => setSelectedGameId(e.target.value)}
                 className={inputCls}
+                disabled={noGamesConfigured}
+                required
               >
+                <option value="" className="bg-background">
+                  {noGamesConfigured ? "No games available" : "Select a game"}
+                </option>
                 {games.map((g) => (
                   <option key={g.id} value={g.id} className="bg-background">
-                    {g.name}{g.isBuiltin ? " (default)" : ""}
+                    {g.name}
                   </option>
                 ))}
               </select>
+              {noGamesConfigured && (
+                <p className="mt-2 text-[11px] text-[#FF4D4D] leading-relaxed">
+                  No games have been set up yet. An administrator must add a game to the catalog
+                  before a tournament can be created. Request one below.
+                </p>
+              )}
               <div className="mt-2">
                 <button
                   type="button"
@@ -413,7 +444,8 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
                 <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">{requestMsg}</p>
               )}
               <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
-                Determines which game leaderboard results count toward. Defaults to General.
+                Determines which game leaderboard results count toward. Required — there is no
+                general-purpose fallback.
               </p>
             </Field>
           </div>

@@ -67,8 +67,20 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
     });
   };
 
+  // Mirrors USERNAME_PATTERN in server/src/auth/dto/auth.dto.ts. Editing an
+  // existing account with a legacy spaced name shows the error only once the
+  // field is touched — the accounts that predate the rule are grandfathered, but
+  // any rename has to satisfy it.
+  const usernameError =
+    formData.username.length > 0 && !/^[A-Za-z0-9._-]+$/.test(formData.username)
+      ? formData.username.includes(" ")
+        ? "Usernames cannot contain spaces."
+        : "Use letters, numbers, dots, underscores or hyphens only."
+      : "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (usernameError) return;
     setIsSubmitting(true);
     
     const submissionData: any = {
@@ -111,9 +123,15 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                 type="text" required
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                aria-invalid={!!usernameError}
+                className={`w-full h-10 bg-background border px-3 text-sm text-white focus:outline-none transition-all placeholder:text-white/10 rounded-sm ${
+                  usernameError ? "border-[#FF4D4D] focus:border-[#FF4D4D]" : "border-white/10 focus:border-primary"
+                }`}
                 placeholder="Username"
               />
+              <p className={`text-[10px] ${usernameError ? "text-[#FF4D4D]" : "text-white/25"}`}>
+                {usernameError || "Letters, numbers, dots, underscores and hyphens. No spaces."}
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -186,7 +204,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!usernameError}
               className="flex-1 h-10 bg-primary text-black text-[11px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 rounded-sm"
             >
               {isSubmitting ? "Saving..." : (user ? "Save Changes" : "Create User")}

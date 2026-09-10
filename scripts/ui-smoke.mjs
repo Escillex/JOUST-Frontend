@@ -19,7 +19,7 @@ import { randomInt } from "node:crypto";
 
 const FRONTEND = process.env.FRONTEND || "http://localhost:3001";
 const BACKEND = process.env.BACKEND || "http://127.0.0.1:4001";
-const SHOTS = "/tmp/claude-1000/-home-esc-Code-JOUST/10d48102-c00d-41ea-9404-2ed6a3e45002/scratchpad";
+const SHOTS = process.env.SHOTS || "/tmp";
 
 function adminPassword() {
   if (process.env.ADMIN_PASSWORD) return process.env.ADMIN_PASSWORD;
@@ -60,8 +60,18 @@ async function main() {
   const fmts = (await api("GET", "/tournament-formats")).json;
   const fmtId = fmts.find((f) => f.name === "Single Elimination")?.id;
   const reqGame = `Smoke${randomInt(1000, 9999)}`;
+  // A tournament needs a real game — there is no fallback since the built-in
+  // "General" was retired (todo.md §5), so ensure the catalog has one first.
+  let games = (await api("GET", "/games")).json ?? [];
+  if (games.length === 0) {
+    await api("POST", "/games", { name: `SmokeGame${randomInt(1000, 9999)}` });
+    games = (await api("GET", "/games")).json ?? [];
+  }
+  const seedGame = games[0];
+  check("catalog has an assignable game", !!seedGame, seedGame?.name ?? "none");
   const t = (await api("POST", "/tournaments/createtournament", {
-    name: `SmokeReq ${randomInt(1000, 9999)}`, formatId: fmtId, maxPlayers: 8, createdById: aid,
+    name: `SmokeReq ${randomInt(1000, 9999)}`, formatId: fmtId, maxPlayers: 8,
+    createdById: aid, gameId: seedGame.id,
   })).json;
   await api("POST", "/games/request", { name: reqGame, tournamentId: t.id, note: "smoke" });
   check("seed game request via API", true, `requested "${reqGame}"`);
@@ -107,13 +117,25 @@ async function main() {
   check("format list renders", (await formatCard.count()) > 0);
   await formatCard.click();
 
-  // 3. The Game selector renders with options (loaded from GET /games). Check the
-  //    visible select actually contains a "General" option.
+  // 3. The Game selector renders with options (loaded from GET /games). It must
+  //    offer the catalog game, start UNSELECTED (no fallback game is assumed),
+  //    and never offer the retired "General" placeholder.
   await page.getByText("Determines which game leaderboard", { exact: false })
     .first().waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
-  const hasGeneral = await page.locator("select:visible").evaluateAll((sels) =>
-    sels.some((s) => Array.from(s.options).some((o) => /General/.test(o.textContent || ""))));
-  check("Game selector shows General", hasGeneral);
+  const gameSelect = await page.locator("select:visible").evaluateAll((sels, name) => {
+    const sel = sels.find((s) => Array.from(s.options).some((o) => o.textContent === name));
+    if (!sel) return null;
+    return {
+      value: sel.value,
+      options: Array.from(sel.options).map((o) => (o.textContent || "").trim()),
+    };
+  }, seedGame.name);
+  check("Game selector lists the catalog game", !!gameSelect, seedGame.name);
+  check("Game selector starts unselected", gameSelect?.value === "",
+        `value="${gameSelect?.value ?? "?"}"`);
+  check("Game selector offers no 'General' fallback",
+        !!gameSelect && !gameSelect.options.some((o) => /^General/.test(o)),
+        (gameSelect?.options ?? []).join(", "));
 
   // 4. The "Request a game" affordance is present, and toggling reveals the input.
   const requestToggle = page.locator("button:visible", { hasText: "Request it" }).first();
@@ -154,7 +176,13 @@ async function main() {
     // modal-closed + catalog-contains rather than "name gone from page".
     await addAssign.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
     check("resolve modal closes on success", !(await addAssign.isVisible().catch(() => true)));
-    const created = (await api("GET", "/games")).json.some((g) => g.name === reqGame);
+    // Poll rather than sample once: the modal hides as soon as the resolve PATCH
+    // returns, which can land a beat before the create is visible to a fresh read.
+    let created = false;
+    for (let i = 0; i < 10 && !created; i++) {
+      created = ((await api("GET", "/games")).json ?? []).some((g) => g.name === reqGame);
+      if (!created) await new Promise((r) => setTimeout(r, 300));
+    }
     check("resolved game added to catalog", created);
     // The row's Resolve button leaves the pending queue once GameManager refreshes
     // (Playwright auto-waits, so this is not racy against the async re-fetch).

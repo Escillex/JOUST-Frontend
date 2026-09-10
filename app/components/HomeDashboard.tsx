@@ -4,17 +4,16 @@ import FadeIn from "./FadeIn";
 import TournamentHero, { TournamentHeroContent } from "./tournaments/TournamentHero";
 import ProfileHeader from "./profile/ProfileHeader";
 import MatchHistory from "./profile/MatchHistory";
-import LeaderboardTable from "./leaderboard/LeaderboardTable";
+import RotatingGameLeaderboard from "./leaderboard/RotatingGameLeaderboard";
 
 interface HomeDashboardProps {
     user: any;
     tournaments: any[];
-    leaderboard: any[];
     stats: any;
     handleLogout: () => void;
 }
 
-export default function HomeDashboard({ user, tournaments, leaderboard, stats, handleLogout }: HomeDashboardProps) {
+export default function HomeDashboard({ user, tournaments, stats, handleLogout }: HomeDashboardProps) {
     const canManage = user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
 
     return (
@@ -82,18 +81,19 @@ export default function HomeDashboard({ user, tournaments, leaderboard, stats, h
                     </div>
                 </div>
 
-                {/* RECENT ACTIVITY: BOTTOM LEFT (Row 3) */}
-                <div className="lg:col-start-1 lg:row-start-3 flex flex-col min-h-[450px]">
+                {/* RECENT ACTIVITY: BOTTOM LEFT (Row 3) — a FIXED height, not a
+                    floor. With min-h the panel grew with its content, so a busy
+                    player pushed the whole dashboard down the page and the inner
+                    scroll area (which both panels already have) never engaged. */}
+                <div className="lg:col-start-1 lg:row-start-3 flex flex-col h-[480px] min-h-0">
                     <MatchHistory userId={user?.id || user?.sub} />
                 </div>
 
-                {/* LEADERBOARDS: BOTTOM RIGHT (Row 3) */}
-                <div className="lg:col-start-2 lg:row-start-3 flex flex-col min-h-[450px] bg-surface border border-white/5 overflow-hidden">
-                    <LeaderboardTable 
-                        entries={leaderboard} 
-                        variant="bento" 
-                        limit={10} 
-                    />
+                {/* LEADERBOARDS: BOTTOM RIGHT (Row 3) — one game at a time,
+                    cycling every minute. It fetches its own board, so the home
+                    page no longer pulls the combined ranking (admin-only). */}
+                <div className="lg:col-start-2 lg:row-start-3 flex flex-col h-[480px] min-h-0">
+                    <RotatingGameLeaderboard limit={10} />
                 </div>
             </div>
         </FadeIn>

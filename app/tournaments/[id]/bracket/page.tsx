@@ -11,7 +11,7 @@ import { Skeleton, SkeletonStatus } from '../../../components/ui/Skeleton';
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { Match, LeaderboardEntry, LogEntry } from "./types";
 import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, usesPointsStandings } from "../../../utils/formatConfig";
-import OddFieldStartModal, { shouldWarnOddField } from "../../../components/tournaments/OddFieldStartModal";
+import OddFieldStartModal, { byeWarningFor, ByeWarning } from "../../../components/tournaments/OddFieldStartModal";
 import DesktopView from "./device/DesktopView";
 import MobileView from "./device/MobileView";
 import ScoringDrawer from "../../../components/tournaments/bracket/ScoringDrawer";
@@ -69,7 +69,7 @@ function BracketViewContent() {
   const [guestUsername, setGuestUsername]     = useState("");
   const [selectedUserId, setSelectedUserId]   = useState("");
   const [isStarting, setIsStarting]           = useState(false);
-  const [oddWarning, setOddWarning]           = useState<{ count: number; byeResult: string } | null>(null);
+  const [oddWarning, setOddWarning]           = useState<{ warning: ByeWarning; byeResult: string } | null>(null);
   const [isRegistering, setIsRegistering]     = useState(false);
   const [scoringMatch, setScoringMatch]       = useState<Match | null>(null);
   const [maximizedPanel, setMaximizedPanel]   = useState<"ACTIVITY" | "STANDINGS" | null>(null);
@@ -370,15 +370,15 @@ function BracketViewContent() {
     }
   };
 
-  // Same odd-field bye warning the manage page shows — an odd Swiss/round-robin
-  // field forces a bye every round. Shared modal/logic so the two start buttons
-  // cannot drift apart.
+  // Same bye warning the manage page shows, for every system. Shared modal/logic
+  // so the two start buttons cannot drift apart.
   const handleStartTournament = () => {
     if (isStarting) return;
     const count = tournament?.participants?.length ?? 0;
-    if (shouldWarnOddField(getTournamentSystem(tournament), count)) {
+    const warning = byeWarningFor(getTournamentSystem(tournament), count);
+    if (warning) {
       const byeResult = String((getTournamentConfig(tournament) as any)?.byeResult ?? "WIN");
-      setOddWarning({ count, byeResult });
+      setOddWarning({ warning, byeResult });
       return;
     }
     void doStartTournament();
@@ -809,7 +809,7 @@ function BracketViewContent() {
 
       {oddWarning && (
         <OddFieldStartModal
-          count={oddWarning.count}
+          warning={oddWarning.warning}
           byeResult={oddWarning.byeResult}
           isStarting={isStarting}
           onCancel={() => setOddWarning(null)}

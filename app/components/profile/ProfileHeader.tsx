@@ -8,7 +8,7 @@ import { BentoBox } from "../ui/Bento";
 
 import Image from "next/image";
 import Link from "next/link";
-import { resolveImageUrl } from "../../utils/api";
+import { displayNameOf, handleOf, resolveImageUrl } from "../../utils/api";
 
 interface ProfileHeaderProps {
   user: UserProfile;
@@ -27,13 +27,13 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
         {user.avatarUrl ? (
           <Image 
             src={resolveImageUrl(user.avatarUrl)}
-            alt={user.username} 
+            alt={displayNameOf(user)} 
             fill 
             className="object-cover"
             unoptimized // Since we might be using local backend uploads
           />
         ) : (
-          user.username?.[0]?.toUpperCase() || "U"
+          displayNameOf(user)[0]?.toUpperCase() || "U"
         )}
 
         {/* Internal technical lines */}
@@ -49,8 +49,15 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
         ${variant === "bento" ? "text-4xl" : "text-6xl md:text-8xl lg:text-9xl"}
         font-black uppercase tracking-tighter text-white font-poppins leading-none mb-6 mix-blend-difference
       `}>
-        {user.username}
+        {displayNameOf(user)}
       </h1>
+      {/* The handle underneath, the way Twitter/Steam do it: the big name is
+          who they are, the @handle is how you address them. */}
+      {handleOf(user) && (
+        <p className={`${variant === "bento" ? "text-xs" : "text-lg"} font-mono text-white/30 -mt-4 mb-2`}>
+          {handleOf(user)}
+        </p>
+      )}
     </div>
   );
 
@@ -76,7 +83,7 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
       {/* Background Greeble Pattern */}
       <div className="absolute inset-0 opacity-[0.02] pointer-events-none overflow-hidden select-none">
         <div className="text-[20rem] font-black leading-none uppercase rotate-12 -ml-24 -mt-24">
-          {user.username}
+          {displayNameOf(user)}
         </div>
       </div>
       <div className="absolute bottom-0 left-0 p-8 text-white/5 font-mono text-[8px] tracking-widest hidden md:block">

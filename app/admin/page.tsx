@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 import { useToast } from "../components/ui/Toast";
 import StatCard from "../components/admin/StatCard";
+import AnalyticsPanel from "../components/admin/AnalyticsPanel";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
 import UserModal from "../components/admin/UserModal";
@@ -60,7 +61,7 @@ interface Stats {
 export default function AdminDashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "DEV_TOOLS" | "PRESETS" | "GAMES">("DASHBOARD");
+  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "DEV_TOOLS" | "PRESETS" | "GAMES">("DASHBOARD");
   const [pendingGameRequests, setPendingGameRequests] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, registeredUsers: 0, guestUsers: 0, totalTournaments: 0, activeTournaments: 0, completedTournaments: 0 });
@@ -111,7 +112,7 @@ export default function AdminDashboard() {
     // Read from window rather than useSearchParams to avoid the Suspense-boundary
     // build requirement in a fully-client page.
     const t = new URLSearchParams(window.location.search).get("tab")?.toUpperCase();
-    if (t === "GAMES" || t === "PRESETS" || t === "DEV_TOOLS") setActiveTab(t);
+    if (t === "GAMES" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS") setActiveTab(t);
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -470,7 +471,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          {(["DASHBOARD", "GAMES", "PRESETS", "DEV_TOOLS"] as const).map((tab) => (
+          {(["DASHBOARD", "ANALYTICS", "GAMES", "PRESETS", "DEV_TOOLS"] as const).map((tab) => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -616,6 +617,21 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </motion.div>
+          ) : activeTab === "ANALYTICS" ? (
+            <motion.div
+              key="analytics"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto w-full pb-12"
+            >
+              <div className="mb-12">
+                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "ANALYTICS" }]} />
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Platform Analytics</h1>
+                <p className="text-sm text-white/30 mt-4">Growth, game and format usage, and player engagement across the platform.</p>
+              </div>
+              <AnalyticsPanel />
             </motion.div>
           ) : activeTab === "PRESETS" ? (
             <motion.div 

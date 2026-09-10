@@ -6,7 +6,9 @@ import { authenticatedFetch, API_ENDPOINTS, SESSION_EXPIRED_EVENT } from "../uti
 
 export type User = {
   id: string;
+  /** The `@handle`. Use `displayNameOf(user)` to render a person. */
   username: string;
+  displayName?: string | null;
   email?: string;
   roles?: string[];
   isGuest?: boolean;

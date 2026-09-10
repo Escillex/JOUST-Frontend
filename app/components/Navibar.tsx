@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { resolveImageUrl, profileHref } from "../utils/api";
+import { displayNameOf, handleOf, profileHref, resolveImageUrl } from "../utils/api";
 import { useUser } from "./UserProvider";
 import NotificationBell from "./NotificationBell";
 
@@ -139,13 +139,13 @@ export default function Navibar() {
                     {user?.avatarUrl ? (
                       <Image 
                         src={resolveImageUrl(user.avatarUrl)}
-                        alt={user.username || "User"} 
+                        alt={displayNameOf(user)} 
                         fill 
                         className="object-cover"
                         unoptimized
                       />
                     ) : (
-                      user?.username?.[0]?.toUpperCase() || "U"
+                      displayNameOf(user)[0]?.toUpperCase() || "U"
                     )}
                   </motion.button>
               {/* Profile Dropdown */}
@@ -156,20 +156,23 @@ export default function Navibar() {
                       {user.avatarUrl ? (
                         <Image 
                           src={resolveImageUrl(user.avatarUrl)}
-                          alt={user.username || "User"} 
+                          alt={displayNameOf(user)} 
                           fill 
                           className="object-cover"
                           unoptimized
                         />
                       ) : (
                         <div className="w-full h-full bg-background text-primary flex items-center justify-center font-black">
-                          {user.username?.[0]?.toUpperCase()}
+                          {displayNameOf(user)[0]?.toUpperCase()}
                         </div>
                       )}
                     </div>
                     <div>
                       <p className="text-[9px] font-black uppercase tracking-[0.3em] text-primary mb-1 font-poppins">USER</p>
-                      <p className="text-lg font-black truncate font-poppins text-white">{user.username?.toUpperCase()}</p>
+                      <p className="text-lg font-black truncate font-poppins text-white">{displayNameOf(user).toUpperCase()}</p>
+                      {handleOf(user) && (
+                        <p className="text-[10px] font-mono text-white/30 truncate">{handleOf(user)}</p>
+                      )}
                     </div>
                   </div>
                   

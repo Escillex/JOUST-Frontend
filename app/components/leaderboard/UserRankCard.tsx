@@ -1,4 +1,5 @@
 "use client";
+import { displayNameOf, handleOf } from "../../utils/api";
 import React from "react";
 import { motion } from "motion/react";
 
@@ -42,7 +43,7 @@ export default function UserRankCard({ stats, loading }: UserRankProps) {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.6em] text-primary mb-4 font-poppins">CURRENT STANDING</p>
             <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-white leading-none font-poppins italic">
-              {stats.username}
+              {displayNameOf(stats)}
             </h2>
           </div>
           

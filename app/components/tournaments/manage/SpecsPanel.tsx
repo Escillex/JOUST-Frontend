@@ -52,7 +52,9 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
   // Game reassignment. Unlike the OPEN-only detail edits, the backend allows the
   // game to change at any status (PATCH /tournaments/:id/game) — an admin often
-  // reassigns after creating a just-requested game (todo.md §5).
+  // reassigns after creating a just-requested game, and legacy tournaments left
+  // on the retired "General" placeholder are moved off it this way (todo.md §5).
+  // GET /games lists only assignable games, so the placeholder is never an option.
   const [gameOptions, setGameOptions] = useState<{ id: string; name: string }[]>([]);
   const [reassigning, setReassigning] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
@@ -196,7 +198,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             >
               <option value="">Select a format</option>
               {formatOptions.map(f => (
-                <option key={f.id} value={f.id}>{f.name} ({f.gameName || "GENERAL"})</option>
+                <option key={f.id} value={f.id}>{f.name}{f.gameName ? ` (${f.gameName})` : ""}</option>
               ))}
             </select>
           </div>
@@ -279,7 +281,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             {[
               { label: "Name", value: tournament.name },
               { label: "Description", value: tournament.description || "N/A" },
-              { label: "Game", value: tournament.game?.name || "General" },
+              { label: "Game", value: tournament.game?.name || "Not set" },
               { label: "Format", value: (typeof tournament.format === 'object' ? tournament.format?.name : null) || "NONE SET" },
               { label: "System", value: (typeof tournament.format === 'object' ? tournament.format?.system : null) === "HYBRID" ? "TOP CUT" : ((typeof tournament.format === 'object' ? tournament.format?.system : null)?.replace("_", " ") || "NONE") },
               { label: "Capacity", value: `${tournament.participants.length} / ${tournament.maxPlayers}` },
@@ -297,7 +299,13 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
             {!reassignOpen ? (
               <button
                 type="button"
-                onClick={() => { setReassignValue(tournament.gameId || ""); setReassignOpen(true); }}
+                onClick={() => {
+                  // Only preselect the current game if it is still assignable; a
+                  // legacy "General" id would leave the select showing nothing.
+                  const current = tournament.gameId || "";
+                  setReassignValue(gameOptions.some((g) => g.id === current) ? current : "");
+                  setReassignOpen(true);
+                }}
                 className="text-xs font-semibold text-primary hover:underline"
               >
                 Change game
@@ -311,6 +319,10 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
                     onChange={(e) => setReassignValue(e.target.value)}
                     className={inputCls}
                   >
+                    {/* A tournament still on the retired placeholder has a gameId
+                        that is not in the list; without this the select would show
+                        another game's name while holding that id. */}
+                    <option value="">Select a game</option>
                     {gameOptions.map((g) => (
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}

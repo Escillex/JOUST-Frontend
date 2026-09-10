@@ -11,25 +11,17 @@ export default function HomePage() {
   const router = useRouter();
   const { user, loading: userLoading, logout } = useUser();
   const [tournaments, setTournaments] = useState<any[]>([]);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ wins: 0, losses: 0, rank: 0, points: 0 });
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
     try {
-      const [tRes, lRes] = await Promise.all([
-        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE),
-        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GLOBAL_LEADERBOARD),
-      ]);
-
+      // The leaderboard bento fetches its own per-game board now (it rotates),
+      // so the combined ranking — admin-only since 2026-09-10 — is not read here.
+      const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE);
       if (tRes.ok) {
         const data = await safeJson(tRes);
         setTournaments(Array.isArray(data) ? data : []);
-      }
-
-      if (lRes.ok) {
-        const data = await safeJson(lRes);
-        setLeaderboard(Array.isArray(data) ? data : []);
       }
 
       const myId = user?.id || user?.sub;
@@ -83,7 +75,6 @@ export default function HomePage() {
           <HomeDashboard 
             user={user}
             tournaments={tournaments}
-            leaderboard={leaderboard}
             stats={stats}
             handleLogout={handleLogout}
           />

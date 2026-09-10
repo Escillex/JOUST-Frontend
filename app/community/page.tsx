@@ -73,6 +73,7 @@ export default function CommunityPage() {
 
   const [champions, setChampions] = useState<Champion[]>([]);
   const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
+  const [topGame, setTopGame] = useState<string | null>(null);
   const [feedLoading, setFeedLoading] = useState(true);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,17 +84,32 @@ export default function CommunityPage() {
   useEffect(() => {
     const loadFeed = async () => {
       try {
-        const [spotRes, lbRes] = await Promise.all([
+        // Top players come from a single game's board. The combined ranking this
+        // used to read is admin-only (2026-09-10) and would 403 here, and it was
+        // never the right list anyway — it ranked players across games they have
+        // never both played. The first game in the list is used, and named, so
+        // the panel says which board the five belong to.
+        const [spotRes, gamesRes] = await Promise.all([
           authenticatedFetch(API_ENDPOINTS.SEARCH.SPOTLIGHT),
-          authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GLOBAL_LEADERBOARD),
+          authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEADERBOARD_GAMES),
         ]);
         if (spotRes.ok) {
           const data = await safeJson(spotRes);
           setChampions(Array.isArray(data?.recentChampions) ? data.recentChampions : []);
         }
-        if (lbRes.ok) {
-          const board = await safeJson(lbRes);
-          setTopPlayers(Array.isArray(board) ? board.slice(0, 5) : []);
+        if (gamesRes.ok) {
+          const games = await safeJson(gamesRes);
+          const first = Array.isArray(games) ? games[0] : null;
+          if (first) {
+            setTopGame(first);
+            const lbRes = await authenticatedFetch(
+              `${API_ENDPOINTS.TOURNAMENTS.GLOBAL_LEADERBOARD}?game=${encodeURIComponent(first)}`,
+            );
+            if (lbRes.ok) {
+              const board = await safeJson(lbRes);
+              setTopPlayers(Array.isArray(board) ? board.slice(0, 5) : []);
+            }
+          }
         }
       } finally {
         setFeedLoading(false);
@@ -268,7 +284,7 @@ export default function CommunityPage() {
               </section>
 
               <section>
-                <SectionLabel>Top Players</SectionLabel>
+                <SectionLabel>{topGame ? `Top Players · ${topGame}` : "Top Players"}</SectionLabel>
                 {feedLoading ? (
                   <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Loading…</p>
                 ) : topPlayers.length === 0 ? (

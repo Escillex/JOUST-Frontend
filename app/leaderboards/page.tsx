@@ -8,12 +8,20 @@ import UserRankCard from "../components/leaderboard/UserRankCard";
 import LeaderboardTable from "../components/leaderboard/LeaderboardTable";
 import MobileLeaderboard from "../components/leaderboard/MobileLeaderboard";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";
+import { useUser } from "../components/UserProvider";
 
 
 export default function LeaderboardsPage() {
   const [leaderboard, setLeaderboard] = useState<GlobalLeaderboardEntry[]>([]);
   const [userStats, setUserStats] = useState<GlobalLeaderboardEntry | null>(null);
   const [games, setGames] = useState<string[]>([]);
+  // Per-game boards lead, and one of them is the default view — the combined
+  // board ranks players who may never have played the same game, so it is an
+  // administrator's overview rather than the standing anyone competes in. The
+  // server enforces the same rule (403 CROSS_GAME_BOARD_ADMIN_ONLY); this only
+  // keeps a non-admin from being shown a tab that would fail.
+  const { user } = useUser();
+  const isAdmin = !!user?.roles?.includes("ADMIN");
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -31,6 +39,8 @@ export default function LeaderboardsPage() {
       if (res.ok) {
         const data = await safeJson(res);
         setLeaderboard(Array.isArray(data) ? data : []);
+      } else if (res.status === 403) {
+        setError("The combined all-games board is available to administrators. Choose a game.");
       } else {
         setError(`Error: Server returned status ${res.status}`);
       }
@@ -48,7 +58,10 @@ export default function LeaderboardsPage() {
       const gamesRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEADERBOARD_GAMES);
       if (gamesRes.ok) {
         const gamesData = await safeJson(gamesRes);
-        setGames(Array.isArray(gamesData) ? gamesData : []);
+        const list = Array.isArray(gamesData) ? gamesData : [];
+        setGames(list);
+        // Land on a real game rather than on the combined board.
+        setSelectedGame((current) => current ?? list[0] ?? null);
       }
 
       const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
@@ -70,8 +83,15 @@ export default function LeaderboardsPage() {
   }, []);
 
   useEffect(() => {
+    // Wait for the games list before the first fetch: firing with `null` would
+    // request the combined board, which a non-admin is refused.
+    if (selectedGame === null && !isAdmin) {
+      if (games.length > 0) return; // a game will be selected on the next tick
+      setInitialLoading(false);
+      return;
+    }
     fetchLeaderboard(selectedGame);
-  }, [selectedGame]);
+  }, [selectedGame, isAdmin, games.length]);
 
   if (initialLoading) {
     return (
@@ -98,7 +118,7 @@ export default function LeaderboardsPage() {
           <div className="space-y-12">
             {games.length > 0 && (
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label="Leaderboard game filter">
-                {[null, ...games].map((game) => {
+                {[...games, ...(isAdmin ? [null] : [])].map((game) => {
                   const active = selectedGame === game;
                   return (
                     <button
@@ -110,7 +130,7 @@ export default function LeaderboardsPage() {
                           : "bg-black text-white/40 border-white/10 hover:border-primary/40 hover:text-white"
                       }`}
                     >
-                      {game ?? "ALL GAMES"}
+                      {game ?? "ALL GAMES · ADMIN"}
                     </button>
                   );
                 })}

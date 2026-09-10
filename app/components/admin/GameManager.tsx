@@ -9,7 +9,7 @@ interface Props {
 }
 
 /** Admin-managed game catalog (todo.md §5). Games are first-class taxonomy: every
- *  tournament has one, the built-in "General" being the floor. Organizers cannot
+ *  tournament names one, and the catalog starts empty. Organizers cannot
  *  create games — they request them (queued here + a GAME_REQUESTED bell
  *  notification), and an admin adds them and resolves the request from this panel. */
 export default function GameManager({ onPendingCountChange }: Props) {
@@ -32,7 +32,10 @@ export default function GameManager({ onPendingCountChange }: Props) {
   const fetchGames = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await authenticatedFetch(API_ENDPOINTS.GAMES.BASE);
+      // includeSystem: the admin catalog is the one place the retired "General"
+      // placeholder stays visible, so its historical tournaments can be found and
+      // reassigned. It is not offered anywhere a game gets chosen.
+      const res = await authenticatedFetch(`${API_ENDPOINTS.GAMES.BASE}?includeSystem=true`);
       if (res.ok) setGames((await safeJson(res)) || []);
     } catch {
       setError("Failed to load games");
@@ -183,7 +186,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
         <div>
           <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">Game Catalog</h3>
           <p className="text-[9px] text-white/30 uppercase tracking-widest mt-1">
-            Every tournament has a game. &quot;General&quot; is the built-in default and cannot be removed.
+            Every tournament names a game, and no tournament can be created until this catalog has one. Retired system entries stay listed so their old tournaments can be reassigned.
           </p>
         </div>
         <button
@@ -270,7 +273,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
                 <div>
                   <h4 className="text-xs font-black text-white uppercase tracking-widest">{g.name}</h4>
                   {g.isBuiltin && (
-                    <span className="text-[8px] font-black text-primary/60 uppercase tracking-[0.2em]">Built-in default</span>
+                    <span className="text-[8px] font-black text-[#FFCC00]/70 uppercase tracking-[0.2em]">Retired — not assignable</span>
                   )}
                 </div>
                 {!g.isBuiltin && (
