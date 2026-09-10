@@ -342,6 +342,10 @@ export const API_ENDPOINTS = {
   // whole user and tournament tables into the browser.
   ADMIN: {
     ANALYTICS: '/admin/analytics',
+    SETTINGS: '/admin/settings',
+    TEST_EMAIL: '/admin/settings/test-email',
+    /** Runtime 2FA enforcement override — in-memory, resets on restart. */
+    TWO_FACTOR: '/dev/two-factor',
   },
   GAMES: {
     BASE: '/games',

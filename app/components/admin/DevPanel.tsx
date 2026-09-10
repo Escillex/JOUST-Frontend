@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { API_ENDPOINTS, authenticatedFetch } from "../../utils/api";
+import { useEffect, useState } from "react";
+import { API_ENDPOINTS, authenticatedFetch, safeJson } from "../../utils/api";
 import { useToast } from "../ui/Toast";
 
 interface Tournament {
@@ -35,7 +35,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         body: JSON.stringify({ count: guestCount }),
       });
       if (res.ok) {
-        toast(`Added ${guestCount} guests`, "success");
+        toast(`Generated ${guestCount} guests`, "success");
         onRefresh();
       } else {
         const err = await res.json();
@@ -51,6 +51,91 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
   const [expiryDays, setExpiryDays] = useState(30);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillResult, setBackfillResult] = useState("");
+
+  // Debug mode is a per-viewer preference in localStorage (`joust_debug_mode`),
+  // read by the bracket page to surface insta-win / random-advance shortcuts.
+  // Mirrored here rather than re-implemented: same key, so flipping it in either
+  // place moves the same switch — two sources of truth would drift immediately.
+  const [debugMode, setDebugMode] = useState(false);
+
+  useEffect(() => {
+    try { setDebugMode(localStorage.getItem("joust_debug_mode") === "1"); } catch { /* storage unavailable */ }
+  }, []);
+
+  const toggleDebugMode = () => {
+    const next = !debugMode;
+    setDebugMode(next);
+    try { localStorage.setItem("joust_debug_mode", next ? "1" : "0"); } catch { /* ignore */ }
+  };
+
+  // `override` is null when nothing is forcing a mode and the stored setting
+  // applies; the endpoint reports it so the panel reflects reality after a
+  // restart rather than showing a stale toggle.
+  const [twoFactorMode, setTwoFactorMode] = useState<string | null>(null);
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false);
+
+  // Bulk guest creation is opt-in and persisted server-side (unlike debug mode,
+  // which is a per-browser preference). The server refuses the endpoint outright
+  // when it is off, so this toggle reflects a real restriction rather than
+  // hiding a button.
+  const [bulkGuests, setBulkGuests] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => {
+    authenticatedFetch(API_ENDPOINTS.ADMIN.TWO_FACTOR)
+      .then(safeJson)
+      .then((d) => setTwoFactorMode(d?.override ?? null))
+      .catch(() => {});
+    authenticatedFetch(API_ENDPOINTS.ADMIN.SETTINGS)
+      .then(safeJson)
+      .then((list) => {
+        const row = Array.isArray(list) ? list.find((x: any) => x.name === "DEV_BULK_GUESTS") : null;
+        setBulkGuests(row?.value === "true");
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleBulkGuests = async () => {
+    setBulkBusy(true);
+    try {
+      const next = !bulkGuests;
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.SETTINGS, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "DEV_BULK_GUESTS", value: String(next) }),
+      });
+      if (res.ok) {
+        setBulkGuests(next);
+        toast(
+          next ? "Bulk guest generation allowed" : "Bulk guest generation blocked",
+          "success",
+        );
+      } else {
+        const err = await safeJson(res);
+        toast(err?.message || "Could not change the setting", "error");
+      }
+    } catch {
+      toast("Could not reach the server", "error");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleSetTwoFactor = async (mode: "all" | "staff" | "off") => {
+    setTwoFactorBusy(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.TWO_FACTOR, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) setTwoFactorMode(mode);
+      else alert(data?.message ?? "Could not change enforcement.");
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
 
   const handleBackfillGameStats = async () => {
     setBackfillLoading(true);
@@ -124,6 +209,32 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
           Player Simulation Tools
         </h2>
 
+        {/* The switch is the gate, not a hint: with it off the server refuses
+            POST .../batch-guests outright, so disabling the button below only
+            keeps the UI honest about what will happen. */}
+        <div className="relative z-10 mb-8 space-y-3">
+          <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+            Bulk Guest Creation
+          </label>
+          <button
+            onClick={toggleBulkGuests}
+            disabled={bulkBusy}
+            className={`w-full px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border flex items-center justify-center gap-3 disabled:opacity-50 ${
+              bulkGuests
+                ? "bg-primary text-background border-primary"
+                : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${bulkGuests ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
+            {bulkBusy ? "Saving..." : bulkGuests ? "Allowed" : "Blocked"}
+          </button>
+          <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            {bulkGuests
+              ? "Generated placeholder entrants can be minted in bulk right now. Turn this off when you are finished testing."
+              : "Off by default — this is the bulk generator only. Adding a walk-in guest to a roster is an ordinary organizer action and is never affected by this switch."}
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
           <div className="space-y-4">
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Target Tournament</label>
@@ -140,7 +251,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
           </div>
 
           <div className="space-y-4">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Quantity</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Quantity To Generate</label>
             <div className="flex gap-4">
               <input 
                 type="number"
@@ -150,12 +261,17 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               />
               <button 
                 onClick={handleBatchAdd}
-                disabled={loading || !selectedTournament}
+                disabled={loading || !selectedTournament || !bulkGuests}
                 className="px-8 py-3 bg-primary text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
               >
-                {loading ? "Adding..." : "Add Guests"}
+                {loading ? "Generating..." : "Generate Guests"}
               </button>
             </div>
+            {!bulkGuests && (
+              <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+                Allow bulk guest creation above to use this. Adding guests one at a time on a roster still works.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -167,6 +283,66 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+          {/* Turning the second factor down for debugging. In-memory on the
+              server, so a restart puts it back — the toggle says so, because an
+              admin who forgets they disabled it is the whole risk here. */}
+          <div className="space-y-4 md:col-span-2">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Two-Factor Enforcement
+            </label>
+            <div className="flex gap-2">
+              {(["all", "staff", "off"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => handleSetTwoFactor(mode)}
+                  disabled={twoFactorBusy}
+                  className={`flex-1 px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 border ${
+                    twoFactorMode === mode
+                      ? mode === "off"
+                        ? "bg-[#FF4D4D] text-background border-[#FF4D4D]"
+                        : "bg-primary text-background border-primary"
+                      : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  {mode === "all" ? "Everyone" : mode === "staff" ? "Staff Only" : "Disabled"}
+                </button>
+              ))}
+            </div>
+            {twoFactorMode === "off" ? (
+              <p className="text-[9px] font-black text-[#FF4D4D] uppercase tracking-widest">
+                ⚠ Sign-in requires only a password right now. Resets to the configured mode on server restart.
+              </p>
+            ) : (
+              <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+                {twoFactorMode
+                  ? "Overriding the stored setting until the server restarts."
+                  : "Using the stored setting from Admin → Settings. Overrides here last until restart and are refused in production."}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-4 md:col-span-2">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Bracket Debug Mode
+            </label>
+            <button
+              onClick={toggleDebugMode}
+              className={`w-full px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border flex items-center justify-center gap-3 ${
+                debugMode
+                  ? "bg-amber-500 text-background border-amber-500"
+                  : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${debugMode ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
+              {debugMode ? "Debug Mode: ON" : "Debug Mode: OFF"}
+            </button>
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              {debugMode
+                ? "Insta-win and random-advance shortcuts are showing on brackets. This browser only."
+                : "Unlocks insta-win / auto-resolve on tournament brackets. Admin-only, stored per browser — not a server setting."}
+            </p>
+          </div>
+
           <div className="space-y-4">
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Guest Expiration (Days)</label>
             <div className="flex gap-4">
