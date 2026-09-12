@@ -354,6 +354,16 @@ function TournamentViewContent() {
                       MANAGE TOURNAMENT
                     </Link>
                   )}
+                  {/* The printable summary: winner, placements, every round.
+                      Offered once there is something to report. */}
+                  {(tournament.status === "ONGOING" || tournament.status === "COMPLETED") && (
+                    <Link
+                      href={`/tournaments/${tournamentId}/report`}
+                      className="h-12 w-full border border-white/15 bg-white/[0.03] text-white/70 flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all"
+                    >
+                      TOURNAMENT REPORT
+                    </Link>
+                  )}
                 </div>
 
                 <ExpansionModule 

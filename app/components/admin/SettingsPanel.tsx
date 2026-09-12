@@ -28,7 +28,7 @@ const SECURITY_FIELDS = [
     name: "TWO_FACTOR_ENFORCEMENT",
     label: "Two-factor enforcement",
     options: ["all", "staff", "off"],
-    help: "all = every account. staff = admins and organizers only. off = nobody. This is the stored default; Dev Tools can override it until restart.",
+    help: "off (the default) = email gates nothing: no sign-in codes and no address check at registration, so the site works before mail is set up. staff = admins and organizers get codes. all = everyone does, and new accounts verify their address. Turn it on only after \"Send test email\" actually delivers — codes that never arrive lock people out. Dev Tools can override this until restart.",
   },
 ];
 

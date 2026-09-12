@@ -353,6 +353,8 @@ export const API_ENDPOINTS = {
     TWO_FACTOR: '/dev/two-factor',
     /** Database backups. `.joustql` files, admin-only — never served from the
      *  static /uploads mount, since a full backup holds every password hash. */
+    /** Organizer/admin audit log (todo.md obj. 3.1). ?category=&q=&cursor=&limit= */
+    AUDIT: '/admin/audit',
     BACKUPS: '/admin/backups',
     BACKUP: (name: string) => `/admin/backups/${encodeURIComponent(name)}`,
     BACKUP_DOWNLOAD: (name: string) =>

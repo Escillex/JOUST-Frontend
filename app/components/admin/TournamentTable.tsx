@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { TournamentStatus } from "../../tournaments/types";
 
 export interface AdminTournament {
@@ -65,7 +66,15 @@ export default function TournamentTable({ tournaments, onForceComplete }: Props)
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right whitespace-nowrap">
+                  {/* Every tournament's results, one click from the admin
+                      dashboard (todo.md obj. 6.2). */}
+                  <Link
+                    href={`/tournaments/${t.id}/report`}
+                    className="mr-2 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white border border-white/10 hover:border-white/30 px-3 py-1 rounded-sm transition-all"
+                  >
+                    Report
+                  </Link>
                   {t.status !== 'COMPLETED' && (
                     <button 
                       onClick={() => onForceComplete(t.id)} 

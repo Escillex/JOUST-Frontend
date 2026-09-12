@@ -282,6 +282,8 @@ export interface UserProfile {
   id: string;
   username: string;
   displayName?: string | null;
+  /** Short plain-text "about" line (obj. 4.2). Rendered as text, never HTML. */
+  bio?: string | null;
   slug?: string | null;
   email?: string;
   roles?: string[];

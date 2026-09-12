@@ -18,6 +18,7 @@ export type User = {
    *  account has a password (disconnecting Google without one would lock it out). */
   googleLinked?: boolean;
   hasPassword?: boolean;
+  bio?: string | null;
 } | null;
 
 type UserContextType = {

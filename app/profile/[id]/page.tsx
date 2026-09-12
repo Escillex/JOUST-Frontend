@@ -81,6 +81,7 @@ function ProfileContent() {
                 id: bundle.id,
                 username: bundle.username,
                 displayName: bundle.displayName,
+                bio: bundle.bio,
                 slug: bundle.slug,
                 avatarUrl: bundle.avatarUrl,
                 isGuest: bundle.isGuest,

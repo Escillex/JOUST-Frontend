@@ -100,6 +100,15 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
           ))}
         </div>
       )}
+
+      {/* The bio. React escapes it, so it is text however it was typed;
+          pre-line keeps the owner's paragraph breaks. Left out of the compact
+          home card, where a paragraph would crowd the avatar. */}
+      {!bento && user.bio && (
+        <p className="mt-6 max-w-xl text-sm md:text-base text-white/60 leading-relaxed whitespace-pre-line break-words mx-auto md:mx-0">
+          {user.bio}
+        </p>
+      )}
     </div>
   );
 

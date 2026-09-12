@@ -10,6 +10,7 @@ import { useUser } from "../../components/UserProvider";
 import { motion } from "motion/react";
 import ShowcaseEditor from "../../components/profile/ShowcaseEditor";
 import ConnectedAccounts from "../../components/profile/ConnectedAccounts";
+import BioEditor from "../../components/profile/BioEditor";
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -146,6 +147,10 @@ export default function ProfileEditPage() {
                 </div>
               </div>
               
+              {user && !user.isGuest && (
+                <BioEditor key={user.id} initial={user.bio} onSaved={refreshUser} />
+              )}
+
               {/* What the public profile shows: pinned medals and the plaque
                   under the name. Guests cannot hold awards, so it is withheld. */}
               {user && !user.isGuest && (

@@ -10,6 +10,7 @@ import AnalyticsPanel from "../components/admin/AnalyticsPanel";
 import SettingsPanel from "../components/admin/SettingsPanel";
 import BackupPanel from "../components/admin/BackupPanel";
 import AwardManager from "../components/admin/AwardManager";
+import ActivityLog from "../components/admin/ActivityLog";
 import GrantAwardModal from "../components/awards/GrantAwardModal";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
@@ -563,10 +564,9 @@ export default function AdminDashboard() {
 
                 {/* Column 2: System Utilities (Narrow) */}
                 <div className="lg:col-span-4 space-y-8">
-                  {/* The "System Audit Log" card was removed. It was not
-                      a real audit log: it re-downloaded all users and
-                      tournaments every 10 seconds just to invent
-                      log-looking lines from them. */}
+                  {/* The old "System Audit Log" card invented lines from a
+                      re-download of every user and tournament every ten
+                      seconds. The real log now sits full-width below. */}
 
                   {/* Tournament Format Manager */}
                   <div className="bg-background border border-white/10 p-6 space-y-6">
@@ -627,6 +627,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* Who did what, when — recorded server-side after each action
+                  succeeds (todo.md obj. 3.1). */}
+              <ActivityLog />
             </motion.div>
           ) : activeTab === "ANALYTICS" ? (
             <motion.div
