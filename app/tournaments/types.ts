@@ -290,6 +290,42 @@ export interface UserProfile {
   createdAt?: string;
 }
 
+/** Mirrors AwardKind (server/prisma/schema.prisma). A MEDAL is a square a user
+ *  may pin to their profile (up to three); a PLAQUE is a 4:1 strip shown under
+ *  their name (one, of their choosing). */
+export type AwardKind = "MEDAL" | "PLAQUE";
+
+/** A catalog entry — what can be given. Admin view. */
+export interface Award {
+  id: string;
+  name: string;
+  description: string | null;
+  kind: AwardKind;
+  imageUrl: string;
+  createdAt: string;
+  archivedAt: string | null;
+  _count?: { grants: number };
+}
+
+/** One award given to one person. Mirrors toPublicAward() in
+ *  server/src/award/award.service.ts. Repeats are separate grants. */
+export interface UserAward {
+  id: string;
+  awardId: string;
+  kind: AwardKind;
+  name: string;
+  description: string | null;
+  imageUrl: string;
+  awardedAt: string;
+  note: string | null;
+  /** 1-3 when this medal is pinned; null otherwise. */
+  pinSlot: number | null;
+  /** True for the one plaque shown under the name. */
+  displayed: boolean;
+  /** Admin grant view only — never on the public profile. */
+  awardedBy?: { id: string; username: string; displayName?: string | null } | null;
+}
+
 /** A past tournament result shown on a profile. `placement` is 1-based
  *  (1 = champion); null means the tournament predates placement persistence. */
 export interface ProfileTournamentResult {

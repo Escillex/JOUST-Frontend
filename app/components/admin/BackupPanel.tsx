@@ -1,0 +1,418 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
+import { useToast } from "../ui/Toast";
+
+/** Mirrors a JoustqlManifest plus the file's own name and size
+ *  (server/src/backup/joustql.ts). */
+interface Backup {
+  name: string;
+  createdAt: string;
+  database: string;
+  schemaMigration: string | null;
+  trigger: "manual" | "scheduled" | "uploaded" | "pre-restore";
+  alias: string | null;
+  description: string | null;
+  pinned: boolean;
+  sanitized: boolean;
+  encrypted: boolean;
+  payloadBytes: number;
+  fileBytes: number;
+}
+
+const bytes = (n: number) =>
+  n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+/** Always shown, even when a backup is aliased: the alias says what it is for,
+ *  the timestamp says which one it is. */
+const when = (iso: string) => {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+};
+
+const TRIGGER_LABEL: Record<Backup["trigger"], string> = {
+  manual: "Manual",
+  scheduled: "Scheduled",
+  uploaded: "Imported",
+  "pre-restore": "Safety copy",
+};
+
+export default function BackupPanel() {
+  const { toast } = useToast();
+  const [backups, setBackups] = useState<Backup[]>([]);
+  const [directory, setDirectory] = useState("");
+  const [demoPassword, setDemoPassword] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const [alias, setAlias] = useState("");
+  const [description, setDescription] = useState("");
+  const [sanitized, setSanitized] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  // Which row is expanded for restore, and what has been typed into its
+  // confirmation box. No window.confirm anywhere in this project.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const [busyRow, setBusyRow] = useState<string | null>(null);
+  const [restartState, setRestartState] = useState<"restoring" | "restarting" | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUPS);
+    const data = await safeJson(res);
+    if (res.ok && data) {
+      setBackups(data.backups ?? []);
+      setDirectory(data.directory ?? "");
+      setDemoPassword(data.sanitizedPassword ?? "");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUPS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alias: alias.trim() || undefined,
+          description: description.trim() || undefined,
+          sanitized,
+        }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        toast(sanitized ? "Sanitized export created" : "Backup created", "success");
+        setAlias(""); setDescription("");
+        await load();
+      } else {
+        toast(data?.message || "Could not create the backup", "error");
+      }
+    } catch {
+      toast("Could not reach the server", "error");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const patch = async (name: string, body: Record<string, unknown>) => {
+    setBusyRow(name);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUP(name), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) await load();
+      else toast((await safeJson(res))?.message || "Could not update the backup", "error");
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  const remove = async (name: string) => {
+    setBusyRow(name);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUP(name), { method: "DELETE" });
+      if (res.ok) { toast("Backup deleted", "success"); await load(); }
+      else toast((await safeJson(res))?.message || "Could not delete the backup", "error");
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  /** The download is an authenticated request, so it cannot be a plain <a
+   *  href>: the Bearer token would not travel. Fetch it and hand the browser a
+   *  blob instead. */
+  const download = async (name: string) => {
+    setBusyRow(name);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUP_DOWNLOAD(name));
+      if (!res.ok) { toast("Could not download the backup", "error"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast("Could not download the backup", "error");
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  const importFile = async (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    setBusyRow("import");
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUP_IMPORT, { method: "POST", body });
+      const data = await safeJson(res);
+      if (res.ok) { toast("Backup imported", "success"); await load(); }
+      else toast(data?.message || "That file was rejected", "error");
+    } finally {
+      setBusyRow(null);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
+  /** After a restore the server exits so the container restarts it; poll the
+   *  unauthenticated health route until it answers, then reload. */
+  const waitForServer = async () => {
+    setRestartState("restarting");
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "/api/backend"}${API_ENDPOINTS.HEALTH}`,
+          { cache: "no-store" },
+        );
+        if (res.ok) { window.location.reload(); return; }
+      } catch { /* still down — that is the expected case here */ }
+    }
+    setRestartState(null);
+    toast("The server has not come back yet. Check the container.", "error");
+  };
+
+  const restore = async (b: Backup) => {
+    setBusyRow(b.name);
+    setRestartState("restoring");
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.BACKUP_RESTORE(b.name), { method: "POST" });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        setRestartState(null);
+        toast(data?.message || "Restore failed", "error");
+        return;
+      }
+      setConfirming(null); setTyped("");
+      if (data?.restarting) await waitForServer();
+      else { setRestartState(null); toast("Restored.", "success"); await load(); }
+    } catch {
+      setRestartState(null);
+      toast("Could not reach the server", "error");
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {restartState && (
+        <div className="bg-amber-500/10 border border-amber-500/40 p-6 flex items-center gap-4">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+          <p className="text-[11px] font-black uppercase tracking-widest text-amber-500">
+            {restartState === "restoring"
+              ? "Restoring the database..."
+              : "Server restarting — this page reloads when it is back."}
+          </p>
+        </div>
+      )}
+
+      {/* Create */}
+      <div className="bg-neutral-900 border border-neutral-800 p-8">
+        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-primary mb-8 flex items-center gap-4">
+          <span className="h-px w-8 bg-primary/30" />
+          Create a Backup
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Alias (optional)
+            </label>
+            <input
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              placeholder="defense-baseline"
+              className="w-full bg-neutral-950 border border-neutral-800 px-4 py-3 text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+            />
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              An aliased backup is pinned, so rolling deletion never takes it.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Description (optional)
+            </label>
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Snapshot taken before the format rework"
+              className="w-full bg-neutral-950 border border-neutral-800 px-4 py-3 text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={() => setSanitized(!sanitized)}
+          className={`mt-6 w-full px-6 py-4 text-left border transition-all ${
+            sanitized ? "bg-primary/10 border-primary" : "bg-neutral-950 border-neutral-800 hover:border-neutral-600"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span className={`w-1.5 h-1.5 rounded-full ${sanitized ? "bg-primary animate-pulse" : "bg-neutral-600"}`} />
+            <span className={`text-[10px] font-black uppercase tracking-widest ${sanitized ? "text-primary" : "text-neutral-400"}`}>
+              Sanitized export {sanitized ? "— on" : "— off"}
+            </span>
+          </div>
+          <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest italic mt-2 leading-relaxed">
+            {sanitized
+              ? `Addresses become @example.invalid and every account gets the password "${demoPassword}". Tournaments, matches and standings are untouched. This is the copy that may leave the building.`
+              : "A full backup holds real addresses and password hashes. It is encrypted at rest, and is the one to restore from."}
+          </p>
+        </button>
+
+        <div className="flex flex-wrap gap-4 mt-6">
+          <button
+            onClick={create}
+            disabled={creating}
+            className="px-8 py-3 bg-primary text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
+          >
+            {creating ? "Working..." : "Back Up Now"}
+          </button>
+
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".joustql"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void importFile(f); }}
+          />
+          <button
+            onClick={() => fileInput.current?.click()}
+            disabled={busyRow === "import"}
+            className="px-8 py-3 bg-neutral-950 border border-neutral-700 text-neutral-300 text-[10px] font-black uppercase tracking-widest hover:border-neutral-500 disabled:opacity-50 transition-all active:scale-95"
+          >
+            {busyRow === "import" ? "Importing..." : "Import .joustql"}
+          </button>
+        </div>
+
+        {directory && (
+          <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic mt-6">
+            Stored in {directory} · retention and schedule are set in Dev Tools
+          </p>
+        )}
+      </div>
+
+      {/* List */}
+      <div className="bg-neutral-900 border border-neutral-800 p-8">
+        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-neutral-400 mb-8 flex items-center gap-4">
+          <span className="h-px w-8 bg-neutral-700" />
+          Snapshots
+        </h2>
+
+        {loading ? (
+          <p className="text-neutral-600 italic text-sm">Reading the backup directory...</p>
+        ) : backups.length === 0 ? (
+          <p className="text-neutral-600 italic text-sm">
+            No backups yet. Press &quot;Back Up Now&quot; — the database is small, so it takes seconds.
+          </p>
+        ) : (
+          <div className="divide-y divide-neutral-800">
+            {backups.map((b) => (
+              <div key={b.name} className="py-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm font-black text-white">{when(b.createdAt)}</span>
+                      {b.alias && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-primary/15 text-primary">
+                          {b.alias}
+                        </span>
+                      )}
+                      {b.pinned && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Pinned</span>
+                      )}
+                      {b.sanitized && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-neutral-800 text-neutral-300">
+                          Sanitized
+                        </span>
+                      )}
+                      {b.encrypted && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Encrypted</span>
+                      )}
+                    </div>
+                    {b.description && (
+                      <p className="text-xs text-neutral-400 mt-1.5">{b.description}</p>
+                    )}
+                    <p className="text-[9px] font-bold text-neutral-600 uppercase tracking-widest mt-1.5">
+                      {TRIGGER_LABEL[b.trigger]} · {bytes(b.fileBytes)} · schema {b.schemaMigration ?? "unknown"}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => void download(b.name)}
+                      disabled={busyRow === b.name}
+                      className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest border border-neutral-700 text-neutral-300 hover:border-neutral-500 disabled:opacity-50 transition-all"
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => void patch(b.name, { pinned: !b.pinned })}
+                      disabled={busyRow === b.name}
+                      className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest border border-neutral-700 text-neutral-300 hover:border-neutral-500 disabled:opacity-50 transition-all"
+                    >
+                      {b.pinned ? "Unpin" : "Pin"}
+                    </button>
+                    <button
+                      onClick={() => { setConfirming(confirming === b.name ? null : b.name); setTyped(""); }}
+                      disabled={busyRow === b.name}
+                      className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest border border-amber-500/40 text-amber-500 hover:bg-amber-500 hover:text-background disabled:opacity-50 transition-all"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      onClick={() => void remove(b.name)}
+                      disabled={busyRow === b.name}
+                      className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white disabled:opacity-50 transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                {confirming === b.name && (
+                  <div className="mt-5 bg-neutral-950 border border-amber-500/30 p-5 space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">
+                      This replaces the entire database
+                    </p>
+                    <p className="text-xs text-neutral-400 leading-relaxed">
+                      Everything currently in <span className="text-white font-bold">{b.database}</span> is
+                      replaced by this snapshot. A safety copy of the current state is taken first, and the
+                      server restarts afterwards. Type <span className="text-white font-bold">{b.database}</span> to continue.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <input
+                        value={typed}
+                        onChange={(e) => setTyped(e.target.value)}
+                        placeholder={b.database}
+                        className="flex-1 min-w-[200px] bg-neutral-900 border border-neutral-800 px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition-all text-foreground"
+                      />
+                      <button
+                        onClick={() => void restore(b)}
+                        disabled={typed !== b.database || busyRow === b.name}
+                        className="px-8 py-2.5 bg-amber-500 text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-40 transition-all active:scale-95"
+                      >
+                        {busyRow === b.name ? "Restoring..." : "Restore"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import FadeIn, { StaggerContainer } from "../components/FadeIn";
 import Footer from "../components/Footer";
 
 import { useUser } from "../components/UserProvider";
+import GoogleButton from "../components/auth/GoogleButton";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -33,6 +34,46 @@ export default function AuthPage() {
   const [usingRecovery, setUsingRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
+  // Google sign-in is offered only when this deployment has switched it on and
+  // given it a Client ID (Admin → Settings). Absent, the page is unchanged.
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API_URL}${API_ENDPOINTS.AUTH.PROVIDERS}`, { credentials: "include" })
+      .then(safeJson)
+      .then((p) => { if (alive && p?.google?.enabled && p.google.clientId) setGoogleClientId(p.google.clientId); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  /** Google already did its own second-factor check, so a verified Google
+   *  credential yields a session directly — no emailed code. */
+  const signInWithGoogle = async (credential: string) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}${API_ENDPOINTS.AUTH.GOOGLE}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ credential }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "Google sign-in failed."}`);
+        return;
+      }
+      if (data?.token) localStorage.setItem("token", data.token);
+      await refreshUser();
+      setMessage(data?.created ? "Success: Account created with Google" : "Success: Signed in with Google");
+      setTimeout(() => router.push("/home"), 600);
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Mirrors USERNAME_PATTERN in server/src/auth/dto/auth.dto.ts. Sign-IN is not
   // checked against it on purpose: the identifier there may be an email, or one
@@ -531,6 +572,21 @@ export default function AuthPage() {
                   <span>→</span>
                 </button>
               </form>
+              )}
+
+              {!recoveryCodes && !challenge && googleClientId && (
+                <div className="mt-8 space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px flex-1 bg-white/10" />
+                    <span className="text-[9px] font-black text-white/30 uppercase tracking-widest font-poppins">or</span>
+                    <div className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <GoogleButton
+                    clientId={googleClientId}
+                    onCredential={signInWithGoogle}
+                    text={mode === "signup" ? "signup_with" : "continue_with"}
+                  />
+                </div>
               )}
 
               <div className="mt-10 flex justify-center">

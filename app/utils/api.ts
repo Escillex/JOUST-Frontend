@@ -258,6 +258,11 @@ export async function authenticatedFetch(
 export const API_ENDPOINTS = {
   AUTH: {
     ME: '/auth/me',
+    /** Public: which sign-in methods this deployment offers (Google, and its
+     *  Client ID from Admin → Settings). */
+    PROVIDERS: '/auth/providers',
+    GOOGLE: '/auth/google',
+    GOOGLE_LINK: '/auth/google/link',
     SIGNIN: '/auth/signin',
     SIGNUP: '/auth/signup',
     SIGNOUT: '/auth/signout',
@@ -346,7 +351,30 @@ export const API_ENDPOINTS = {
     TEST_EMAIL: '/admin/settings/test-email',
     /** Runtime 2FA enforcement override — in-memory, resets on restart. */
     TWO_FACTOR: '/dev/two-factor',
+    /** Database backups. `.joustql` files, admin-only — never served from the
+     *  static /uploads mount, since a full backup holds every password hash. */
+    BACKUPS: '/admin/backups',
+    BACKUP: (name: string) => `/admin/backups/${encodeURIComponent(name)}`,
+    BACKUP_DOWNLOAD: (name: string) =>
+      `/admin/backups/${encodeURIComponent(name)}/download`,
+    BACKUP_RESTORE: (name: string) =>
+      `/admin/backups/${encodeURIComponent(name)}/restore`,
+    BACKUP_IMPORT: '/admin/backups/import',
   },
+  /** Awards (todo.md obj. 4.1). Catalog and grants are ADMIN-only; the
+   *  showcase is the signed-in user arranging their own. */
+  AWARDS: {
+    CATALOG: '/awards',
+    CATALOG_ALL: '/awards?includeArchived=true',
+    ONE: (id: string) => `/awards/${id}`,
+    IMAGE: (id: string) => `/awards/${id}/image`,
+    GRANTS: (userId: string) => `/users/${userId}/awards`,
+    GRANT: (userId: string, grantId: string) => `/users/${userId}/awards/${grantId}`,
+    SHOWCASE: '/users/me/showcase',
+  },
+  /** Unauthenticated liveness probe. Polled while the server restarts after a
+   *  restore — an authenticated route cannot answer that question. */
+  HEALTH: '/health',
   GAMES: {
     BASE: '/games',
     DETAILS: (id: string) => `/games/${id}`,

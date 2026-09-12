@@ -89,11 +89,53 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
     authenticatedFetch(API_ENDPOINTS.ADMIN.SETTINGS)
       .then(safeJson)
       .then((list) => {
-        const row = Array.isArray(list) ? list.find((x: any) => x.name === "DEV_BULK_GUESTS") : null;
-        setBulkGuests(row?.value === "true");
+        const at = (name: string) =>
+          Array.isArray(list) ? list.find((x: any) => x.name === name)?.value ?? null : null;
+        setBulkGuests(at("DEV_BULK_GUESTS") === "true");
+        setBackupEnabled(at("BACKUP_ENABLED") === "true");
+        setBackupCron(at("BACKUP_CRON") ?? "0 3 * * *");
+        setRetention(at("BACKUP_RETENTION") ?? "14");
+        setAllowRestore(at("BACKUP_ALLOW_RESTORE") === "true");
       })
       .catch(() => {});
   }, []);
+
+  // Backup policy. These live here rather than on the Backups tab because this
+  // is where the project keeps switches that change how the system behaves;
+  // the Backups tab is for the snapshots themselves.
+  const [backupEnabled, setBackupEnabled] = useState(false);
+  const [backupCron, setBackupCron] = useState("0 3 * * *");
+  const [retention, setRetention] = useState("14");
+  const [allowRestore, setAllowRestore] = useState(false);
+  const [policyBusy, setPolicyBusy] = useState<string | null>(null);
+
+  const writeSetting = async (name: string, value: string) => {
+    setPolicyBusy(name);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.SETTINGS, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, value }),
+      });
+      if (!res.ok) {
+        const err = await safeJson(res);
+        toast(err?.message || "Could not save the setting", "error");
+        return false;
+      }
+      return true;
+    } catch {
+      toast("Could not reach the server", "error");
+      return false;
+    } finally {
+      setPolicyBusy(null);
+    }
+  };
+
+  const SCHEDULES: { label: string; cron: string }[] = [
+    { label: "Daily 3am", cron: "0 3 * * *" },
+    { label: "Every 6h", cron: "0 */6 * * *" },
+    { label: "Weekly", cron: "0 3 * * 0" },
+  ];
 
   const toggleBulkGuests = async () => {
     setBulkBusy(true);
@@ -340,6 +382,116 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               {debugMode
                 ? "Insta-win and random-advance shortcuts are showing on brackets. This browser only."
                 : "Unlocks insta-win / auto-resolve on tournament brackets. Admin-only, stored per browser — not a server setting."}
+            </p>
+          </div>
+
+          {/* Backup policy. The snapshots themselves live on the BACKUPS tab;
+              what belongs here is how often they are taken, how many survive,
+              and whether restoring is permitted at all. */}
+          <div className="space-y-4 md:col-span-2 border-t border-neutral-800 pt-8">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Scheduled Backups
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  const next = !backupEnabled;
+                  if (await writeSetting("BACKUP_ENABLED", String(next))) {
+                    setBackupEnabled(next);
+                    toast(next ? "Scheduled backups on" : "Scheduled backups off", "success");
+                  }
+                }}
+                disabled={policyBusy === "BACKUP_ENABLED"}
+                className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 border ${
+                  backupEnabled
+                    ? "bg-primary text-background border-primary"
+                    : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                }`}
+              >
+                {backupEnabled ? "On" : "Off"}
+              </button>
+              {SCHEDULES.map((s) => (
+                <button
+                  key={s.cron}
+                  onClick={async () => {
+                    if (await writeSetting("BACKUP_CRON", s.cron)) {
+                      setBackupCron(s.cron);
+                      toast(`Backups scheduled ${s.label.toLowerCase()}`, "success");
+                    }
+                  }}
+                  disabled={policyBusy === "BACKUP_CRON"}
+                  className={`flex-1 px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 border ${
+                    backupCron === s.cron
+                      ? "bg-neutral-800 border-neutral-600 text-white"
+                      : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              {backupEnabled
+                ? `Running on "${backupCron}". Takes effect immediately — no restart.`
+                : "Nothing is scheduled. Manual backups still work from the Backups tab."}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Backups Kept (Rolling)
+            </label>
+            <div className="flex gap-4">
+              <input
+                type="number"
+                min={1}
+                value={retention}
+                onChange={(e) => setRetention(e.target.value)}
+                className="flex-1 bg-neutral-950 border border-neutral-800 px-4 py-3 text-sm focus:outline-none focus:border-primary transition-all text-foreground"
+              />
+              <button
+                onClick={async () => {
+                  if (await writeSetting("BACKUP_RETENTION", String(Math.max(1, Number(retention) || 14)))) {
+                    toast(`Keeping the newest ${retention} backups`, "success");
+                  }
+                }}
+                disabled={policyBusy === "BACKUP_RETENTION"}
+                className="px-8 py-3 bg-amber-500 text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
+              >
+                Apply
+              </button>
+            </div>
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              Oldest roll off first. Pinned and aliased backups are never deleted.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Allow Restore
+            </label>
+            <button
+              onClick={async () => {
+                const next = !allowRestore;
+                if (await writeSetting("BACKUP_ALLOW_RESTORE", String(next))) {
+                  setAllowRestore(next);
+                  toast(next ? "Restoring allowed" : "Restoring blocked", "success");
+                }
+              }}
+              disabled={policyBusy === "BACKUP_ALLOW_RESTORE"}
+              className={`w-full px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border flex items-center justify-center gap-3 disabled:opacity-50 ${
+                allowRestore
+                  ? "bg-[#FF4D4D] text-background border-[#FF4D4D]"
+                  : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${allowRestore ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
+              {allowRestore ? "Allowed" : "Blocked"}
+            </button>
+            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              {allowRestore
+                ? "⚠ A restore can overwrite this database right now. Turn it off when you are done."
+                : "Off by default. A restore replaces every row in the database, so it must be allowed explicitly."}
             </p>
           </div>
 

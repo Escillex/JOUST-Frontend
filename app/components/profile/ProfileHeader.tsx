@@ -1,5 +1,8 @@
 "use client";
-import { UserProfile } from "../../tournaments/types";
+import { UserProfile, UserAward } from "../../tournaments/types";
+import Medal from "../awards/Medal";
+import Plaque from "../awards/Plaque";
+import { showcaseOf } from "../awards/group";
 
 import React from "react";
 import * as m from "motion/react";
@@ -15,9 +18,17 @@ interface ProfileHeaderProps {
   isOwnProfile?: boolean;
   onLogout?: () => void;
   variant?: "default" | "bento";
+  /** Every award this person holds; the header shows the chosen plaque and
+   *  the pinned medals, and the full list lives in AwardsCase. */
+  awards?: UserAward[];
+  /** Present only when the viewer is an admin and the profile can hold awards;
+   *  opens GrantAwardModal. */
+  onAward?: () => void;
 }
 
-export default function ProfileHeader({ user, isOwnProfile = false, onLogout, variant = "default" }: ProfileHeaderProps) {
+export default function ProfileHeader({ user, isOwnProfile = false, onLogout, variant = "default", awards, onAward }: ProfileHeaderProps) {
+  const { pinned, plaque } = showcaseOf(awards);
+  const bento = variant === "bento";
   const avatar = (
     <div className="relative group">
       <div className={`
@@ -57,6 +68,37 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
         <p className={`${variant === "bento" ? "text-xs" : "text-lg"} font-mono text-white/30 -mt-4 mb-2`}>
           {handleOf(user)}
         </p>
+      )}
+
+      {/* The one plaque this person chose, directly under the handle — a
+          nameplate, the way Steam and Discord place theirs. */}
+      {plaque && (
+        <Plaque
+          name={plaque.name}
+          imageUrl={plaque.imageUrl}
+          size={bento ? "sm" : "lg"}
+          count={plaque.grants.length}
+          title={plaque.description ?? plaque.name}
+          className={bento ? "mt-2" : "mt-4 mx-auto md:mx-0"}
+        />
+      )}
+
+      {pinned.length > 0 && (
+        <div className={`flex items-center gap-3 ${bento ? "mt-3" : "mt-5 justify-center md:justify-start"}`}>
+          {pinned.map((g) => (
+            <Medal
+              key={g.awardId}
+              name={g.name}
+              imageUrl={g.imageUrl}
+              description={g.description}
+              grants={g.grants}
+              sizeClass={bento ? "w-10 h-10" : "w-14 h-14 md:w-[72px] md:h-[72px]"}
+              // The bento card clips its overflow, which would cut the detail
+              // card off; the full profile has room for it.
+              showDetail={!bento}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -108,6 +150,18 @@ export default function ProfileHeader({ user, isOwnProfile = false, onLogout, va
           )}
         </div>
       </div>
+
+      {onAward && (
+        <div className={`absolute top-6 ${isOwnProfile ? "right-20 md:right-28" : "right-6 md:right-12"} md:top-12 z-20`}>
+          <button
+            onClick={onAward}
+            className="h-10 md:h-12 px-4 border-2 border-primary/60 text-primary text-[10px] font-black uppercase tracking-widest transition-all hover:bg-primary hover:text-black"
+            title="Give this user an award"
+          >
+            Award
+          </button>
+        </div>
+      )}
 
       {isOwnProfile && (
         <div className="absolute top-6 right-6 md:top-12 md:right-12 z-20">

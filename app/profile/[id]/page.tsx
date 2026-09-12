@@ -1,5 +1,5 @@
 "use client";
-import { LeaderboardStats, UserProfile, ProfileTournamentResult } from "../../tournaments/types";
+import { LeaderboardStats, UserProfile, ProfileTournamentResult, UserAward } from "../../tournaments/types";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -11,6 +11,8 @@ import ProfileHeader from "../../components/profile/ProfileHeader";
 import StatsGrid from "../../components/profile/StatsGrid";
 import MatchHistory from "../../components/profile/MatchHistory";
 import TournamentHistory from "../../components/profile/TournamentHistory";
+import AwardsCase from "../../components/profile/AwardsCase";
+import GrantAwardModal from "../../components/awards/GrantAwardModal";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
 
 
@@ -24,6 +26,13 @@ function ProfileContent() {
   const [stats, setStats] = useState<LeaderboardStats | null>(null);
   const [tournaments, setTournaments] = useState<ProfileTournamentResult[]>([]);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [awards, setAwards] = useState<UserAward[]>([]);
+  // Admins may give awards from here; guests cannot hold them (the cleanup
+  // job would delete the award with the account), so the button is withheld.
+  const [viewerIsAdmin, setViewerIsAdmin] = useState(false);
+  const [granting, setGranting] = useState(false);
+  // Bumped after a give/revoke so the effect below re-reads the profile.
+  const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   // Sign-out logic now lives in one place: UserProvider.logout.
   // This page previously had its own copy of the same steps.
@@ -62,6 +71,8 @@ function ProfileContent() {
           (myData.id === bundle.id || myData.sub === bundle.id)
         );
         setIsOwnProfile(isMe);
+        setViewerIsAdmin(!!myData?.roles?.includes("ADMIN"));
+        setAwards(Array.isArray(bundle.awards) ? bundle.awards : []);
 
         setUser(
           isMe
@@ -98,7 +109,7 @@ function ProfileContent() {
     };
 
     fetchProfileData();
-  }, [profileId, router]);
+  }, [profileId, router, reloadKey]);
 
   // Placeholders shaped like the profile itself — header block, then the two
   // column panels — rather than a centred spinner, so the layout the user is
@@ -151,6 +162,8 @@ function ProfileContent() {
                 user={user} 
                 isOwnProfile={isOwnProfile} 
                 onLogout={handleLogout} 
+                awards={awards}
+                onAward={viewerIsAdmin && !user.isGuest ? () => setGranting(true) : undefined}
               />
             </FadeIn>
 
@@ -172,10 +185,26 @@ function ProfileContent() {
               </FadeIn>
             </div>
 
+            {awards.length > 0 && (
+              <FadeIn>
+                <AwardsCase awards={awards} />
+              </FadeIn>
+            )}
+
             <FadeIn>
               <TournamentHistory results={tournaments} />
             </FadeIn>
           </StaggerContainer>
+
+          {viewerIsAdmin && granting && (
+            <GrantAwardModal
+              userId={user.id}
+              userName={user.displayName || user.username}
+              isOpen={granting}
+              onClose={() => setGranting(false)}
+              onChanged={() => setReloadKey((k) => k + 1)}
+            />
+          )}
         </div>
       </HomeFrame>
     </div>

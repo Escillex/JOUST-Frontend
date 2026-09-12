@@ -8,6 +8,9 @@ import { useToast } from "../components/ui/Toast";
 import StatCard from "../components/admin/StatCard";
 import AnalyticsPanel from "../components/admin/AnalyticsPanel";
 import SettingsPanel from "../components/admin/SettingsPanel";
+import BackupPanel from "../components/admin/BackupPanel";
+import AwardManager from "../components/admin/AwardManager";
+import GrantAwardModal from "../components/awards/GrantAwardModal";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
 import UserModal from "../components/admin/UserModal";
@@ -62,7 +65,9 @@ interface Stats {
 export default function AdminDashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "GAMES" | "PRESETS" | "SETTINGS" | "DEV_TOOLS">("DASHBOARD");
+  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "GAMES" | "AWARDS" | "PRESETS" | "SETTINGS" | "BACKUPS" | "DEV_TOOLS">("DASHBOARD");
+  // Who the grant modal is open for, from a user-management row.
+  const [awardTarget, setAwardTarget] = useState<{ id: string; name: string } | null>(null);
   const [pendingGameRequests, setPendingGameRequests] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, registeredUsers: 0, guestUsers: 0, totalTournaments: 0, activeTournaments: 0, completedTournaments: 0 });
@@ -113,7 +118,7 @@ export default function AdminDashboard() {
     // Read from window rather than useSearchParams to avoid the Suspense-boundary
     // build requirement in a fully-client page.
     const t = new URLSearchParams(window.location.search).get("tab")?.toUpperCase();
-    if (t === "GAMES" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS" || t === "SETTINGS") setActiveTab(t);
+    if (t === "GAMES" || t === "AWARDS" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS" || t === "SETTINGS" || t === "BACKUPS") setActiveTab(t);
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -461,8 +466,11 @@ export default function AdminDashboard() {
         </div>
       )}
       <div className="max-w-7xl mx-auto w-full flex flex-col">
-        {/* Tactical Folder Tabs */}
-        <div className="flex items-end gap-1 px-4">
+        {/* Folder tabs. Eight of them no longer fit at the old padding (DEV
+            TOOLS was pushed off the right edge at 1440px once AWARDS joined),
+            so padding tightens below xl, and the strip wraps rather than hide a
+            tab on a narrow screen. */}
+        <div className="flex flex-wrap items-end gap-1 px-4">
           {/* Brand Tab */}
           <div className="px-6 py-4 bg-background border-t-2 border-l-2 border-r-2 border-white/10 flex flex-col justify-center min-w-[160px]">
             <div className="text-white font-black tracking-tighter text-xl font-poppins uppercase leading-none">
@@ -472,11 +480,11 @@ export default function AdminDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          {(["DASHBOARD", "ANALYTICS", "GAMES", "PRESETS", "SETTINGS", "DEV_TOOLS"] as const).map((tab) => (
+          {(["DASHBOARD", "ANALYTICS", "GAMES", "AWARDS", "PRESETS", "SETTINGS", "BACKUPS", "DEV_TOOLS"] as const).map((tab) => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-10 py-5 text-[10px] font-black uppercase tracking-[0.2em] transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
+              className={`px-4 xl:px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
                 activeTab === tab 
                   ? "bg-[#111] border-white/20 text-primary pt-6" 
                   : "bg-background border-white/5 text-white/30 hover:text-white hover:bg-white/5"
@@ -543,6 +551,7 @@ export default function AdminDashboard() {
                       onBatchDelete={handleBatchDelete}
                       onConvert={setGuestToConvert}
                       onEdit={(u) => { setUserToEdit(u); setIsUserModalOpen(true); }}
+                      onAward={(u) => setAwardTarget({ id: u.id || u.sub!, name: u.username })}
                       onCreateClick={() => { setUserToEdit(null); setIsUserModalOpen(true); }}
                     />
                   </div>
@@ -649,6 +658,36 @@ export default function AdminDashboard() {
               </div>
               <SettingsPanel />
             </motion.div>
+          ) : activeTab === "AWARDS" ? (
+            <motion.div
+              key="awards"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto w-full pb-12"
+            >
+              <div className="mb-12">
+                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "AWARDS" }]} />
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Awards</h1>
+                <p className="text-sm text-white/30 mt-4">Medals users can pin to their profile, and plaques shown under their name. Give them from User Management or from a profile.</p>
+              </div>
+              <AwardManager />
+            </motion.div>
+          ) : activeTab === "BACKUPS" ? (
+            <motion.div
+              key="backups"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto w-full pb-12"
+            >
+              <div className="mb-12">
+                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "BACKUPS" }]} />
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Database Backups</h1>
+                <p className="text-sm text-white/30 mt-4">Snapshot, restore, and export a sanitized copy for a second instance.</p>
+              </div>
+              <BackupPanel />
+            </motion.div>
           ) : activeTab === "PRESETS" ? (
             <motion.div 
               key="presets"
@@ -713,6 +752,16 @@ export default function AdminDashboard() {
     onClose={() => setIsUserModalOpen(false)}
     onSubmit={handleUserModalSubmit}
   />
+
+  {awardTarget && (
+    <GrantAwardModal
+      key={awardTarget.id}
+      userId={awardTarget.id}
+      userName={awardTarget.name}
+      isOpen
+      onClose={() => setAwardTarget(null)}
+    />
+  )}
 
   <ConvertGuestModal 
     guest={guestToConvert}

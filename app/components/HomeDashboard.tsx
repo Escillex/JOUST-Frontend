@@ -1,5 +1,7 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { API_ENDPOINTS, authenticatedFetch, safeJson } from "../utils/api";
+import type { UserAward } from "../tournaments/types";
 import FadeIn from "./FadeIn";
 import TournamentHero, { TournamentHeroContent } from "./tournaments/TournamentHero";
 import ProfileHeader from "./profile/ProfileHeader";
@@ -15,6 +17,21 @@ interface HomeDashboardProps {
 
 export default function HomeDashboard({ user, tournaments, stats, handleLogout }: HomeDashboardProps) {
     const canManage = user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
+
+    // The signed-in user's plaque and pinned medals for the bento header. Not
+    // on the critical path: the header renders immediately and the showcase
+    // fills in when this lands, so a slow link delays decoration, not the page.
+    const [awards, setAwards] = useState<UserAward[]>([]);
+    const uid = user?.id || user?.sub;
+    useEffect(() => {
+        if (!uid || user?.isGuest) return;
+        let alive = true;
+        authenticatedFetch(API_ENDPOINTS.AUTH.USER_PROFILE(uid))
+            .then(safeJson)
+            .then((b) => { if (alive && Array.isArray(b?.awards)) setAwards(b.awards); })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, [uid, user?.isGuest]);
 
     return (
         <FadeIn>
@@ -35,6 +52,7 @@ export default function HomeDashboard({ user, tournaments, stats, handleLogout }
                         variant="bento" 
                         isOwnProfile={true}
                         onLogout={handleLogout}
+                        awards={awards}
                     />
                 </div>
 

@@ -17,10 +17,13 @@ interface Props {
   onBatchDelete: (ids: string[]) => void;
   onConvert: (user: AdminUser) => void;
   onEdit: (user: AdminUser) => void;
+  /** Opens GrantAwardModal. Omitted for guests: they cannot hold awards, since
+   *  the guest-cleanup job would delete them along with the account. */
+  onAward?: (user: AdminUser) => void;
   onCreateClick: () => void;
 }
 
-export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert, onEdit, onCreateClick }: Props) {
+export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert, onEdit, onAward, onCreateClick }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"ALL" | "REGISTERED" | "GUEST">("ALL");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -176,6 +179,14 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                           className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
                         >
                           Register
+                        </button>
+                      )}
+                      {!u.isGuest && onAward && (
+                        <button
+                          onClick={() => onAward(u)}
+                          className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                        >
+                          Award
                         </button>
                       )}
                       <button 

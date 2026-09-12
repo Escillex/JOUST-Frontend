@@ -30,11 +30,29 @@ const SECURITY_FIELDS = [
     options: ["all", "staff", "off"],
     help: "all = every account. staff = admins and organizers only. off = nobody. This is the stored default; Dev Tools can override it until restart.",
   },
+];
+
+/** Google sign-in, configured per deployment. The Client ID belongs to whoever
+ *  runs this site — their own Google Cloud project — so Google's consent screen
+ *  names them, not the developer who wrote the code. */
+const GOOGLE_FIELDS = [
   {
     name: "GOOGLE_SIGNIN_ENABLED",
     label: "Google sign-in",
     options: ["false", "true"],
-    help: "Not yet implemented — the toggle is here so the setting exists when it lands.",
+    help: "The button appears on the sign-in page only when this is true AND a Client ID is set.",
+  },
+  {
+    name: "GOOGLE_CLIENT_ID",
+    label: "OAuth Client ID",
+    placeholder: "1234567890-abc123.apps.googleusercontent.com",
+    help: "From your own Google Cloud project. Public by design — no client secret is needed or stored.",
+  },
+  {
+    name: "GOOGLE_ALLOWED_DOMAIN",
+    label: "Allowed domain (optional)",
+    placeholder: "school.edu",
+    help: "Only accept Google accounts from this Workspace domain. Leave empty to accept any Google account.",
   },
 ];
 
@@ -46,6 +64,10 @@ export default function SettingsPanel() {
   const [testTo, setTestTo] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ text: string; ok: boolean } | null>(null);
+  // Where this page is served from — the exact value Google's "Authorized
+  // JavaScript origins" needs. Read on the client only (no window on the server).
+  const [origin, setOrigin] = useState("");
+  useEffect(() => { setOrigin(window.location.origin); }, []);
 
   const load = useCallback(async () => {
     const res = await authenticatedFetch(API_ENDPOINTS.ADMIN.SETTINGS);
@@ -206,6 +228,30 @@ export default function SettingsPanel() {
         <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Security</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
           {SECURITY_FIELDS.map(field)}
+        </div>
+      </div>
+
+      <div className="bg-background border border-white/10 p-6 space-y-6">
+        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Google Sign-In</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+          {GOOGLE_FIELDS.map(field)}
+        </div>
+
+        {/* The setup a deployer does once, in their own Google account. The
+            origin is read from the page, so it is exactly what Google needs. */}
+        <div className="border border-white/5 bg-white/[0.02] p-5 space-y-3">
+          <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Getting a Client ID</p>
+          <ol className="text-[11px] text-white/40 leading-relaxed space-y-1.5 list-decimal list-inside">
+            <li>In Google Cloud Console, create (or pick) a project owned by whoever runs this site.</li>
+            <li>APIs &amp; Services → OAuth consent screen: set the app name and support email your users should see.</li>
+            <li>Credentials → Create credentials → OAuth client ID → <span className="text-white/70">Web application</span>.</li>
+            <li>
+              Under <span className="text-white/70">Authorized JavaScript origins</span>, add{" "}
+              <code className="text-primary bg-black/40 px-1.5 py-0.5">{origin || "this site's address"}</code>. No
+              redirect URI is needed.
+            </li>
+            <li>Paste the Client ID above, save, and set Google sign-in to <span className="text-white/70">true</span>.</li>
+          </ol>
         </div>
       </div>
     </div>

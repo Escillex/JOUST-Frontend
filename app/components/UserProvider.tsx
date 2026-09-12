@@ -14,6 +14,10 @@ export type User = {
   isGuest?: boolean;
   avatarUrl?: string | null;
   sub?: string;
+  /** From /auth/me: whether Google sign-in is connected, and whether the
+   *  account has a password (disconnecting Google without one would lock it out). */
+  googleLinked?: boolean;
+  hasPassword?: boolean;
 } | null;
 
 type UserContextType = {

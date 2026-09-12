@@ -8,6 +8,8 @@ import ImageUpload from "../../components/ui/ImageUpload";
 import { authenticatedFetch, API_ENDPOINTS, API_URL, UPLOAD_TIMEOUT_MS, profileHref } from "../../utils/api";
 import { useUser } from "../../components/UserProvider";
 import { motion } from "motion/react";
+import ShowcaseEditor from "../../components/profile/ShowcaseEditor";
+import ConnectedAccounts from "../../components/profile/ConnectedAccounts";
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -144,6 +146,20 @@ export default function ProfileEditPage() {
                 </div>
               </div>
               
+              {/* What the public profile shows: pinned medals and the plaque
+                  under the name. Guests cannot hold awards, so it is withheld. */}
+              {user && !user.isGuest && (
+                <ShowcaseEditor handle={user.id} />
+              )}
+
+              {user && !user.isGuest && (
+                <ConnectedAccounts
+                  googleLinked={!!user.googleLinked}
+                  hasPassword={user.hasPassword !== false}
+                  onChanged={refreshUser}
+                />
+              )}
+
               {/* Footer greeble */}
               <div className="mt-12 flex items-center justify-between opacity-10">
                  <div className="text-[8px] font-mono tracking-widest uppercase">Identity Synchronized</div>
