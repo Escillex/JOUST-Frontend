@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useEffect } from 'react';
 import { Match } from '../../../tournaments/[id]/bracket/types';
 import { FormatConfig } from '../../../tournaments/types';
+import { displayNameOf } from '../../../utils/api';
 // Lazy-loaded: TrackerPanel is the largest component in the bracket tree and
 // is only reachable once an organizer opens the scoring drawer, so it does not
 // belong in the initial bundle.
@@ -78,10 +79,20 @@ export default function ScoringDrawer({
     }
   }, [hasTrackerCapability]);
 
+  // Escape closes it, like every other dialog in the app. Registered before the
+  // early return below so the hook order never changes between renders.
+  const isOpen = !!match;
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!match) return null;
 
-  const p1Name = match.player1?.username || match.p1Name || 'TBD';
-  const p2Name = match.player2?.username || match.p2Name || 'TBD';
+  const p1Name = displayNameOf(match.player1, '') || match.p1Name || 'TBD';
+  const p2Name = displayNameOf(match.player2, '') || match.p2Name || 'TBD';
   const bestOf = formatConfig?.bestOf ?? 1;
   const winsNeeded = Math.ceil(bestOf / 2);
   const p1Score = match.player1Score ?? 0;

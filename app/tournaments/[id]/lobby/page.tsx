@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, displayNameOf } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
 import { useToast } from "../../../components/ui/Toast";
@@ -212,7 +212,7 @@ function TournamentLobbyContent() {
                 <div className="space-y-1">
                   <span className="text-[9px] font-black text-primary uppercase tracking-[0.4em]">YOUR STATUS</span>
                   <div className="text-4xl font-black uppercase italic tracking-tighter text-white truncate">
-                    {user?.username || "Guest"}
+                    {displayNameOf(user, "Guest")}
                   </div>
                 </div>
 
@@ -299,7 +299,7 @@ function TournamentLobbyContent() {
                           </span>
                           <div className="flex flex-col">
                             <span className={`text-sm font-black uppercase tracking-wider transition-colors ${p.userId === myId ? "text-primary" : "text-white"}`}>
-                              {p.user.username}
+                              {displayNameOf(p.user)}
                             </span>
                             <span className="text-[8px] font-black text-white/10 uppercase tracking-widest group-hover:text-primary/40 transition-colors">
                               {p.status === "FORFEITED" ? "FORFEITED" : "PARTICIPANT"}

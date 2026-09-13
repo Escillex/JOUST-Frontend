@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Tournament } from "../../../tournaments/types";
+import { displayNameOf } from "../../../utils/api";
 import { isManualSeeding } from "../../../utils/formatConfig";
 import { DragDropProvider, PointerSensor, DragEndEvent } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
@@ -64,7 +65,12 @@ function SortableParticipantCard({
   };
 
   return (
-    <div ref={ref} className="space-y-px">
+    // The sortable ref only while the row can actually be dragged. With no
+    // handle rendered (reordering is locked once the tournament starts) dnd-kit
+    // puts its draggable attributes on this element instead — role=button,
+    // tabindex=0, aria-disabled=true — so every row became a dead tab stop and
+    // screen readers announced the Forfeit/Replace buttons inside as disabled.
+    <div ref={isAdmin ? ref : undefined} className="space-y-px">
       <div
         className={`bg-[#000000] border transition-colors rounded flex items-center justify-between group h-12 px-4 ${isDragging ? 'border-primary bg-white/5' : 'border-white/20 hover:border-white/40'} ${isForfeited ? 'opacity-50' : ''}`}
       >
@@ -82,7 +88,7 @@ function SortableParticipantCard({
           <div className="flex items-center gap-3">
             <span className="text-[#888888] font-mono text-xs w-6 text-right">{idx + 1}.</span>
             <span className={`text-sm font-semibold truncate max-w-[120px] md:max-w-xs ${isForfeited ? 'text-[#888888] line-through' : 'text-white'}`}>
-              {p.user?.username || "Unknown"}
+              {displayNameOf(p.user)}
             </span>
           </div>
           {p.user?.isGuest && (

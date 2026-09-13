@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import React, { useState, useEffect, Suspense, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, displayNameOf } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import ConnectionPill from '../../../components/ui/ConnectionPill';
 import LastUpdated from '../../../components/ui/LastUpdated';
@@ -415,8 +415,8 @@ function BracketViewContent() {
   const handleScoreMatch = async (winnerId: string | null) => {
     if (!activeAdmin || !scoringMatch || updating) return;
     const matchId = scoringMatch.id;
-    const p1Name = scoringMatch.player1?.username || "TBD";
-    const p2Name = scoringMatch.player2?.username || "TBD";
+    const p1Name = displayNameOf(scoringMatch.player1, "TBD");
+    const p2Name = displayNameOf(scoringMatch.player2, "TBD");
     const winnerName = winnerId === scoringMatch.player1?.id ? p1Name : winnerId === scoringMatch.player2?.id ? p2Name : null;
     setUpdating(matchId);
     try {
@@ -493,11 +493,13 @@ function BracketViewContent() {
               <div className="flex items-center gap-3">
                 <ConnectionPill connected={connected} />
                 <LastUpdated lastUpdated={lastUpdated} />
+                {/* isAdmin here means "may manage this tournament" (canManage),
+                    which organizers and co-organizers have too — so the label
+                    names the viewer's actual role instead of calling every
+                    organizer a system administrator. */}
                 <span className={`text-[8px] font-black uppercase tracking-[0.3em] ${isAdmin ? "text-primary/60" : "text-foreground/20"}`}>
-                  {isAdmin ? "SYSTEM ADMINISTRATOR" : "AUTHORIZED VIEWER"}
+                  {isRealAdmin ? "Administrator" : isAdmin ? "Organizer" : "Spectator"}
                 </span>
-                <div className="w-1 h-1 rounded-full bg-foreground/10" />
-                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-foreground/20">TOURNAMENT CONTROLLER v2.0</span>
               </div>
             </div>
           </div>
@@ -634,7 +636,7 @@ function BracketViewContent() {
                   transition={{ delay: 0.3, type: "spring", stiffness: 100, damping: 12 }}
                   className="text-6xl md:text-8xl font-black text-white uppercase tracking-tighter leading-none font-poppins italic group-hover:scale-[1.02] transition-transform duration-700"
                 >
-                  {tournament.winner.username}
+                  {displayNameOf(tournament.winner)}
                 </motion.h2>
                 <motion.div 
                   initial={{ opacity: 0 }}
@@ -654,7 +656,7 @@ function BracketViewContent() {
                 className="w-32 h-32 md:w-48 md:h-48 bg-primary text-black flex items-center justify-center relative shadow-[0_0_50px_rgba(82,185,70,0.3)] shrink-0"
               >
                 <div className="absolute inset-2 border-2 border-black/20" />
-                <span className="text-6xl md:text-8xl font-black italic">{tournament.winner.username?.[0]}</span>
+                <span className="text-6xl md:text-8xl font-black italic">{displayNameOf(tournament.winner)[0]}</span>
               </motion.div>
             </div>
           </motion.div>
@@ -741,7 +743,7 @@ function BracketViewContent() {
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse mb-3 shadow-[0_0_8px_#52b946]" />
             <h3 className="text-xl font-black uppercase tracking-tight text-white mb-1">Your Match is Live</h3>
             <p className="text-[10px] text-white/50 uppercase tracking-widest mb-6">
-              An organizer has opened the tracker for {activePlayerMatchPopup.player1?.username || "P1"} vs {activePlayerMatchPopup.player2?.username || "P2"}.
+              An organizer has opened the tracker for {displayNameOf(activePlayerMatchPopup.player1, "P1")} vs {displayNameOf(activePlayerMatchPopup.player2, "P2")}.
             </p>
             <div className="flex gap-3 w-full">
               <button 
@@ -780,7 +782,7 @@ function BracketViewContent() {
               <div>
                 <span className="text-[9px] font-black uppercase tracking-[0.3em] text-amber-500 block mb-1">Threshold Met</span>
                 <h3 className="text-sm font-black uppercase tracking-wide text-white">
-                  {activeAdminMatchNotification.player1?.username || "P1"} vs {activeAdminMatchNotification.player2?.username || "P2"}
+                  {displayNameOf(activeAdminMatchNotification.player1, "P1")} vs {displayNameOf(activeAdminMatchNotification.player2, "P2")}
                 </h3>
                 <p className="text-[10px] text-white/40 uppercase tracking-widest mt-1">Requires Result Verification</p>
               </div>

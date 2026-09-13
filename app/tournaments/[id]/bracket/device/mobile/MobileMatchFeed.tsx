@@ -4,6 +4,7 @@ import { isWinnersRound, isLosersRound, isGrandFinal, losersRoundIndex } from ".
 import React, { useState, useMemo } from "react";
 import { Match, Round, LeaderboardEntry } from "../../types";
 import MatchCard from "../../../../../components/tournaments/bracket/MatchCard";
+import { displayNameOf } from "../../../../../utils/api";
 
 interface MobileMatchFeedProps {
     tournament: any;
@@ -88,8 +89,8 @@ export default function MobileMatchFeed({
                 }
                 if (searchQuery.trim() && isAdmin) {
                     const query = searchQuery.toLowerCase().trim();
-                    const p1Name = (match.player1?.username || match.p1Name || "").toLowerCase();
-                    const p2Name = (match.player2?.username || match.p2Name || "").toLowerCase();
+                    const p1Name = `${match.player1?.username ?? ""} ${match.player1?.displayName ?? ""} ${match.p1Name ?? ""}`.toLowerCase();
+                    const p2Name = `${match.player2?.username ?? ""} ${match.player2?.displayName ?? ""} ${match.p2Name ?? ""}`.toLowerCase();
                     if (!p1Name.includes(query) && !p2Name.includes(query)) return false;
                 }
                 return true;
@@ -107,7 +108,7 @@ export default function MobileMatchFeed({
     };
 
     const getChampionDisplay = () => {
-        if (tournament?.winner) return tournament.winner.username;
+        if (tournament?.winner) return displayNameOf(tournament.winner);
         if (tournament?.winnerName) return tournament.winnerName;
 
         // Fallback to searching rounds if status is completed
@@ -115,11 +116,11 @@ export default function MobileMatchFeed({
             const allMatches = sortedRounds.flatMap(r => r.matches);
             const finalMatch = allMatches.find(m => !m.nextMatchId && m.status === 'COMPLETED');
             if (finalMatch) {
-                return finalMatch.winner?.username || finalMatch.winnerName || "Unknown Champion";
+                return displayNameOf(finalMatch.winner, "") || finalMatch.winnerName || "Unknown Champion";
             }
         }
 
-        return leaderboard.length > 0 ? leaderboard[0]?.username : "AWAITING RESULTS";
+        return leaderboard.length > 0 ? displayNameOf(leaderboard[0]) : "AWAITING RESULTS";
     };
 
     return (

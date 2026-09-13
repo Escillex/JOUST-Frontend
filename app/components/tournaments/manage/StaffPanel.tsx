@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, displayNameOf } from "../../../utils/api";
 import { TournamentStaff } from "../../../tournaments/types";
 import { useToast } from "../../ui/Toast";
 
@@ -132,7 +132,7 @@ export default function StaffPanel({ tournamentId, isCreator }: Props) {
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-sm text-white truncate">
-                  {member.user?.username || "Unknown"}
+                  {displayNameOf(member.user)}
                 </span>
                 <span
                   className={`text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded ${

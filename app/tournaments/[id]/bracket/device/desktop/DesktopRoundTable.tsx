@@ -37,7 +37,24 @@ export default function DesktopRoundTable({
     const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
     
     const isDoubleElim = tournament?.format?.system === "DOUBLE_ELIMINATION";
-    const [bracketView, setBracketView] = useState<"WINNERS" | "LOSERS">("WINNERS");
+    const [bracketView, setBracketView] = useState<"WINNERS" | "LOSERS">(
+        isDoubleElim && isLosersRound(initialRound) ? "LOSERS" : "WINNERS",
+    );
+
+    // Follow the live round. `initialRound` is recomputed on every refresh, but
+    // useState only read it once, so an organizer who finished round 1 was left
+    // looking at a page of FULL TIME cards with the next round one tab away.
+    // Follow only when they were on the live round — someone who went back to
+    // review an earlier round keeps their place. (State adjusted during render,
+    // React's pattern for deriving state from changing props, not an effect.)
+    const [followedRound, setFollowedRound] = useState<number>(initialRound);
+    if (initialRound !== followedRound) {
+        setFollowedRound(initialRound);
+        if (activeRound === followedRound) {
+            setActiveRound(initialRound);
+            if (isDoubleElim) setBracketView(isLosersRound(initialRound) ? "LOSERS" : "WINNERS");
+        }
+    }
 
     const displayedRounds = React.useMemo(() => {
         if (!isDoubleElim) return sortedRounds;
@@ -78,8 +95,8 @@ export default function DesktopRoundTable({
                 }
                 if (searchQuery.trim()) {
                     const query = searchQuery.toLowerCase().trim();
-                    const p1Name = (match.player1?.username || match.p1Name || "").toLowerCase();
-                    const p2Name = (match.player2?.username || match.p2Name || "").toLowerCase();
+                    const p1Name = `${match.player1?.username ?? ""} ${match.player1?.displayName ?? ""} ${match.p1Name ?? ""}`.toLowerCase();
+                    const p2Name = `${match.player2?.username ?? ""} ${match.player2?.displayName ?? ""} ${match.p2Name ?? ""}`.toLowerCase();
                     if (!p1Name.includes(query) && !p2Name.includes(query)) return false;
                 }
                 return true;

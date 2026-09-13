@@ -3,8 +3,8 @@ import { MatchGameLog } from "../../types";
 
 export interface Match {
   id: string;
-  player1: { id: string; username: string; isGuest?: boolean } | null;
-  player2: { id: string; username: string; isGuest?: boolean } | null;
+  player1: { id: string; username: string; displayName?: string | null; isGuest?: boolean } | null;
+  player2: { id: string; username: string; displayName?: string | null; isGuest?: boolean } | null;
   player1Id?: string | null;
   player2Id?: string | null;
   winnerId?: string | null;
@@ -36,6 +36,7 @@ export interface LeaderboardEntry {
   rank: number;
   userId: string;
   username: string;
+  displayName?: string | null;
   isGuest?: boolean;
   points: number;
   wins: number;

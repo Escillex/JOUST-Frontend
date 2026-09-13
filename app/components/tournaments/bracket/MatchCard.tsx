@@ -1,5 +1,6 @@
 "use client";
 import { Match, LeaderboardEntry } from "../../../tournaments/[id]/bracket/types";
+import { displayNameOf } from "../../../utils/api";
 
 interface MatchCardProps {
   match: Match;
@@ -98,14 +99,14 @@ export default function MatchCard({
 
       <div className="flex flex-col">
         <ParticipantRow
-          username={match.player1?.username || match.p1Name || undefined}
+          username={displayNameOf(match.player1, "") || match.p1Name || undefined}
           score={p1Score}
           isWinner={match.winnerId ? match.winnerId === match.player1?.id : false}
           isTracked={trackedUserId === match.player1?.id}
         />
         <div className="h-[1px] bg-white/5 w-full" />
         <ParticipantRow
-          username={match.player2?.username || match.p2Name || undefined}
+          username={displayNameOf(match.player2, "") || match.p2Name || undefined}
           score={p2Score}
           isWinner={match.winnerId ? match.winnerId === match.player2?.id : false}
           isBye={match.isBye}

@@ -1,4 +1,5 @@
 "use client";
+import { displayNameOf } from "../../../utils/api";
 import { LeaderboardEntry, LogEntry } from "../../../tournaments/[id]/bracket/types";
 
 
@@ -58,7 +59,7 @@ export default function MaximizedModal({ panel, logs, leaderboard, onClose }: Pr
                     {leaderboard.map(e => (
                       <tr key={e.userId} className="border-b border-white/5 hover:bg-white/5 transition-all">
                         <td className="py-8 px-8 text-primary font-poppins text-2xl w-32">#{e.rank.toString().padStart(2, "0")}</td>
-                        <td className="py-8 px-4 font-poppins tracking-tighter text-2xl">{e.username}</td>
+                        <td className="py-8 px-4 font-poppins tracking-tighter text-2xl">{displayNameOf(e)}</td>
                         <td className="py-8 px-8 text-center font-poppins text-2xl w-48">{e.points}</td>
                         <td className="py-8 px-8 text-center text-foreground/40 font-poppins text-2xl w-48">{e.wins}-{e.draws || 0}-{e.losses}</td>
                         <td className="py-8 px-8 text-right text-foreground/60 font-poppins text-2xl w-48">{(e.matchWinPct * 100).toFixed(0)}%</td>

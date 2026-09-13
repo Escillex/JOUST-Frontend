@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Tournament } from '../../../tournaments/types';
 import { getTournamentConfig } from '../../../utils/formatConfig';
+import { displayNameOf } from '../../../utils/api';
 import { useLiveTournamentData } from './useLiveTournamentData';
 import LiveMatchGrid from '../../../components/tournaments/live/LiveMatchGrid';
 import TVOverlay from '../../../components/tournaments/live/TVOverlay';
@@ -96,8 +97,8 @@ export default function LivePage() {
   const activeLog = matchLogs.find(l => l.trackerActive) ?? null;
   const completedLogs = matchLogs.filter(l => !l.trackerActive && l.completedAt);
 
-  const p1Name = focusedMatch?.player1?.username || focusedMatch?.p1Name || 'TBD';
-  const p2Name = focusedMatch?.player2?.username || focusedMatch?.p2Name || 'TBD';
+  const p1Name = displayNameOf(focusedMatch?.player1, '') || focusedMatch?.p1Name || 'TBD';
+  const p2Name = displayNameOf(focusedMatch?.player2, '') || focusedMatch?.p2Name || 'TBD';
   const p1Wins = focusedMatch?.player1Score ?? 0;
   const p2Wins = focusedMatch?.player2Score ?? 0;
 

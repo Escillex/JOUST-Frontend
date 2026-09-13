@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { authenticatedFetch, API_ENDPOINTS } from "../../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, displayNameOf } from "../../../utils/api";
 import { isManualSeeding } from "../../../utils/formatConfig";
 import { 
   ReactFlow, 
@@ -74,8 +74,8 @@ function computeAllRounds(ps: RawParticipant[], format: string): PreviewRound[] 
     const matches: PreviewMatch[] = Array.from({ length: Math.ceil(n / 2) }, (_, i) => ({
       id: `preview-0-${i}`,
       matchIndex: i,
-      player1: s[i * 2] ? { userId: s[i * 2].userId, name: s[i * 2].user.username, seed: s[i * 2].seed ?? i * 2 + 1, isGuest: s[i * 2].user.isGuest } : null,
-      player2: s[i * 2 + 1] ? { userId: s[i * 2 + 1].userId, name: s[i * 2 + 1].user.username, seed: s[i * 2 + 1].seed ?? i * 2 + 2, isGuest: s[i * 2 + 1].user.isGuest } : null,
+      player1: s[i * 2] ? { userId: s[i * 2].userId, name: displayNameOf(s[i * 2].user), seed: s[i * 2].seed ?? i * 2 + 1, isGuest: s[i * 2].user.isGuest } : null,
+      player2: s[i * 2 + 1] ? { userId: s[i * 2 + 1].userId, name: displayNameOf(s[i * 2 + 1].user), seed: s[i * 2 + 1].seed ?? i * 2 + 2, isGuest: s[i * 2 + 1].user.isGuest } : null,
     }));
     return [{ id: "preview-round-1", roundNumber: 1, matches }];
   }
@@ -90,7 +90,7 @@ function computeAllRounds(ps: RawParticipant[], format: string): PreviewRound[] 
   const slot = (seedNumber: number) => {
     const p = s[seedNumber - 1];
     if (!p) return null;
-    return { userId: p.userId, name: p.user.username, seed: p.seed ?? seedNumber, isGuest: p.user.isGuest };
+    return { userId: p.userId, name: displayNameOf(p.user), seed: p.seed ?? seedNumber, isGuest: p.user.isGuest };
   };
 
   let currentMatchCount = powerOf2 / 2;
@@ -118,7 +118,7 @@ function PlayerPicker({ participants, excludeId, onSelect, onClose }: {
   const [q, setQ] = useState(""); const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { ref.current?.focus(); }, []);
   const opts = participants.filter(p =>
-    p.userId !== excludeId && p.user.username.toLowerCase().includes(q.toLowerCase())
+    p.userId !== excludeId && (p.user.username.toLowerCase().includes(q.toLowerCase()) || displayNameOf(p.user).toLowerCase().includes(q.toLowerCase()))
   );
   return (
     <div className="absolute z-[1000] top-full left-0 mt-2 w-80 bg-black border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
@@ -135,7 +135,7 @@ function PlayerPicker({ participants, excludeId, onSelect, onClose }: {
               className="w-full px-4 py-3 text-left flex items-center gap-4 hover:bg-white/5 text-white transition-all border-b border-white/5 last:border-0 group">
               <span className="text-[10px] font-bold text-primary w-6">#{p.seed ?? "?"}</span>
               <div className="flex-1 flex flex-col">
-                <span className="text-sm font-medium transition-colors group-hover:text-primary">{p.user.username}</span>
+                <span className="text-sm font-medium transition-colors group-hover:text-primary">{displayNameOf(p.user)}</span>
                 {p.user.isGuest && <span className="text-[10px] text-white/40 mt-0.5">Guest Unit</span>}
               </div>
             </button>
@@ -207,7 +207,10 @@ const PreviewMatchNode = ({ data }: NodeProps<FlowNode<{
 }>>) => {
     const [open, setOpen] = useState(false);
     return (
-        <div className="relative group">
+        // pointer-events-auto: see MatchNode in EliminationLayout — React Flow
+        // makes a non-selectable, non-draggable node ignore the pointer, which
+        // left the seed-swap picker on these slots unclickable.
+        <div className="relative group pointer-events-auto">
             <Handle type="target" position={Position.Left} className="!opacity-0 !w-0 !h-0" />
             
             <div className={`w-80 flex flex-col border border-white/10 bg-black transition-all ${open ? "z-[10000] border-primary/50 shadow-2xl" : "z-0 shadow-xl"}`}>
@@ -445,7 +448,7 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
       await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.UPDATE_SEED(tournamentId, toId), {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seed: fromSeed }),
       });
-      addLog("SEED SWAP", `${fromP.user.username.toUpperCase()} ↔ ${toP.user.username.toUpperCase()}`);
+      addLog("SEED SWAP", `${displayNameOf(fromP.user).toUpperCase()} ↔ ${displayNameOf(toP.user).toUpperCase()}`);
       onRefresh();
     } catch { addLog("ERROR", "SEED SWAP FAILED"); }
     finally { setSwapping(false); }
@@ -599,7 +602,7 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
             >
                 <option value="">{trackedUserId ? "Back to Neutral" : "Track Participant"}</option>
                 {sorted(participants).map(p => (
-                    <option key={p.userId} value={p.userId}>{p.user.username}</option>
+                    <option key={p.userId} value={p.userId}>{displayNameOf(p.user)}</option>
                 ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40">▼</div>

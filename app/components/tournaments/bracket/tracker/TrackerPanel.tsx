@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MatchGameLog, GameTrackingMode, FormatConfig } from '../../../../tournaments/types';
 import { Match } from '../../../../tournaments/[id]/bracket/types';
-import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../../utils/api';
+import { authenticatedFetch, safeJson, API_ENDPOINTS, displayNameOf } from '../../../../utils/api';
 import { usePolling } from '../../../../utils/usePolling';
 import { useTournamentSocket, TrackerUpdatePayload } from '../../../../utils/useTournamentSocket';
 import ConnectionPill from '../../../ui/ConnectionPill';
@@ -52,8 +52,8 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
   const activeLog = logs.find(l => l.trackerActive) ?? null;
   const p1Wins = match.player1Score ?? 0;
   const p2Wins = match.player2Score ?? 0;
-  const p1Name = match.player1?.username || match.p1Name || 'Player 1';
-  const p2Name = match.player2?.username || match.p2Name || 'Player 2';
+  const p1Name = displayNameOf(match.player1, '') || match.p1Name || 'Player 1';
+  const p2Name = displayNameOf(match.player2, '') || match.p2Name || 'Player 2';
 
   const isPlayerInMatch = currentUserId === match.player1?.id || currentUserId === match.player2?.id || currentUserId === match.player1Id || currentUserId === match.player2Id;
   const canManipulate = isAdmin || isPlayerInMatch;

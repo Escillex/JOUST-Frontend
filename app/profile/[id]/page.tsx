@@ -1,5 +1,5 @@
 "use client";
-import { LeaderboardStats, UserProfile, ProfileTournamentResult, UserAward } from "../../tournaments/types";
+import { LeaderboardStats, UserProfile, ProfileTournamentResult, UserAward, GalleryImage } from "../../tournaments/types";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import StatsGrid from "../../components/profile/StatsGrid";
 import MatchHistory from "../../components/profile/MatchHistory";
 import TournamentHistory from "../../components/profile/TournamentHistory";
 import AwardsCase from "../../components/profile/AwardsCase";
+import GallerySection from "../../components/profile/GallerySection";
 import GrantAwardModal from "../../components/awards/GrantAwardModal";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
 
@@ -30,6 +31,9 @@ function ProfileContent() {
   // Admins may give awards from here; guests cannot hold them (the cleanup
   // job would delete the award with the account), so the button is withheld.
   const [viewerIsAdmin, setViewerIsAdmin] = useState(false);
+  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+  // Undefined when signed out: reporting needs an account.
+  const [viewerRoles, setViewerRoles] = useState<string[] | undefined>(undefined);
   const [granting, setGranting] = useState(false);
   // Bumped after a give/revoke so the effect below re-reads the profile.
   const [reloadKey, setReloadKey] = useState(0);
@@ -73,6 +77,8 @@ function ProfileContent() {
         setIsOwnProfile(isMe);
         setViewerIsAdmin(!!myData?.roles?.includes("ADMIN"));
         setAwards(Array.isArray(bundle.awards) ? bundle.awards : []);
+        setGallery(Array.isArray(bundle.gallery) ? bundle.gallery : []);
+        setViewerRoles(myData ? (myData.roles ?? []) : undefined);
 
         setUser(
           isMe
@@ -189,6 +195,17 @@ function ProfileContent() {
             {awards.length > 0 && (
               <FadeIn>
                 <AwardsCase awards={awards} />
+              </FadeIn>
+            )}
+
+            {gallery.length > 0 && (
+              <FadeIn>
+                <GallerySection
+                  images={gallery}
+                  viewerRoles={viewerRoles}
+                  isOwnProfile={isOwnProfile}
+                  onRemoved={() => setReloadKey((k) => k + 1)}
+                />
               </FadeIn>
             )}
 

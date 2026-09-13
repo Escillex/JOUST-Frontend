@@ -4,6 +4,7 @@ import { isWinnersRound, isLosersRound, losersRoundIndex } from "../roundNumbers
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Match, Round, LeaderboardEntry } from "../types";
 import MatchCard from "../../../../components/tournaments/bracket/MatchCard";
+import { displayNameOf } from "../../../../utils/api";
 import { 
   ReactFlow, 
   Background, 
@@ -38,7 +39,14 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
     onOpenScoring: (match: Match, pos?: {x: number, y: number}) => void;
 }>>) => {
     return (
-        <div className="relative group">
+        // pointer-events-auto: React Flow v12 gives a node that is not
+        // selectable, draggable or click-handled `pointer-events: none` (all
+        // three are off on this canvas), and the property is inherited, so the
+        // card's hover states and click handler never received the pointer.
+        // Scoring from this view stays off by design (DesktopView passes
+        // isAdmin={false}); the same trap disabled the seed-swap picker in
+        // BracketPreview, where it did matter.
+        <div className="relative group pointer-events-auto">
             {/* Input handles (incoming from the previous round, either side) */}
             <Handle id="tl" type="target" position={Position.Left} className="!opacity-0 !w-0 !h-0" />
             <Handle id="tr" type="target" position={Position.Right} className="!opacity-0 !w-0 !h-0" />
@@ -453,7 +461,7 @@ export default function EliminationLayout({
                 type: 'champion',
                 position: { x: centerX, y: finalY + 220 },
                 data: {
-                    label: tournament?.winner?.username || 'TBD',
+                    label: displayNameOf(tournament?.winner, 'TBD'),
                     hasChampion: !!tournament?.winner
                 },
                 draggable: false
@@ -629,7 +637,7 @@ export default function EliminationLayout({
                     type: 'champion',
                     position: { x: championX, y: championY - 35 },
                     data: { 
-                        label: tournament?.winner?.username || 'TBD',
+                        label: displayNameOf(tournament?.winner, 'TBD'),
                         hasChampion: !!tournament?.winner
                     },
                     draggable: false

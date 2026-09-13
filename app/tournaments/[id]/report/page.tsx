@@ -53,7 +53,7 @@ interface ReportTournament {
   completedAt?: string | null;
   maxPlayers: number;
   prizePool: number | null;
-  createdBy?: { username: string } | null;
+  createdBy?: { username: string; displayName?: string | null } | null;
   winner?: Person | null;
   game?: { name: string } | null;
   format?: { name: string; system: string } | null;
@@ -211,7 +211,7 @@ export default function TournamentReportPage() {
               ["Status", done ? "Completed" : t.status.charAt(0) + t.status.slice(1).toLowerCase()],
               ["Event date", fmtDate(t.date ?? t.createdAt)],
               ["Completed", done ? fmtDate(t.completedAt) : "—"],
-              ["Organizer", t.createdBy?.username ?? "—"],
+              ["Organizer", displayNameOf(t.createdBy, "—")],
               ...(t.venue ? [["Venue", t.venue]] : []),
               ...(t.prizePool ? [["Prize pool", String(t.prizePool)]] : []),
             ].map(([k, v]) => (
@@ -397,7 +397,14 @@ export default function TournamentReportPage() {
                               <td className="py-2 pr-3 text-white/30 text-[11px]">{i + 1}</td>
                               <td className={`py-2 pr-3 text-right truncate ${w1 ? "font-black" : "text-white/60"}`}>{p1}</td>
                               <td className="py-2 px-3 text-center font-mono whitespace-nowrap">
-                                {m.isBye || m.status !== "COMPLETED" ? "–" : `${m.player1Score ?? 0} : ${m.player2Score ?? 0}`}
+                                {/* A result entered without game scores (an organizer's
+                                    direct win, a forfeit) has 0 : 0 on record, which
+                                    read as a scoreless match beside a bolded winner. */}
+                                {m.isBye || m.status !== "COMPLETED"
+                                  ? "–"
+                                  : !m.player1Score && !m.player2Score && m.winnerId
+                                    ? (w1 ? "W : L" : "L : W")
+                                    : `${m.player1Score ?? 0} : ${m.player2Score ?? 0}`}
                               </td>
                               <td className={`py-2 pl-3 truncate ${w2 ? "font-black" : "text-white/60"}`}>{p2}</td>
                               <td className="py-2 text-right text-[11px] text-white/40 whitespace-nowrap">{note}</td>

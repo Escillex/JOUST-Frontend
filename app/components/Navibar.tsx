@@ -130,6 +130,9 @@ export default function Navibar() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                    aria-label="Account menu"
+                    aria-haspopup="menu"
+                    aria-expanded={isProfileMenuOpen}
                     className={`w-10 h-10 flex items-center justify-center font-black text-xs transition-all border-2 font-poppins overflow-hidden relative ${
                       isProfileMenuOpen 
                       ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(var(--color-primary),0.5)]" 

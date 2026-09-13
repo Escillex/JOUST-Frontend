@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
-import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, displayNameOf } from "../../../utils/api";
 import {
   getTournamentConfig,
   getTournamentSystem,
@@ -270,7 +270,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
     // undefined, so every guest fell through to the placeholder and this panel
     // showed "TBD vs TBD" for guest-vs-guest matches, which at a walk-in event
     // is most of them. Guests carry a real `username` now.
-    return player.username || placeholder;
+    return displayNameOf(player, placeholder);
   };
 
   return (

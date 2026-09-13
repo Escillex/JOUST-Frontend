@@ -374,6 +374,30 @@ export const API_ENDPOINTS = {
     GRANT: (userId: string, grantId: string) => `/users/${userId}/awards/${grantId}`,
     SHOWCASE: '/users/me/showcase',
   },
+  /** Tournament builds (obj. 4.3). LIST is filtered for the viewer; MINE is
+   *  the signed-in entrant's own (multipart when it is an image). */
+  BUILDS: {
+    LIST: (tournamentId: string) => `/tournaments/${tournamentId}/builds`,
+    MINE: (tournamentId: string) => `/tournaments/${tournamentId}/builds/me`,
+    REVIEW: (tournamentId: string, buildId: string) =>
+      `/tournaments/${tournamentId}/builds/${buildId}/review`,
+    SETTINGS: (tournamentId: string) => `/tournaments/${tournamentId}/builds/settings`,
+  },
+  /** The signed-in user's profile gallery — one image per game (obj. 4.3). */
+  GALLERY: {
+    MINE: '/users/me/gallery',
+    GAME: (gameId: string) => `/users/me/gallery/${gameId}`,
+  },
+  /** Report a gallery image or build. From an organizer it is a removal request. */
+  REPORTS: '/reports',
+  /** Admin moderation queue — only admins remove content. */
+  MODERATION: {
+    QUEUE: (view: 'open' | 'removed') => `/admin/moderation?view=${view}`,
+    COUNT: '/admin/moderation/count',
+    REMOVE: '/admin/moderation/remove',
+    DISMISS: '/admin/moderation/dismiss',
+    RESTORE: '/admin/moderation/restore',
+  },
   /** Unauthenticated liveness probe. Polled while the server restarts after a
    *  restore — an authenticated route cannot answer that question. */
   HEALTH: '/health',

@@ -1,6 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import { Match } from '../../../tournaments/[id]/bracket/types';
+import { displayNameOf } from '../../../utils/api';
 import { MatchGameLog, GameTrackingMode } from '../../../tournaments/types';
 import GameBar from '../bracket/tracker/GameBar';
 import GameSeriesScore from '../bracket/tracker/GameSeriesScore';
@@ -19,8 +20,8 @@ export default function LiveMatchTile({ match, roundNumber, matchIndex, logs, wi
   const completedLogs = logs.filter(l => !l.trackerActive && l.completedAt);
   const isTrackerActive = !!activeLog;
 
-  const p1Name = match.player1?.username || match.p1Name || 'TBD';
-  const p2Name = match.player2?.username || match.p2Name || 'TBD';
+  const p1Name = displayNameOf(match.player1, '') || match.p1Name || 'TBD';
+  const p2Name = displayNameOf(match.player2, '') || match.p2Name || 'TBD';
   const p1Wins = match.player1Score ?? 0;
   const p2Wins = match.player2Score ?? 0;
 

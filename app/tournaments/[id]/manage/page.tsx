@@ -13,6 +13,7 @@ import { useUser } from "../../../components/UserProvider";
 import ControlRoomHeader from "../../../components/tournaments/manage/ControlRoomHeader";
 import RosterPanel from "../../../components/tournaments/manage/RosterPanel";
 import StaffPanel from "../../../components/tournaments/manage/StaffPanel";
+import BuildsReviewPanel from "../../../components/tournaments/manage/BuildsReviewPanel";
 import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
@@ -567,6 +568,12 @@ function ControlRoomContent() {
                 !!tournament.createdById &&
                 tournament.createdById === (currentUser?.sub || currentUser?.id)
               }
+            />
+            <BuildsReviewPanel
+              tournamentId={tournamentId!}
+              status={tournament.status}
+              refreshKey={`${tournament.status}:${tournament.participants.map(p => `${p.userId}/${p.status}`).join(",")}`}
+              setMessage={toast}
             />
             <AddParticipantsPanel
               tournament={tournament}

@@ -14,6 +14,7 @@ import {
   authenticatedFetch,
   API_ENDPOINTS,
   safeJson,
+  displayNameOf,
 } from "../../../utils/api";
 import { useUser } from "../../../components/UserProvider";
 import { useToast } from "../../../components/ui/Toast";
@@ -227,7 +228,7 @@ export default function InvitePage() {
                 disabled={joining}
                 className="w-full h-11 bg-primary text-black font-semibold text-sm rounded hover:brightness-90 transition-colors disabled:opacity-50"
               >
-                {joining ? "Joining..." : `Join as ${user.username || "yourself"}`}
+                {joining ? "Joining..." : `Join as ${displayNameOf(user, "yourself")}`}
               </button>
             )
           ) : (

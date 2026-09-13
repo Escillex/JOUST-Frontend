@@ -70,8 +70,6 @@ export default function ManageTournaments() {
     }
   };
 
-  if (isAuthorized === false) return null;
-
   // The dashboard chrome — heading, refresh, "Create New" — renders immediately
   // and only the table region is skeletoned, so the page is navigable while the
   // tournament list is still in flight instead of being hidden behind a spinner.
@@ -106,6 +104,11 @@ export default function ManageTournaments() {
       return t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
     });
   }, [tournaments, query, statusFilter, gameFilter, organizerFilter]);
+
+  // After every hook: returning earlier rendered fewer hooks than the previous
+  // render once a player was bounced, and React threw ("Rendered fewer hooks
+  // than expected") into the error boundary instead of redirecting quietly.
+  if (isAuthorized === false) return null;
 
   const filtersActive =
     query.trim() !== "" || statusFilter !== "ALL" || gameFilter !== "ALL" || organizerFilter !== "ALL";

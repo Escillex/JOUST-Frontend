@@ -28,7 +28,20 @@ export default function MobileView({
 }: MobileViewProps) {
     const fs = tournament?.format?.system;
     const isElimination = fs === "SINGLE_ELIMINATION" || fs === "DOUBLE_ELIMINATION" || fs === "HYBRID";
-    const [activePhase, setActivePhase] = React.useState<number>(0);
+    // Open on the live round, not round 1 — and follow it as rounds finish,
+    // unless the viewer has moved to another round (same rule as the desktop
+    // card view). Indices are into the rounds sorted by number, as
+    // MobileMatchFeed reads them.
+    const sorted: { roundNumber: number; matches: { status?: string }[] }[] =
+        [...(tournament?.rounds || [])].sort((a, b) => a.roundNumber - b.roundNumber);
+    const firstOpen = sorted.findIndex((r) => r.matches.some((m) => m.status !== "COMPLETED"));
+    const livePhase = firstOpen >= 0 ? firstOpen : Math.max(0, sorted.length - 1);
+    const [activePhase, setActivePhase] = React.useState<number>(livePhase);
+    const [followedPhase, setFollowedPhase] = React.useState<number>(livePhase);
+    if (livePhase !== followedPhase) {
+        setFollowedPhase(livePhase);
+        if (activePhase === followedPhase) setActivePhase(livePhase);
+    }
 
     return (
         <div className="h-full w-full overflow-hidden relative">

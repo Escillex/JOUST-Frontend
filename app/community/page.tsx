@@ -9,12 +9,14 @@ import {
   safeJson,
   resolveImageUrl,
   profileHref,
+  displayNameOf,
 } from "../utils/api";
 import HomeFrame from "../components/HomeFrame";
 
 interface UserResult {
   id: string;
   username: string | null;
+  displayName?: string | null;
   slug: string | null;
   avatarUrl: string | null;
   tournamentsPlayed: number;
@@ -36,11 +38,12 @@ interface Champion {
   tournamentSlug: string | null;
   date: string;
   game: string | null;
-  winner: { id: string; username: string | null; slug: string | null; avatarUrl: string | null } | null;
+  winner: { id: string; username: string | null; displayName?: string | null; slug: string | null; avatarUrl: string | null } | null;
 }
 interface TopPlayer {
   userId: string;
   username: string;
+  displayName?: string | null;
   slug?: string | null;
   avatarUrl?: string | null;
   points: number;
@@ -198,10 +201,10 @@ export default function CommunityPage() {
                         href={profileHref(u)}
                         className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:border-primary/40 hover:bg-white/[0.04] transition-all group"
                       >
-                        <Avatar url={u.avatarUrl} name={u.username} />
+                        <Avatar url={u.avatarUrl} name={displayNameOf(u, "")} />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-black uppercase tracking-tight text-white truncate font-poppins group-hover:text-primary transition-colors">
-                            {u.username || "Player"}
+                            {displayNameOf(u, "Player")}
                           </p>
                           <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-0.5">
                             {u.tournamentsWon} won · {u.tournamentsPlayed} played · {u.globalPoints} pts
@@ -262,12 +265,12 @@ export default function CommunityPage() {
                           // tournament). They must NOT nest: an <a> inside an <a>
                           // is invalid HTML and triggers a hydration error.
                           <>
-                            <Link href={profileHref(c.winner)} className="shrink-0" aria-label={c.winner.username || "Player"}>
-                              <Avatar url={c.winner.avatarUrl} name={c.winner.username} size="w-9 h-9" />
+                            <Link href={profileHref(c.winner)} className="shrink-0" aria-label={displayNameOf(c.winner, "Player")}>
+                              <Avatar url={c.winner.avatarUrl} name={displayNameOf(c.winner, "")} size="w-9 h-9" />
                             </Link>
                             <div className="min-w-0 flex-1">
                               <Link href={profileHref(c.winner)} className="block text-sm font-black uppercase tracking-tight text-white truncate font-poppins hover:text-primary transition-colors">
-                                {c.winner.username || "Player"}
+                                {displayNameOf(c.winner, "Player")}
                               </Link>
                               <Link href={`/tournaments/${c.tournamentId}`} className="block text-[9px] font-black text-white/30 uppercase tracking-widest hover:text-primary transition-colors truncate">
                                 won {c.tournamentName}
@@ -298,9 +301,9 @@ export default function CommunityPage() {
                         className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl hover:border-primary/40 hover:bg-white/[0.04] transition-all group"
                       >
                         <span className="w-6 text-center text-sm font-black text-primary font-poppins shrink-0">{i + 1}</span>
-                        <Avatar url={p.avatarUrl} name={p.username} size="w-9 h-9" />
+                        <Avatar url={p.avatarUrl} name={displayNameOf(p, "")} size="w-9 h-9" />
                         <p className="text-sm font-black uppercase tracking-tight text-white truncate font-poppins flex-1 group-hover:text-primary transition-colors">
-                          {p.username}
+                          {displayNameOf(p)}
                         </p>
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest shrink-0">{p.points} pts</span>
                       </Link>

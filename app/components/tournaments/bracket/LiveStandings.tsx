@@ -1,4 +1,5 @@
 "use client";
+import { displayNameOf } from "../../../utils/api";
 import { LeaderboardEntry } from "../../../tournaments/[id]/bracket/types";
 import { tieBreakerLabel } from "../../../utils/formatConfig";
 
@@ -96,7 +97,7 @@ export default function LiveStandings({ leaderboard, onMaximize, tieBreakerOrder
                         {e.rank === 1 && <span className="text-[8px] px-1 bg-primary text-black">TOP</span>}
                       </div>
                     </td>
-                    <td className={`py-4 px-2 truncate max-w-[120px] ${e.rank === 1 ? 'text-primary' : ''}`}>{e.username}</td>
+                    <td className={`py-4 px-2 truncate max-w-[120px] ${e.rank === 1 ? 'text-primary' : ''}`}>{displayNameOf(e)}</td>
                     <td className={`py-4 px-4 text-center ${e.rank === 1 ? 'text-primary font-bold' : ''}`}>{e.points}</td>
                     <td
                       className={`py-4 px-4 text-center ${isTied ? 'text-foreground/70' : 'text-foreground/25'}`}

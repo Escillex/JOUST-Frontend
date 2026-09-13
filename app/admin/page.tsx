@@ -11,6 +11,7 @@ import SettingsPanel from "../components/admin/SettingsPanel";
 import BackupPanel from "../components/admin/BackupPanel";
 import AwardManager from "../components/admin/AwardManager";
 import ActivityLog from "../components/admin/ActivityLog";
+import ModerationPanel from "../components/admin/ModerationPanel";
 import GrantAwardModal from "../components/awards/GrantAwardModal";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
@@ -66,10 +67,11 @@ interface Stats {
 export default function AdminDashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "GAMES" | "AWARDS" | "PRESETS" | "SETTINGS" | "BACKUPS" | "DEV_TOOLS">("DASHBOARD");
+  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "GAMES" | "AWARDS" | "MODERATION" | "PRESETS" | "SETTINGS" | "BACKUPS" | "DEV_TOOLS">("DASHBOARD");
   // Who the grant modal is open for, from a user-management row.
   const [awardTarget, setAwardTarget] = useState<{ id: string; name: string } | null>(null);
   const [pendingGameRequests, setPendingGameRequests] = useState(0);
+  const [openReports, setOpenReports] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, registeredUsers: 0, guestUsers: 0, totalTournaments: 0, activeTournaments: 0, completedTournaments: 0 });
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -119,7 +121,7 @@ export default function AdminDashboard() {
     // Read from window rather than useSearchParams to avoid the Suspense-boundary
     // build requirement in a fully-client page.
     const t = new URLSearchParams(window.location.search).get("tab")?.toUpperCase();
-    if (t === "GAMES" || t === "AWARDS" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS" || t === "SETTINGS" || t === "BACKUPS") setActiveTab(t);
+    if (t === "GAMES" || t === "AWARDS" || t === "MODERATION" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS" || t === "SETTINGS" || t === "BACKUPS") setActiveTab(t);
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -132,13 +134,24 @@ export default function AdminDashboard() {
 
   // Badge the GAMES tab with the pending request count, independent of whether the
   // tab is open. GameManager keeps it live via onPendingCountChange after resolves.
+  // Same for MODERATION: reported items awaiting an admin. Both wait until the
+  // role check has passed — a player who lands here is redirected, and firing
+  // admin-only reads first just produced two 403s on the way out.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isAuthorized !== true) return;
+    authenticatedFetch(API_ENDPOINTS.MODERATION.COUNT)
+      .then(safeJson)
+      .then((d) => { if (typeof d?.open === "number") setOpenReports(d.open); })
+      .catch(() => {});
+  }, [mounted, isAuthorized]);
+
+  useEffect(() => {
+    if (!mounted || isAuthorized !== true) return;
     authenticatedFetch(API_ENDPOINTS.GAMES.REQUESTS)
       .then(safeJson)
       .then((d) => { if (Array.isArray(d)) setPendingGameRequests(d.length); })
       .catch(() => {});
-  }, [mounted]);
+  }, [mounted, isAuthorized]);
 
   const fetchData = async () => {
     const startTime = performance.now();
@@ -469,8 +482,8 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto w-full flex flex-col">
         {/* Folder tabs. Eight of them no longer fit at the old padding (DEV
             TOOLS was pushed off the right edge at 1440px once AWARDS joined),
-            so padding tightens below xl, and the strip wraps rather than hide a
-            tab on a narrow screen. */}
+            and MODERATION made nine, so padding and letter-spacing stay tight
+            below 2xl. The strip wraps rather than hide a tab on a narrow screen. */}
         <div className="flex flex-wrap items-end gap-1 px-4">
           {/* Brand Tab */}
           <div className="px-6 py-4 bg-background border-t-2 border-l-2 border-r-2 border-white/10 flex flex-col justify-center min-w-[160px]">
@@ -481,17 +494,22 @@ export default function AdminDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          {(["DASHBOARD", "ANALYTICS", "GAMES", "AWARDS", "PRESETS", "SETTINGS", "BACKUPS", "DEV_TOOLS"] as const).map((tab) => (
+          {(["DASHBOARD", "ANALYTICS", "GAMES", "AWARDS", "MODERATION", "PRESETS", "SETTINGS", "BACKUPS", "DEV_TOOLS"] as const).map((tab) => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 xl:px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
+              className={`px-3 2xl:px-6 py-5 text-[10px] font-black uppercase tracking-[0.15em] 2xl:tracking-[0.2em] whitespace-nowrap transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
                 activeTab === tab 
                   ? "bg-[#111] border-white/20 text-primary pt-6" 
                   : "bg-background border-white/5 text-white/30 hover:text-white hover:bg-white/5"
               }`}
             >
               {tab.replace("_", " ")}
+              {tab === "MODERATION" && openReports > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center text-[8px] font-black text-black bg-[#FF4D4D] rounded-full px-1.5 py-0.5 align-middle">
+                  {openReports}
+                </span>
+              )}
               {tab === "GAMES" && pendingGameRequests > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center text-[8px] font-black text-black bg-primary rounded-full px-1.5 py-0.5 align-middle">
                   {pendingGameRequests}
@@ -676,6 +694,21 @@ export default function AdminDashboard() {
                 <p className="text-sm text-white/30 mt-4">Medals users can pin to their profile, and plaques shown under their name. Give them from User Management or from a profile.</p>
               </div>
               <AwardManager />
+            </motion.div>
+          ) : activeTab === "MODERATION" ? (
+            <motion.div
+              key="moderation"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="max-w-7xl mx-auto w-full pb-12"
+            >
+              <div className="mb-12">
+                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "MODERATION" }]} />
+                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Moderation</h1>
+                <p className="text-sm text-white/30 mt-4">Reported gallery images and tournament builds. Removed items are hidden at once and can be restored for 30 days.</p>
+              </div>
+              <ModerationPanel onCountChange={setOpenReports} />
             </motion.div>
           ) : activeTab === "BACKUPS" ? (
             <motion.div

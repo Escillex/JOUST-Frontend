@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl } from "../../utils/api";
+import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl, displayNameOf } from "../../utils/api";
 import { Tournament } from "../types";
 import { getTournamentConfig } from "../../utils/formatConfig";
 import Image from "next/image";
@@ -27,6 +27,7 @@ const BracketPreview = dynamic(
   },
 );
 import { useToast } from "../../components/ui/Toast";
+import TournamentBuildsPanel from "../../components/tournaments/TournamentBuildsPanel";
 
 function TournamentViewContent() {
   const { toast } = useToast();
@@ -38,7 +39,7 @@ function TournamentViewContent() {
   const [user, setUser] = useState<{ sub: string; id?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DETAILS" | "PLAYERS" | "BRACKET">("DETAILS");
+  const [activeTab, setActiveTab] = useState<"DETAILS" | "PLAYERS" | "BUILDS" | "BRACKET">("DETAILS");
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
   const [respondingToInvite, setRespondingToInvite] = useState(false);
 
@@ -193,7 +194,8 @@ function TournamentViewContent() {
 
   const tabs = [
     { id: "DETAILS", label: "Overview" },
-    { id: "PLAYERS", label: `Players (${tournament.participants.length})` }
+    { id: "PLAYERS", label: `Players (${tournament.participants.length})` },
+    { id: "BUILDS", label: "Builds" },
   ];
 
   return (
@@ -411,6 +413,25 @@ function TournamentViewContent() {
             </motion.div>
           )}
 
+          {activeTab === "BUILDS" && (
+            <motion.div
+              key="builds"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+            >
+              <TournamentBuildsPanel
+                tournamentId={tournamentId}
+                tournamentStatus={tournament.status}
+                viewerId={myId}
+                viewerRoles={user ? ((user as any).roles ?? []) : undefined}
+                isActiveEntrant={tournament.participants.some(
+                  (p: any) => p.userId === myId && p.status !== "FORFEITED" && !p.user?.isGuest,
+                )}
+              />
+            </motion.div>
+          )}
+
           {activeTab === "PLAYERS" && (
             <motion.div 
               key="players"
@@ -438,7 +459,7 @@ function TournamentViewContent() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-black text-primary uppercase tracking-widest">SEED #{p.seed || idx + 1}</span>
-                      <span className="text-xl font-black text-white uppercase tracking-tighter truncate">{p.user.username}</span>
+                      <span className="text-xl font-black text-white uppercase tracking-tighter truncate">{displayNameOf(p.user)}</span>
                       <span className="text-[8px] font-black text-white/20 uppercase tracking-widest mt-2">
                         {p.user.isGuest ? "GUEST" : "REGISTERED USER"}
                       </span>

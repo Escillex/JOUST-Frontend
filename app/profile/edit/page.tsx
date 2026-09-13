@@ -11,6 +11,7 @@ import { motion } from "motion/react";
 import ShowcaseEditor from "../../components/profile/ShowcaseEditor";
 import ConnectedAccounts from "../../components/profile/ConnectedAccounts";
 import BioEditor from "../../components/profile/BioEditor";
+import GalleryEditor from "../../components/profile/GalleryEditor";
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -156,6 +157,8 @@ export default function ProfileEditPage() {
               {user && !user.isGuest && (
                 <ShowcaseEditor handle={user.id} />
               )}
+
+              {user && !user.isGuest && <GalleryEditor />}
 
               {user && !user.isGuest && (
                 <ConnectedAccounts

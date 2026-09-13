@@ -339,3 +339,69 @@ export interface ProfileTournamentResult {
   format?: string | null;
   game?: string | null;
 }
+
+// ─── Builds, galleries and moderation (obj. 4.3) ─────────────────────────────
+
+/** Mirrors BuildKind / BuildStatus / BuildVisibility in server/prisma/schema.prisma. */
+export type BuildKind = "IMAGE" | "TEXT" | "LINK";
+export type BuildStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type BuildVisibility = "PUBLIC" | "AFTER_COMPLETION" | "STAFF_ONLY";
+
+export interface TournamentBuild {
+  id: string;
+  tournamentId: string;
+  userId: string;
+  kind: BuildKind;
+  imageUrl: string | null;
+  text: string | null;
+  url: string | null;
+  status: BuildStatus;
+  reviewedAt: string | null;
+  /** Owner and staff only; null for everyone else. */
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: { id: string; username: string; displayName?: string | null; slug?: string | null; isGuest?: boolean };
+}
+
+/** GET /tournaments/:id/builds — BuildService.list(). */
+export interface BuildsResponse {
+  settings: {
+    buildsRequired: boolean;
+    buildVisibility: BuildVisibility;
+    buildsLockAtStart: boolean;
+    locked: boolean;
+  };
+  canManage: boolean;
+  mine: TournamentBuild | null;
+  builds: TournamentBuild[];
+  /** Staff only: every active entrant with their build status. GUEST = exempt. */
+  entrants?: { userId: string; name: string; status: BuildStatus | "MISSING" | "GUEST" }[];
+}
+
+/** One entry of a profile gallery — GalleryService.publicGallery(). */
+export interface GalleryImage {
+  id: string;
+  gameId: string;
+  gameName: string;
+  imageUrl: string;
+  caption: string | null;
+  updatedAt: string;
+}
+
+export type ReportReason = "SPAM" | "OFFENSIVE" | "NOT_A_BUILD" | "OTHER";
+export type ReportTarget = "GALLERY_IMAGE" | "TOURNAMENT_BUILD";
+
+/** One row of the admin moderation queue — ModerationService.queue(). */
+export interface ModerationItem {
+  targetType: ReportTarget;
+  targetId: string;
+  owner: { id: string; name: string; slug: string | null };
+  context: { kind: "game" | "tournament"; id?: string; name: string };
+  preview: { kind: BuildKind; imageUrl: string | null; text?: string | null; url?: string | null; caption?: string | null };
+  reports: { reason: ReportReason; note: string | null; fromStaff: boolean; createdAt: string; reporterName: string }[];
+  removalReason: string | null;
+  removedByName: string | null;
+  removedAt?: string;
+  purgeAt?: string;
+}
