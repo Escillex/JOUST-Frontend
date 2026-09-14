@@ -113,6 +113,17 @@ export default function AdminDashboard() {
   const [formats, setFormats] = useState<any[]>([]);
   const [isCreatingFormat, setIsCreatingFormat] = useState(false);
 
+  // First-run setup (docs/setup-wizard-plan.md). Unguarded endpoint, so this
+  // resolves even before the admin's own data loads; false until it answers, so
+  // a finished deployment never flashes the banner.
+  const [setupDone, setSetupDone] = useState(true);
+  useEffect(() => {
+    authenticatedFetch(API_ENDPOINTS.SETUP.STATUS)
+      .then(async (r) => (r.ok ? await safeJson(r) : null))
+      .then((d) => { if (d) setSetupDone(!!d.completed); })
+      .catch(() => undefined);
+  }, []);
+
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -415,6 +426,20 @@ export default function AdminDashboard() {
 
   return (
     <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col p-4 md:p-12 gap-0`}>
+      {!setupDone && (
+        <a
+          href="/setup"
+          className="mb-6 flex items-center justify-between gap-4 border border-primary/40 bg-primary/5 px-5 py-4 hover:bg-primary/10 transition-colors"
+        >
+          <span className="space-y-1">
+            <span className="block text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Setup not finished</span>
+            <span className="block text-[13px] text-[#B0B0B0] leading-relaxed">
+              Email, two-factor sign-in and backups have never been confirmed on this deployment.
+            </span>
+          </span>
+          <span className="text-[11px] font-semibold text-primary shrink-0">Run setup →</span>
+        </a>
+      )}
       {forfeitPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
           <div className="bg-[#1B1B1B] border border-white/20 rounded max-w-md w-full p-6 space-y-4 shadow-[0_0_40px_rgba(0,0,0,1)]">

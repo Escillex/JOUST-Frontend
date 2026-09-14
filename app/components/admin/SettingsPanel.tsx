@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
+// One catalog, rendered by this panel and by the /setup wizard.
+import { MAIL_FIELDS, SECURITY_FIELDS, GOOGLE_FIELDS, type SettingField } from "./settingsFields";
 
 /** Mirrors the payload of GET /admin/settings. `value` is null for secrets —
  *  they are write-only, so the API reports whether one is set, never what. */
@@ -12,49 +14,6 @@ interface Setting {
   secret: boolean;
   configured: boolean;
 }
-
-const MAIL_FIELDS: { name: string; label: string; help?: string; placeholder?: string }[] = [
-  { name: "MAIL_TRANSPORT", label: "Transport", help: "console = write to the server log and send nothing. smtp = actually send." },
-  { name: "MAIL_HOST", label: "SMTP host", placeholder: "smtp-relay.brevo.com", help: "Any SMTP provider works — Brevo, Gmail, Mailjet, a school relay." },
-  { name: "MAIL_PORT", label: "Port", placeholder: "587", help: "587 for STARTTLS, 465 for implicit TLS." },
-  { name: "MAIL_USER", label: "Username", placeholder: "you@example.com" },
-  { name: "MAIL_PASS", label: "Password / SMTP key", help: "Stored encrypted and never shown again. Leave blank to keep the current one." },
-  { name: "MAIL_FROM", label: "From", placeholder: "JOUST <noreply@example.com>", help: "Some providers force this to match the authenticated account." },
-  { name: "MAIL_REPLY_TO", label: "Reply-to", placeholder: "(optional)" },
-];
-
-const SECURITY_FIELDS = [
-  {
-    name: "TWO_FACTOR_ENFORCEMENT",
-    label: "Two-factor enforcement",
-    options: ["all", "staff", "off"],
-    help: "off (the default) = email gates nothing: no sign-in codes and no address check at registration, so the site works before mail is set up. staff = admins and organizers get codes. all = everyone does, and new accounts verify their address. Turn it on only after \"Send test email\" actually delivers — codes that never arrive lock people out. Dev Tools can override this until restart.",
-  },
-];
-
-/** Google sign-in, configured per deployment. The Client ID belongs to whoever
- *  runs this site — their own Google Cloud project — so Google's consent screen
- *  names them, not the developer who wrote the code. */
-const GOOGLE_FIELDS = [
-  {
-    name: "GOOGLE_SIGNIN_ENABLED",
-    label: "Google sign-in",
-    options: ["false", "true"],
-    help: "The button appears on the sign-in page only when this is true AND a Client ID is set.",
-  },
-  {
-    name: "GOOGLE_CLIENT_ID",
-    label: "OAuth Client ID",
-    placeholder: "1234567890-abc123.apps.googleusercontent.com",
-    help: "From your own Google Cloud project. Public by design — no client secret is needed or stored.",
-  },
-  {
-    name: "GOOGLE_ALLOWED_DOMAIN",
-    label: "Allowed domain (optional)",
-    placeholder: "school.edu",
-    help: "Only accept Google accounts from this Workspace domain. Leave empty to accept any Google account.",
-  },
-];
 
 export default function SettingsPanel() {
   const [settings, setSettings] = useState<Setting[]>([]);
@@ -132,9 +91,7 @@ export default function SettingsPanel() {
   const input =
     "w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded-sm placeholder:text-white/15";
 
-  const field = (
-    f: { name: string; label: string; help?: string; placeholder?: string; options?: string[] },
-  ) => {
+  const field = (f: SettingField) => {
     const setting = settings.find((s) => s.name === f.name);
     const dirty = drafts[f.name] !== undefined;
     return (

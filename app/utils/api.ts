@@ -264,6 +264,9 @@ export const API_ENDPOINTS = {
     GOOGLE: '/auth/google',
     GOOGLE_LINK: '/auth/google/link',
     SIGNIN: '/auth/signin',
+    /** Replace a password somebody else set. Takes the short-lived
+     *  `changeToken` from sign-in, not a session. */
+    FORCED_PASSWORD_CHANGE: '/auth/password/forced-change',
     SIGNUP: '/auth/signup',
     SIGNOUT: '/auth/signout',
     USERS: '/auth/users',
@@ -345,6 +348,12 @@ export const API_ENDPOINTS = {
   // Admin-only aggregate analytics for the ANALYTICS tab. One payload, counted
   // server-side — the dashboard's older figures were derived by downloading the
   // whole user and tournament tables into the browser.
+  /** First-run setup wizard (docs/setup-wizard-plan.md). STATUS is public —
+   *  the banner has to decide before anything else loads. */
+  SETUP: {
+    STATUS: '/setup/status',
+    COMPLETE: '/setup/complete',
+  },
   ADMIN: {
     ANALYTICS: '/admin/analytics',
     SETTINGS: '/admin/settings',

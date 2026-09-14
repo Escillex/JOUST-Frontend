@@ -35,6 +35,13 @@ export default function AuthPage() {
   const [recoveryCode, setRecoveryCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
+  // A password an admin (or the seed) chose buys one sign-in, spent replacing
+  // it. The server hands back a single-purpose token instead of a session, so
+  // there is nothing to store and nothing to skip past.
+  const [changeToken, setChangeToken] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   // Google sign-in is offered only when this deployment has switched it on and
   // given it a Client ID (Admin → Settings). Absent, the page is unchanged.
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
@@ -123,6 +130,39 @@ export default function AuthPage() {
     }
   };
 
+  /** Step two for an account whose password was set by somebody else. */
+  const submitNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy || !changeToken) return;
+    if (newPassword !== confirmPassword) {
+      setMessage("Error: Those passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}${API_ENDPOINTS.AUTH.FORCED_PASSWORD_CHANGE}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ changeToken, newPassword }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "Could not set that password."}`);
+        return;
+      }
+      if (data?.token) localStorage.setItem("token", data.token);
+      await refreshUser();
+      setMessage("Success: Password updated");
+      setTimeout(() => router.push("/home"), 600);
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy || !challenge) return;
@@ -177,6 +217,39 @@ export default function AuthPage() {
     setMessage("");
   };
 
+  /** Rendered by both steps. It used to sit inside the password form, which is
+   *  unmounted while a code challenge is open, so nothing the code step said —
+   *  a wrong code, a lockout, a resend confirmation — ever reached the screen. */
+  const messageBanner = (
+    <AnimatePresence mode="wait">
+      {message && (
+        <motion.div 
+          key="message"
+          initial={{ opacity: 0, x: -5 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={`p-4 text-[10px] font-black uppercase tracking-widest border-l-4 ${
+            message.startsWith("Error") 
+              ? "border-red-500 bg-red-500/5 text-red-500" 
+              : "border-primary bg-primary/5 text-primary"
+          }`}
+        >
+          {message}
+          {message.includes("successfully signed up") && (
+            <div className="mt-2">
+              <button 
+                type="button" 
+                onClick={() => { setMode("login"); setMessage(""); }} 
+                className="underline text-white/50 hover:text-primary transition-colors cursor-pointer capitalize"
+              >
+                (Click this link if you aren't redirected)
+              </button>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
@@ -213,6 +286,12 @@ export default function AuthPage() {
               ? `Error: ${data.emailError || "We could not send the code. Try again shortly."}`
               : "",
           );
+          return;
+        }
+        if (data?.passwordChangeRequired && data?.changeToken) {
+          setChangeToken(data.changeToken);
+          setPassword("");
+          setMessage("");
           return;
         }
         if (mode === "login") {
@@ -378,7 +457,64 @@ export default function AuthPage() {
               )}
 
               {/* Step two: the emailed code. */}
-              {!recoveryCodes && challenge && (
+              {/* A password chosen by somebody else. There is no session yet
+                  and no way past this — the token the server issued authorises
+                  this one call and nothing else. */}
+              {changeToken && (
+                <form onSubmit={submitNewPassword} className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-white font-poppins">
+                      Choose a new password
+                    </h3>
+                    <p className="text-xs text-white/50 mt-2 leading-relaxed">
+                      This account was given a password by an administrator. Replace it to finish
+                      signing in — it must be at least 8 characters, and different from the one you
+                      were given.
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                      New password
+                    </span>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoFocus
+                      required
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                      Confirm
+                    </span>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                    />
+                  </div>
+
+                  {messageBanner}
+
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="w-full h-14 bg-primary text-black font-black text-sm uppercase tracking-[0.3em] hover:brightness-90 transition-all disabled:opacity-50"
+                  >
+                    {busy ? "Saving…" : "Set password & sign in"}
+                  </button>
+                </form>
+              )}
+
+              {!recoveryCodes && !changeToken && challenge && (
                 <form onSubmit={usingRecovery ? submitRecovery : submitCode} className="space-y-6">
                   <div>
                     <h3 className="text-xl font-black uppercase tracking-tight text-white font-poppins">
@@ -429,6 +565,8 @@ export default function AuthPage() {
                     </label>
                   )}
 
+                  {messageBanner}
+
                   <button
                     type="submit"
                     disabled={busy}
@@ -459,7 +597,7 @@ export default function AuthPage() {
                 </form>
               )}
 
-              {!recoveryCodes && !challenge && (
+              {!recoveryCodes && !changeToken && !challenge && (
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="relative">
                   <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
@@ -536,33 +674,7 @@ export default function AuthPage() {
                   />
                 </div>
 
-                <AnimatePresence mode="wait">
-                  {message && (
-                    <motion.div 
-                      key="message"
-                      initial={{ opacity: 0, x: -5 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`p-4 text-[10px] font-black uppercase tracking-widest border-l-4 ${
-                        message.startsWith("Error") 
-                          ? "border-red-500 bg-red-500/5 text-red-500" 
-                          : "border-primary bg-primary/5 text-primary"
-                      }`}
-                    >
-                      {message}
-                      {message.includes("successfully signed up") && (
-                        <div className="mt-2">
-                          <button 
-                            type="button" 
-                            onClick={() => { setMode("login"); setMessage(""); }} 
-                            className="underline text-white/50 hover:text-primary transition-colors cursor-pointer capitalize"
-                          >
-                            (Click this link if you aren't redirected)
-                          </button>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {messageBanner}
 
                 <button
                   type="submit"
@@ -574,7 +686,7 @@ export default function AuthPage() {
               </form>
               )}
 
-              {!recoveryCodes && !challenge && googleClientId && (
+              {!recoveryCodes && !changeToken && !challenge && googleClientId && (
                 <div className="mt-8 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="h-px flex-1 bg-white/10" />
