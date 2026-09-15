@@ -13,7 +13,7 @@ interface EditState {
   description: string;
   formatId: string;
   maxPlayers: number;
-  prizePool: string | number;
+  prizePool: string;
   isPrivate: boolean;
   slug: string;
 }
@@ -157,6 +157,22 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
     }
   };
 
+  const handlePrizeUpload = async (file: File) => {
+    const url = await upload(API_ENDPOINTS.IMAGES.UPLOAD_PRIZE(tournamentId), file);
+    if (url) {
+      setMessage("Prize picture updated");
+      fetchData();
+    }
+  };
+
+  const handlePrizeDelete = async () => {
+    const ok = await remove(API_ENDPOINTS.IMAGES.DELETE_PRIZE(tournamentId));
+    if (ok) {
+      setMessage("Prize picture removed");
+      fetchData();
+    }
+  };
+
   return (
     <div className="bg-[#000000] border border-white/20 p-4 md:p-6 rounded">
       <div className="mb-8">
@@ -169,6 +185,23 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
           aspectRatio="aspect-[21/9]"
           label="UPDATE IMAGE"
         />
+      </div>
+
+      {/* Optional photo of the prize. The prize text on the tournament page
+          becomes a link to it, so "Trophy" can be seen as well as read. */}
+      <div className="mb-8">
+        <label className="text-xs font-semibold text-[#888888] mb-2 block">Prize Picture</label>
+        <ImageUpload
+          currentUrl={tournament.prizeImageUrl ?? null}
+          onUpload={handlePrizeUpload}
+          onDelete={handlePrizeDelete}
+          uploading={uploading}
+          aspectRatio="aspect-[4/3]"
+          label="UPDATE PRIZE PICTURE"
+        />
+        <p className="text-[10px] text-white/25 mt-2 leading-relaxed">
+          Shown to players as a link on the prize text. Leave empty if the prize needs no picture.
+        </p>
       </div>
 
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
@@ -216,7 +249,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
                 value={editState.description} 
                 onChange={e => onEditChange("description", e.target.value)} 
                 className={`${inputCls} h-24 py-3 resize-none`} 
-                placeholder="Optional tournament details or lore"
+                placeholder="Optional details — rules, what to bring, how to find the venue"
               />
             </div>
             
@@ -227,7 +260,7 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-[#888888] block">Prize Pool</label>
-                <input type="number" value={editState.prizePool} onChange={e => onEditChange("prizePool", editState.prizePool === "" ? "" : Number(e.target.value))} className={inputCls} />
+                <input type="text" maxLength={120} placeholder="Trophy, ₱2,000, booster box…" value={editState.prizePool} onChange={e => onEditChange("prizePool", e.target.value)} className={inputCls} />
               </div>
             </div>
 

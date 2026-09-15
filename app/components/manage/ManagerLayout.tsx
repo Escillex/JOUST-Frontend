@@ -50,7 +50,7 @@ export default function ManagerLayout({ children, breadcrumbs }: ManagerLayoutPr
         {breadcrumbs.length > 0 && (
           <nav
             aria-label="Breadcrumb"
-            className="max-w-[1600px] mx-auto w-full px-10 pt-8"
+            className="max-w-[1600px] mx-auto w-full px-4 md:px-6 pt-8"
           >
             <ol className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-[#888888]">
               {breadcrumbs.map((crumb, i) => (
@@ -75,7 +75,7 @@ export default function ManagerLayout({ children, breadcrumbs }: ManagerLayoutPr
             renders immediately with placeholder blocks instead of swapping the
             whole screen for a centred spinner, so the page does not visibly
             jump from one layout to another once the check resolves. */}
-        <main className="flex-1 p-10 max-w-[1600px] mx-auto w-full">
+        <main className="flex-1 px-4 md:px-6 py-8 max-w-[1600px] mx-auto w-full">
           {loading ? (
             <div className="space-y-8">
               <SkeletonStatus label="Loading" />

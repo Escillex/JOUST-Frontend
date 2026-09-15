@@ -19,6 +19,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-easy-crop": "^5.5.7",
+    "sharp": "^0.35.4",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

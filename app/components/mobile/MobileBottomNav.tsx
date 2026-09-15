@@ -12,6 +12,11 @@ import { profileHref } from "../../utils/api";
  */
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  // Same rule as Navibar: the route decides the mode, never a stored toggle.
+  const inManageMode =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/tournaments/manage") ||
+    /^\/tournaments\/[^/]+\/manage/.test(pathname);
   const router = useRouter();
   const { user, logout } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -200,8 +205,12 @@ export default function MobileBottomNav() {
             COMMUNITY
           </Link>
 
-          {/* Organizer Control Dashboard */}
-          {user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") && (
+          {/* Management has exactly two destinations — the tournament list and the
+              admin panel — so only an ADMIN has anywhere to navigate between.
+              An organizer in management mode gets a way back and nothing else;
+              a second button pointing at the page they are already on is noise. */}
+          {user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") &&
+            !(inManageMode && !user?.roles?.includes("ADMIN")) && (
             <Link
               href="/tournaments/manage"
               onClick={() => setIsMenuOpen(false)}
@@ -216,12 +225,12 @@ export default function MobileBottomNav() {
                 <path d="M9 3v18" />
                 <path d="m14 9 3 3-3 3" />
               </svg>
-              Organizer Portal
+              Manage
             </Link>
           )}
 
           {/* System Administrator Panel */}
-          {user?.roles?.includes("ADMIN") && (
+          {user?.roles?.includes("ADMIN") && inManageMode && (
             <Link
               href="/admin"
               onClick={() => setIsMenuOpen(false)}
@@ -236,7 +245,22 @@ export default function MobileBottomNav() {
                 <path d="M12 8v4" />
                 <path d="M12 16h.01" />
               </svg>
-              SYSTEM ADMIN
+              Admin
+            </Link>
+          )}
+
+          {/* The way out of management mode. */}
+          {inManageMode && user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") && (
+            <Link
+              href="/home"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-widest border border-foreground/5 bg-foreground/5 text-white/60 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all rounded-xl font-poppins"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 shrink-0">
+                <path d="M19 12H5" />
+                <path d="m12 19-7-7 7-7" />
+              </svg>
+              Back to site
             </Link>
           )}
 

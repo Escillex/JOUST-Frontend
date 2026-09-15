@@ -150,8 +150,8 @@ export default function InvitePage() {
     {
       label: "Prize Pool",
       value:
-        tournament.prizePool != null
-          ? `₱${tournament.prizePool.toLocaleString()}`
+        tournament.prizePool
+          ? tournament.prizePool
           : "None",
     },
     {

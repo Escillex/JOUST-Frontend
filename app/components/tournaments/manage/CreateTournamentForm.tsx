@@ -57,7 +57,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
   const [allowDraw, setAllowDraw] = useState(false);
   // Inherited from the chosen format preset, overridable per tournament.
   const [seedingMode, setSeedingMode] = useState<"RANDOM" | "MANUAL">("RANDOM");
-  const [prizePool, setPrizePool] = useState<number | "">("");
+  const [prizePool, setPrizePool] = useState("");
   const [swissRounds, setSwissRounds] = useState(3);
   const [swissPointsWin, setSwissPointsWin] = useState(3);
   const [swissPointsDraw, setSwissPointsDraw] = useState(1);
@@ -238,7 +238,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
       formatId: selectedFormatId,
       gameId: selectedGameId || undefined,
       maxPlayers: Number(maxPlayers),
-      prizePool: prizePool === "" ? null : Number(prizePool),
+      prizePool: prizePool.trim() || null,
       venue,
       date: finalDate,
       isPrivate,
@@ -454,7 +454,7 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
               <textarea 
                 value={description} 
                 onChange={e => setDescription(e.target.value)} 
-                placeholder="Optional tournament details or lore" 
+                placeholder="Optional details — rules, what to bring, how to find the venue" 
                 className={`${inputCls} h-24 py-3 resize-none`} 
               />
             </Field>
@@ -680,10 +680,13 @@ export default function CreateTournamentForm({ userId, userRoles = [], onSuccess
         <Field label="Venue">
           <input type="text" value={venue} onChange={e => setVenue(e.target.value)} placeholder="Physical / Online" className={inputCls} />
         </Field>
-        <Field label="Activation Mode">
+        <Field label="Prize">
+          <input type="text" maxLength={120} value={prizePool} onChange={e => setPrizePool(e.target.value)} placeholder="Trophy, ₱2,000, booster box…" className={inputCls} />
+        </Field>
+        <Field label="Registration">
           <select value={startNow ? "IMMEDIATE" : "SCHEDULED"} onChange={e => setStartNow(e.target.value === "IMMEDIATE")} className={inputCls}>
-            <option value="SCHEDULED">Scheduled Release</option>
-            <option value="IMMEDIATE">Instant Activation</option>
+            <option value="SCHEDULED">Schedule for later</option>
+            <option value="IMMEDIATE">Open registration now</option>
           </select>
         </Field>
         {!startNow && (

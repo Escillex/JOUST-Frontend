@@ -52,7 +52,7 @@ interface ReportTournament {
   createdAt: string;
   completedAt?: string | null;
   maxPlayers: number;
-  prizePool: number | null;
+  prizePool: string | null;
   createdBy?: { username: string; displayName?: string | null } | null;
   winner?: Person | null;
   game?: { name: string } | null;

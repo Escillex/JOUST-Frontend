@@ -3,10 +3,14 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Inter } from "next/font/google";
 import { motion } from "motion/react";
 import { displayNameOf, handleOf, profileHref, resolveImageUrl } from "../utils/api";
 import { useUser } from "./UserProvider";
 import NotificationBell from "./NotificationBell";
+
+// The management screens are set in Inter, not Poppins. The bar joins them.
+const inter = Inter({ subsets: ["latin"] });
 
 /**
  * Navibar - The primary navigation component.
@@ -37,50 +41,97 @@ export default function Navibar() {
     await logout();
   };
 
-  const navLinks = [];
-  if (user) {
-    navLinks.push({ name: "Home", href: "/home" });
-  }
-  navLinks.push(
-    { name: "Tournaments", href: "/tournaments" },
-    { name: "Leaderboards", href: "/leaderboards" },
-    { name: "Community", href: "/community" }
-  );
-
-  // Organizers and admins reach the management dashboard from the same unified
-  // navbar the rest of the app uses — this mirrors the "Organizer Portal" entry
-  // the mobile menu already offers, so the manage zone is no longer a place with
-  // its own separate navigation.
   const isOrganizer = user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
-  if (isOrganizer) {
-    navLinks.push({ name: "Manage", href: "/tournaments/manage" });
-  }
+  const isAdmin = user?.roles?.includes("ADMIN");
 
-  const isAdmin = user?.roles?.includes('ADMIN');
-  if (isAdmin) {
-    navLinks.push({ name: "Admin", href: "/admin" });
+  /**
+   * The navbar has two modes, and the ROUTE decides which — not a toggle held in
+   * state. A refresh, a deep link, or a notification that drops someone straight
+   * into a manage page all have to arrive in the right mode, and only the URL
+   * knows that. Stacking "Manage" and "Admin" beside the public links made the
+   * userspace bar carry management it mostly does not need.
+   */
+  const inManageMode =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/tournaments/manage") ||
+    /^\/tournaments\/[^/]+\/manage/.test(pathname);
+
+  /**
+   * Userspace lists the public pages; management lists the management ones.
+   * Showing the public links inside management just offers exits, and the way
+   * out is already the Back button on the left.
+   *
+   * Management has exactly two destinations, so an organizer who is not an
+   * admin has nowhere to navigate — their bar is Back and nothing else, the
+   * same rule the phone menu follows.
+   */
+  const navLinks: { name: string; href: string }[] = [];
+  if (inManageMode) {
+    if (isAdmin || (loading && pathname.startsWith("/admin"))) {
+      navLinks.push(
+        { name: "Manage", href: "/tournaments/manage" },
+        { name: "Admin", href: "/admin" },
+      );
+    }
+  } else {
+    if (user) navLinks.push({ name: "Home", href: "/home" });
+    navLinks.push(
+      { name: "Tournaments", href: "/tournaments" },
+      { name: "Leaderboards", href: "/leaderboards" },
+      { name: "Community", href: "/community" },
+    );
+    // Plain link, styled like every other one: a bordered green button made the
+    // way in look like the most important thing on a page it has nothing to do with.
+    if (isOrganizer || loading) {
+      navLinks.push({ name: "Manage", href: "/tournaments/manage" });
+    }
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background border-b border-component-border h-20">
-      <div className="max-w-7xl mx-auto h-full px-8 flex items-center justify-between relative z-10">
-        {/* Branding */}
-        <div className="flex items-center gap-12">
-          <Link href="/" className="group flex items-center">
-            <div className="flex items-center gap-4">
-              <Image
-                src="/hpluslogo.png"
-                alt="Hplus Logo"
-                width={120}
-                height={40}
-                className="w-28 h-auto object-contain brightness-125 group-hover:scale-105 transition-transform duration-300"
-                priority
-              />
-            </div>
-          </Link>
- 
+    <header className={`sticky top-0 z-50 w-full border-b transition-colors ${
+      // Two zones, one bar (docs/design-system.md). Management borrows the
+      // manage screens' own treatment — Inter, softer borders, a shorter bar —
+      // so the chrome stops shouting the moment the work starts.
+      inManageMode
+        ? `h-14 bg-component-background border-white/10 ${inter.className}`
+        : "h-20 bg-background border-component-border"
+    }`}>
+      <div className={`mx-auto h-full flex items-center justify-between relative z-10 ${
+        // In management the bar shares ManagerLayout's container, so "Back"
+        // starts on the same line as the table below it.
+        inManageMode ? "max-w-[1600px] w-full px-4 md:px-6" : "max-w-7xl px-8"
+      }`}>
+        {/* Branding — or, in management, the way back out. */}
+        <div className={`flex items-center ${inManageMode ? "gap-8" : "gap-12"}`}>
+          {inManageMode ? (
+            <Link
+              href="/home"
+              className="flex items-center gap-2 text-[13px] font-semibold text-[#E0E0E0]/60 hover:text-[#E0E0E0] transition-colors"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+                <path d="M19 12H5" />
+                <path d="m12 19-7-7 7-7" />
+              </svg>
+              Back
+            </Link>
+          ) : (
+            <Link href="/" className="group flex items-center">
+              <div className="flex items-center gap-4">
+                <Image
+                  src="/hpluslogo.png"
+                  alt="Hplus Logo"
+                  width={120}
+                  height={40}
+                  className="w-28 h-auto object-contain brightness-125 group-hover:scale-105 transition-transform duration-300"
+                  priority
+                />
+              </div>
+            </Link>
+          )}
+
+
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-10">
+          <nav className={`hidden md:flex items-center ${inManageMode ? "gap-7" : "gap-10"}`}>
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               const linkDelays: Record<string, number> = {
@@ -98,15 +149,25 @@ export default function Navibar() {
                 >
                   <Link
                     href={link.href}
-                    className={`text-[11px] font-black uppercase tracking-[0.4em] transition-all duration-300 relative py-2 font-poppins hover:scale-105 active:scale-95 block ${
-                      isActive ? "text-primary" : "text-white/40 hover:text-white"
+                    className={`transition-colors duration-200 relative py-2 block ${
+                      inManageMode
+                        ? "text-[13px] font-semibold tracking-normal"
+                        : "text-[11px] font-black uppercase tracking-[0.4em] font-poppins transition-all duration-300 hover:scale-105 active:scale-95"
+                    } ${
+                      isActive
+                        ? inManageMode ? "text-primary" : "text-primary"
+                        : inManageMode ? "text-[#E0E0E0]/50 hover:text-[#E0E0E0]" : "text-white/40 hover:text-white"
                     }`}
                   >
                     {link.name}
                     {isActive && (
                       <motion.div 
                         layoutId="activeNavIndicator"
-                        className="absolute -bottom-1 left-0 w-full h-[3px] bg-primary shadow-[0_0_20px_rgba(var(--color-primary),1)]"
+                        className={`absolute left-0 w-full ${
+                          inManageMode
+                            ? "-bottom-2 h-[2px] bg-primary/70 rounded-full"
+                            : "-bottom-1 h-[3px] bg-primary shadow-[0_0_20px_rgba(var(--color-primary),1)]"
+                        }`}
                         transition={{ type: "spring", stiffness: 380, damping: 30 }}
                       />
                     )}
@@ -114,6 +175,7 @@ export default function Navibar() {
                 </motion.div>
               );
             })}
+
           </nav>
         </div>
 

@@ -48,7 +48,7 @@ function ControlRoomContent() {
   const [formatConfig, setFormatConfig]     = useState<RawConfig>({});
   const [formatDefinitions, setFormatDefinitions] = useState<any[]>([]);
   const [formats, setFormats] = useState<any[]>([]);
-  const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "" as number | "", isPrivate: false, slug: "" });
+  const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "", isPrivate: false, slug: "" });
 
   const [guestUsername, setGuestUsername]     = useState("");
   const [batchGuestCount, setBatchGuestCount] = useState<number | "">("");
@@ -182,7 +182,7 @@ function ControlRoomContent() {
         description: editState.description || undefined,
         formatId: editState.formatId,
         maxPlayers: Number(editState.maxPlayers),
-        prizePool: editState.prizePool === "" ? null : Number(editState.prizePool),
+        prizePool: editState.prizePool.trim() || null,
         isPrivate: editState.isPrivate,
         // The invite-link name is normalized to the allowed characters
         // (lowercase letters, numbers, dashes) before sending, so typing

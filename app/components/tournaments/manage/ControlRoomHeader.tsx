@@ -84,7 +84,7 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
               <span className="text-xs font-semibold text-[#888888]">{tournament.status}</span>
             </div>
             <span className="text-xs text-[#888888]">
-              {(typeof tournament.format === 'string' ? tournament.format : tournament.format?.system || "UNKNOWN").replace(/_/g, " ")} <span className="mx-2">/</span> ₱{tournament.prizePool?.toLocaleString() || "0"} POOL
+              {(typeof tournament.format === 'string' ? tournament.format : tournament.format?.system || "UNKNOWN").replace(/_/g, " ")} <span className="mx-2">/</span> {tournament.prizePool || "No prize"}
             </span>
             {connected !== undefined && <ConnectionPill connected={connected} />}
             <LastUpdated lastUpdated={lastUpdated ?? null} />

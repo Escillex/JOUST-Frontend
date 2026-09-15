@@ -169,6 +169,59 @@ export default function SetupPage() {
     );
   };
 
+  /**
+   * MAIL_FROM is one RFC 5322 header — `Name <address>` — and the transport
+   * wants it whole, so it stays one stored setting. But one combined box let
+   * `Escillex <noreply@example.com>` through on the first real deployment:
+   * example.com is IANA's reserved placeholder, Brevo rejects it with a 550,
+   * and the mistake was invisible until the row was read out of the database.
+   * Two labelled inputs, composed on the way out and split on the way in.
+   */
+  const fromField = () => {
+    const raw = valueOf("MAIL_FROM");
+    const m = raw.match(/^\s*(.*?)\s*<([^>]*)>\s*$/);
+    const namePart = m ? m[1] : "";
+    const addrPart = m ? m[2] : raw;
+    const compose = (name: string, addr: string) =>
+      name.trim() ? `${name.trim()} <${addr.trim()}>` : addr.trim();
+    const set = (v: string) => setDrafts((d) => ({ ...d, MAIL_FROM: v }));
+    const domain = addrPart.split("@")[1]?.toLowerCase() ?? "";
+    const bad = domain === "example.com" || domain === "example.org";
+
+    return (
+      <div key="MAIL_FROM" className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div className="space-y-1.5">
+          <label className={label} htmlFor="setting-MAIL_FROM_NAME">From name</label>
+          <input
+            id="setting-MAIL_FROM_NAME"
+            type="text"
+            value={namePart}
+            onChange={(e) => set(compose(e.target.value, addrPart))}
+            placeholder="JOUST"
+            className={input}
+          />
+          <p className="text-[10px] text-white/25 leading-relaxed">What recipients see as the sender.</p>
+        </div>
+        <div className="space-y-1.5">
+          <label className={label} htmlFor="setting-MAIL_FROM_ADDR">From address</label>
+          <input
+            id="setting-MAIL_FROM_ADDR"
+            type="email"
+            value={addrPart}
+            onChange={(e) => set(compose(namePart, e.target.value))}
+            placeholder="noreply@yourdomain.com"
+            className={input}
+          />
+          <p className={`text-[10px] leading-relaxed ${bad ? "text-[#FFB020]" : "text-white/25"}`}>
+            {bad
+              ? "example.com is a reserved placeholder domain — it cannot send, and providers reject it. Use a domain you have authenticated."
+              : "Must be on a domain your provider has verified, or it is rejected with a 550."}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return <main className="min-h-screen bg-[#1B1B1B] flex items-center justify-center text-white/40 text-sm">Loading…</main>;
   }
@@ -200,6 +253,11 @@ export default function SetupPage() {
   const next = async () => {
     if (await saveStep(stepFields)) setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
+
+  /** Save without advancing — the test email needs stored values, and the only
+   *  way to store them used to be the button that leaves the page. */
+  const saveOnly = () => saveStep(stepFields);
+  const dirtyCount = stepFields.filter((f) => drafts[f.name] !== undefined).length;
 
   const enforcement = valueOf("TWO_FACTOR_ENFORCEMENT");
   const transport = valueOf("MAIL_TRANSPORT");
@@ -243,7 +301,9 @@ export default function SetupPage() {
           </div>
 
           {current.key !== "finish" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">{stepFields.map(field)}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+              {stepFields.map((f) => (f.name === "MAIL_FROM" ? fromField() : field(f)))}
+            </div>
           )}
 
           {current.key === "mail" && (
@@ -263,8 +323,15 @@ export default function SetupPage() {
                   className={input}
                 />
                 <button
-                  onClick={sendTest}
-                  disabled={testing || !testTo.trim()}
+                  onClick={saveOnly}
+                  disabled={saving || dirtyCount === 0}
+                  className="px-4 h-10 shrink-0 border border-white/20 text-white text-xs font-semibold rounded-sm hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
+                >
+                  {saving ? "Saving…" : dirtyCount > 0 ? `Save ${dirtyCount}` : "Saved"}
+                </button>
+                <button
+                  onClick={async () => { if (dirtyCount > 0) await saveStep(stepFields); await sendTest(); }}
+                  disabled={testing || saving || !testTo.trim()}
                   className="px-4 h-10 shrink-0 border border-white/20 text-white text-xs font-semibold rounded-sm hover:border-primary hover:text-primary transition-colors disabled:opacity-30"
                 >
                   {testing ? "Sending…" : "Send test"}

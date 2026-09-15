@@ -254,13 +254,27 @@ function TournamentViewContent() {
               <div className="lg:col-span-7 flex flex-col gap-12">
                 <div className="relative group border-2 border-component-border overflow-hidden">
                   <div className="aspect-video relative overflow-hidden">
-                    <Image 
-                      src={resolveImageUrl(tournament.bannerUrl, "/placeholder.png")}
-                      alt={tournament.name} 
-                      fill 
-                      unoptimized
-                      className="object-cover transition-transform duration-1000 group-hover:scale-105"
-                    />
+                    {/* /placeholder.png has "PLACEHOLDER — NO IMAGE SET" drawn
+                        into the artwork, which reads as broken rather than as
+                        empty. A tournament without a banner gets a quiet ground. */}
+                    {tournament.bannerUrl ? (
+                      <Image
+                        src={resolveImageUrl(tournament.bannerUrl, "")}
+                        alt={tournament.name}
+                        fill
+                        unoptimized
+                        className="object-cover transition-transform duration-1000 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 bg-zinc-900"
+                        style={{
+                          backgroundImage:
+                            "repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 14px)",
+                        }}
+                      />
+                    )}
                   </div>
                   
                   <div className="absolute top-6 left-6 flex flex-col items-start gap-4 z-20">
@@ -379,9 +393,25 @@ function TournamentViewContent() {
                 <ExpansionModule 
                   label="Event Logistics"
                   data={[
-                    { label: "Date", value: tournament.date ? new Date(tournament.date).toLocaleDateString() : "TBD" },
-                    { label: "Prize Pool", value: `₱${tournament.prizePool?.toLocaleString() || "0"}` },
-                    { label: "Venue", value: tournament.venue || "Global Stadium" }
+                    { label: "Date", value: tournament.date ? new Date(tournament.date).toLocaleDateString() : "To be announced" },
+                    {
+                      label: "Prize",
+                      value: tournament.prizePool
+                        ? (tournament.prizeImageUrl
+                            // The text IS the link to the picture of the prize —
+                            // "Trophy" means more when you can see which trophy.
+                            ? <a
+                                href={resolveImageUrl(tournament.prizeImageUrl, "")}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="underline decoration-primary/40 underline-offset-4 hover:text-primary transition-colors"
+                              >
+                                {tournament.prizePool} <span aria-hidden className="text-primary">↗</span>
+                              </a>
+                            : tournament.prizePool)
+                        : "None" },
+                    { label: "Venue", value: tournament.venue || "Not specified" }
                   ]}
                 />
 
@@ -487,7 +517,7 @@ function TournamentViewContent() {
   );
 }
 
-function ExpansionModule({ label, data }: { label: string, data: { label: string, value: string }[] }) {
+function ExpansionModule({ label, data }: { label: string, data: { label: string, value: React.ReactNode }[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -587,7 +617,7 @@ function ExpansionModule({ label, data }: { label: string, data: { label: string
                 className="text-[8px] font-black text-primary uppercase tracking-widest italic flex items-center gap-2"
               >
                 <div className="w-1 h-1 bg-primary rounded-full animate-ping" />
-                Active_Status
+                Live
               </motion.span>
             )}
           </AnimatePresence>

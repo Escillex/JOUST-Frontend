@@ -267,6 +267,11 @@ export const API_ENDPOINTS = {
     /** Replace a password somebody else set. Takes the short-lived
      *  `changeToken` from sign-in, not a session. */
     FORCED_PASSWORD_CHANGE: '/auth/password/forced-change',
+    /** Forgot-password: ask for a code, then finish with the code or a
+     *  recovery code. The first answers identically for unknown accounts. */
+    FORGOT_PASSWORD: '/auth/password/forgot',
+    RESET_PASSWORD: '/auth/password/reset',
+    RESET_WITH_RECOVERY: '/auth/password/reset-recovery',
     SIGNUP: '/auth/signup',
     SIGNOUT: '/auth/signout',
     USERS: '/auth/users',
@@ -448,6 +453,9 @@ export const API_ENDPOINTS = {
     DELETE_AVATAR: (userId: string) => `/images/avatar/${userId}`,
     UPLOAD_BANNER: (tournamentId: string) => `/images/banner/${tournamentId}`,
     DELETE_BANNER: (tournamentId: string) => `/images/banner/${tournamentId}`,
+    /** Photo of the prize on offer; the prize text links to it. */
+    UPLOAD_PRIZE: (tournamentId: string) => `/images/prize/${tournamentId}`,
+    DELETE_PRIZE: (tournamentId: string) => `/images/prize/${tournamentId}`,
     UPSERT_ASSET: (key: string) => `/images/assets/${key}`,
     DELETE_ASSET: (key: string) => `/images/assets/${key}`,
     // Single assets are read out of the LIST_ASSETS response; the server has no

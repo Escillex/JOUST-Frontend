@@ -41,6 +41,51 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
+/**
+ * Nine tabs did not fit, so they were shrunk until they did — which is the point
+ * at which a tab strip has stopped being navigation. They group into four things
+ * an administrator actually does: watch the platform, act on people, define the
+ * reusable pieces, and configure the installation.
+ *
+ * `activeTab` stays the single source of truth (every panel and the ?tab= deep
+ * links already speak it); the group is derived from it, never stored, so the
+ * two can never disagree.
+ */
+type AdminTab =
+  | "DASHBOARD" | "ANALYTICS"
+  | "USERS" | "MODERATION"
+  | "GAMES" | "PRESETS" | "AWARDS"
+  | "SETTINGS" | "BACKUPS" | "DEV_TOOLS";
+
+const ADMIN_GROUPS: {
+  key: string;
+  label: string;
+  // `href` entries are their own page rather than a panel on this one.
+  tabs: { tab?: AdminTab; href?: string; label: string }[];
+}[] = [
+  { key: "OVERVIEW", label: "Overview", tabs: [
+    { tab: "DASHBOARD", label: "Summary" },
+    { tab: "ANALYTICS", label: "Analytics" },
+  ] },
+  { key: "PEOPLE", label: "People", tabs: [
+    { tab: "USERS", label: "Users" },
+    { tab: "MODERATION", label: "Moderation" },
+  ] },
+  { key: "CATALOG", label: "Catalog", tabs: [
+    { tab: "GAMES", label: "Games" },
+    { tab: "PRESETS", label: "Formats" },
+    { tab: "AWARDS", label: "Awards" },
+  ] },
+  { key: "SYSTEM", label: "System", tabs: [
+    { tab: "SETTINGS", label: "Settings" },
+    { tab: "BACKUPS", label: "Backups" },
+    // Its own route. It used to be reachable only from a link block on the old
+    // dashboard; when that block went, the page was orphaned.
+    { href: "/admin/editor", label: "Home page" },
+    { tab: "DEV_TOOLS", label: "Developer tools" },
+  ] },
+];
+
 function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
   return (
     <nav className="flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 mb-8">
@@ -67,7 +112,7 @@ interface Stats {
 export default function AdminDashboard() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DASHBOARD" | "ANALYTICS" | "GAMES" | "AWARDS" | "MODERATION" | "PRESETS" | "SETTINGS" | "BACKUPS" | "DEV_TOOLS">("DASHBOARD");
+  const [activeTab, setActiveTab] = useState<AdminTab>("DASHBOARD");
   // Who the grant modal is open for, from a user-management row.
   const [awardTarget, setAwardTarget] = useState<{ id: string; name: string } | null>(null);
   const [pendingGameRequests, setPendingGameRequests] = useState(0);
@@ -110,8 +155,6 @@ export default function AdminDashboard() {
   } | null>(null);
   const [forfeitBusy, setForfeitBusy] = useState(false);
 
-  const [formats, setFormats] = useState<any[]>([]);
-  const [isCreatingFormat, setIsCreatingFormat] = useState(false);
 
   // First-run setup (docs/setup-wizard-plan.md). Unguarded endpoint, so this
   // resolves even before the admin's own data loads; false until it answers, so
@@ -124,7 +167,6 @@ export default function AdminDashboard() {
       .catch(() => undefined);
   }, []);
 
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -132,11 +174,10 @@ export default function AdminDashboard() {
     // Read from window rather than useSearchParams to avoid the Suspense-boundary
     // build requirement in a fully-client page.
     const t = new URLSearchParams(window.location.search).get("tab")?.toUpperCase();
-    if (t === "GAMES" || t === "AWARDS" || t === "MODERATION" || t === "PRESETS" || t === "DEV_TOOLS" || t === "ANALYTICS" || t === "SETTINGS" || t === "BACKUPS") setActiveTab(t);
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    // Checked against the group table rather than a hand-kept list, which is
+    // how USERS would have been forgotten the moment it was added.
+    const known = ADMIN_GROUPS.flatMap((g) => g.tabs.map((x) => x.tab)).filter(Boolean);
+    if (t && (known as string[]).includes(t)) setActiveTab(t as AdminTab);
   }, []);
 
   useEffect(() => {
@@ -181,18 +222,18 @@ export default function AdminDashboard() {
       }
       setIsAuthorized(true);
 
-      const [usersRes, tourneyRes, formatsRes] = await Promise.all([
+      // Presets are fetched by PresetManager itself; this page stopped rendering
+      // a formats list when the Catalog tab took that job, so the third request
+      // was a page-load cost buying nothing.
+      const [usersRes, tourneyRes] = await Promise.all([
         authenticatedFetch(API_ENDPOINTS.AUTH.USERS),
         authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE),
-        authenticatedFetch(API_ENDPOINTS.PRESETS.BASE),
       ]);
       const usersData: AdminUser[]       = (await safeJson(usersRes))  ?? [];
       const tourneyData: AdminTournament[] = (await safeJson(tourneyRes)) ?? [];
-      const formatsData = (await safeJson(formatsRes)) ?? [];
 
       setUsers(usersData);
       setTournaments(tourneyData);
-      setFormats(formatsData);
       updateStats(usersData, tourneyData);
       
       const endTime = performance.now();
@@ -334,26 +375,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Same pattern as handleDeleteUser: no confirm() popup, block double
-  // clicks with withBusy, show the outcome with a toast. The backend
-  // refuses to delete a preset that is still in use, so that error
-  // message must reach the admin instead of being hidden.
-  const handleDeleteFormat = (formatId: string) =>
-    withBusy(formatId, async () => {
-      try {
-        const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DELETE(formatId), { method: "DELETE" });
-        if (res.ok) {
-          setFormats(prev => prev.filter(f => f.id !== formatId));
-          toast("Format preset deleted", "success");
-        } else {
-          const data = await safeJson(res);
-          toast(data?.message || "Failed to delete format preset", "error");
-        }
-      } catch {
-        toast("Network error while deleting format preset", "error");
-      }
-    });
-
   const handleBatchDelete = async (userIds: string[]) => {
     setIsLoading(true);
     try {
@@ -399,33 +420,15 @@ export default function AdminDashboard() {
 
   if (isAuthorized === false) return null;
 
-  if (isMobile) return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 text-center">
-      <div className="w-16 h-16 border border-white/10 flex items-center justify-center mb-6">
-        <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      </div>
-      <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2">Desktop Required</h2>
-      <p className="text-xs text-white/40 max-w-sm mb-8 leading-relaxed font-questrial">
-        The System Admin Center contains high-density data tables and diagnostic logs that require a larger viewport. Please access this panel from a desktop device.
-      </p>
-      <button 
-        onClick={() => router.push("/tournaments")}
-        className="px-6 py-3 bg-white text-black hover:bg-primary transition-colors text-[10px] font-black uppercase tracking-widest"
-      >
-        Return to Tournaments
-      </button>
-    </div>
-  );
 
   // The tab chrome renders immediately and only the panel body is a placeholder,
   // so the administrator can switch tabs while the first fetch is still running
   // instead of waiting on a full-screen spinner.
   const isLoadingUsers = isLoading && users.length === 0;
 
+
   return (
-    <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col p-4 md:p-12 gap-0`}>
+    <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col px-4 md:px-6 py-8 gap-0`}>
       {!setupDone && (
         <a
           href="/setup"
@@ -505,51 +508,83 @@ export default function AdminDashboard() {
         </div>
       )}
       <div className="max-w-7xl mx-auto w-full flex flex-col">
-        {/* Folder tabs. Eight of them no longer fit at the old padding (DEV
-            TOOLS was pushed off the right edge at 1440px once AWARDS joined),
-            and MODERATION made nine, so padding and letter-spacing stay tight
-            below 2xl. The strip wraps rather than hide a tab on a narrow screen. */}
-        <div className="flex flex-wrap items-end gap-1 px-4">
-          {/* Brand Tab */}
-          <div className="px-6 py-4 bg-background border-t-2 border-l-2 border-r-2 border-white/10 flex flex-col justify-center min-w-[160px]">
-            <div className="text-white font-black tracking-tighter text-xl font-poppins uppercase leading-none">
-              JOUST<br/>
-              <span className="text-primary text-[8px] tracking-[0.4em] font-bold">ADMIN</span>
-            </div>
+        {/* Two levels, both plain: the group, then what is inside it. No folder
+            metaphor, no brand tab — the navbar already says where you are. */}
+        <div className="border-b border-white/10">
+          <div className="flex flex-wrap items-center gap-1">
+            {ADMIN_GROUPS.map((group) => {
+              const isActive = group.tabs.some((t) => t.tab === activeTab);
+              // A badge on a sub-tab has to be visible from the group, or it is
+              // hidden behind a click and stops being a notification.
+              const badge =
+                (group.tabs.some((t) => t.tab === "MODERATION") ? openReports : 0) +
+                (group.tabs.some((t) => t.tab === "GAMES") ? pendingGameRequests : 0);
+              return (
+                <button
+                  key={group.key}
+                  onClick={() => { const first = group.tabs.find((t) => t.tab); if (first?.tab) setActiveTab(first.tab); }}
+                  className={`px-4 py-3 text-[13px] font-semibold transition-colors border-b-2 -mb-[2px] ${
+                    isActive
+                      ? "border-primary text-white"
+                      : "border-transparent text-[#E0E0E0]/45 hover:text-[#E0E0E0]"
+                  }`}
+                >
+                  {group.label}
+                  {badge > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center text-[10px] font-semibold text-black bg-[#FF4D4D] rounded-full px-1.5">
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-
-          {/* Navigation Tabs */}
-          {(["DASHBOARD", "ANALYTICS", "GAMES", "AWARDS", "MODERATION", "PRESETS", "SETTINGS", "BACKUPS", "DEV_TOOLS"] as const).map((tab) => (
-            <button 
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 2xl:px-6 py-5 text-[10px] font-black uppercase tracking-[0.15em] 2xl:tracking-[0.2em] whitespace-nowrap transition-all border-t-2 border-l-2 border-r-2 relative z-20 -mb-[2px] ${
-                activeTab === tab 
-                  ? "bg-[#111] border-white/20 text-primary pt-6" 
-                  : "bg-background border-white/5 text-white/30 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              {tab.replace("_", " ")}
-              {tab === "MODERATION" && openReports > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center text-[8px] font-black text-black bg-[#FF4D4D] rounded-full px-1.5 py-0.5 align-middle">
-                  {openReports}
-                </span>
-              )}
-              {tab === "GAMES" && pendingGameRequests > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center text-[8px] font-black text-black bg-primary rounded-full px-1.5 py-0.5 align-middle">
-                  {pendingGameRequests}
-                </span>
-              )}
-              {activeTab === tab && (
-                <div className="absolute -bottom-[2px] left-0 right-0 h-[4px] bg-[#111] z-30" />
-              )}
-            </button>
-          ))}
         </div>
 
+        {(() => {
+          const group = ADMIN_GROUPS.find((g) => g.tabs.some((t) => t.tab === activeTab));
+          if (!group) return null;
+          return (
+            <div className="flex flex-wrap items-center gap-2 py-4">
+              {group.tabs.map(({ tab, href, label }) => {
+                const base =
+                  "px-3 h-8 inline-flex items-center text-xs font-semibold rounded border transition-colors";
+                if (href) {
+                  return (
+                    <a
+                      key={href}
+                      href={href}
+                      className={`${base} border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20`}
+                    >
+                      {label} <span aria-hidden className="ml-1.5 text-[#E0E0E0]/30">↗</span>
+                    </a>
+                  );
+                }
+                const count = tab === "MODERATION" ? openReports : tab === "GAMES" ? pendingGameRequests : 0;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => tab && setActiveTab(tab)}
+                    className={`px-3 h-8 text-xs font-semibold rounded border transition-colors ${
+                      activeTab === tab
+                        ? "bg-white/10 border-white/20 text-white"
+                        : "border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20"
+                    }`}
+                  >
+                    {label}
+                    {count > 0 && (
+                      <span className="ml-2 text-[10px] font-semibold text-[#FF4D4D]">{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         {/* Main Folder Body */}
-        <div className="bg-[#111] border-2 border-white/20 shadow-2xl relative z-10 flex flex-col min-h-[80vh]">
-          <main className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10">
+        <div className="flex flex-col min-h-[70vh]">
+          <main className="flex-1">
         {isLoadingUsers ? (
           <div className="space-y-6">
             <SkeletonStatus label="Loading administration data" />
@@ -564,116 +599,62 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full space-y-8 pb-12"
+              className="w-full space-y-8 pb-12"
             >
               <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
                 <div>
-                  <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "DASHBOARD" }]} />
-                  <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Management Overview</h1>
-                  <p className="text-sm text-white/30 mt-4 max-w-2xl">
-                    High-performance administrative hub for user records, tournament logistics, and real-time audit logs.
+                  <h1 className="text-2xl font-semibold text-white">Overview</h1>
+                  <p className="text-sm text-[#E0E0E0]/45 mt-2 max-w-2xl">
+                    Tournaments on this installation, and a record of every action staff have taken.
                   </p>
                 </div>
               </div>
 
               {/* Stats Bento */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="System Users"        value={stats.totalUsers}           subtitle={`${stats.registeredUsers} REG / ${stats.guestUsers} GUEST`} delay={0.1} color="text-primary" />
-                <StatCard title="Total Tournaments"   value={stats.totalTournaments}    subtitle="Historical Volume" delay={0.2} color="text-white" />
-                <StatCard title="Active Instances"     value={stats.activeTournaments}    subtitle="Ongoing Cycles" delay={0.3} color="text-amber-400" />
-                <StatCard title="System Latency"      value={`${latency}ms`}            subtitle="Connection Health" delay={0.4} color={latency < 200 ? "text-primary" : "text-amber-400"} />
+                <StatCard title="Users"        value={stats.totalUsers}           subtitle={`${stats.registeredUsers} registered · ${stats.guestUsers} guest`} delay={0.1} color="text-primary" />
+                <StatCard title="Tournaments"   value={stats.totalTournaments}    subtitle="All time" delay={0.2} color="text-white" />
+                <StatCard title="Running now"     value={stats.activeTournaments}    subtitle="In progress" delay={0.3} color="text-amber-400" />
+                <StatCard title="Response time"      value={`${latency}ms`}            subtitle="Server round trip" delay={0.4} color={latency < 200 ? "text-primary" : "text-amber-400"} />
               </div>
 
-              {/* Primary/Secondary Dual Column Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Column 1: Master Management (Wide) */}
-                <div className="lg:col-span-8 space-y-8">
-                  <div className="bg-background border border-white/10 p-1">
-                    <UserRegistry       
+              {/* Tournaments, then the log of what was done to them. Users moved
+                  to People; the formats mini-panel and the "external gateways"
+                  link block went with the navbar's Manage entry and the Catalog
+                  tab, which both do the same job properly. */}
+              <div className="bg-background border border-white/10 p-1">
+                <TournamentTable tournaments={tournaments} onForceComplete={handleForceComplete} />
+              </div>
+
+              {/* Who did what, when — recorded server-side after each action
+                  succeeds (todo.md obj. 3.1). */}
+              <ActivityLog />
+            </motion.div>
+          ) : activeTab === "USERS" ? (
+            <motion.div
+              key="users"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full pb-12"
+            >
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Users</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">
+                  Every account on this installation. Guests are temporary accounts created by organizers.
+                </p>
+              </div>
+              <div className="bg-background border border-white/10 p-1">
+                <UserRegistry       
                       users={users}             
                       onDelete={handleDeleteUser}
                       onBatchDelete={handleBatchDelete}
                       onConvert={setGuestToConvert}
                       onEdit={(u) => { setUserToEdit(u); setIsUserModalOpen(true); }}
                       onAward={(u) => setAwardTarget({ id: u.id || u.sub!, name: u.username })}
-                      onCreateClick={() => { setUserToEdit(null); setIsUserModalOpen(true); }}
-                    />
-                  </div>
-                  
-                  <div className="bg-background border border-white/10 p-1">
-                    <TournamentTable tournaments={tournaments} onForceComplete={handleForceComplete} />
-                  </div>
-                </div>
-
-                {/* Column 2: System Utilities (Narrow) */}
-                <div className="lg:col-span-4 space-y-8">
-                  {/* The old "System Audit Log" card invented lines from a
-                      re-download of every user and tournament every ten
-                      seconds. The real log now sits full-width below. */}
-
-                  {/* Tournament Format Manager */}
-                  <div className="bg-background border border-white/10 p-6 space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Tournament Formats</h3>
-                      {/* Switch the tab state directly. The old link pushed
-                          "?tab=PRESETS" to the URL, but nothing on this page
-                          reads that query parameter, so the button did nothing. */}
-                      <button
-                        onClick={() => setActiveTab("PRESETS")}
-                        className="text-[9px] font-black text-primary uppercase tracking-widest hover:brightness-125"
-                      >
-                        MANAGE
-                      </button>
-                    </div>
- 
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {formats.map(f => (
-                        <div key={f.id} className="flex items-center justify-between p-3 border border-white/5 hover:border-white/10 transition-all group/item">
-                          <div>
-                            <p className="text-[10px] font-black text-white uppercase tracking-widest">{f.name}</p>
-                            {f.gameName && <p className="text-[8px] text-primary/60 mt-0.5 tracking-tighter uppercase">{f.gameName}</p>}
-                            {f.isBuiltin && <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">BUILT-IN</span>}
-                          </div>
-                          <button
-                            onClick={() => handleDeleteFormat(f.id)}
-                            className="opacity-0 group-hover/item:opacity-100 hover:text-red-500 text-white/20 text-xs font-bold transition-all px-2 py-1"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-background border border-white/10 p-6">
-                    <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-6">External Gateways</h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <button 
-                        onClick={() => router.push("/tournaments/manage")} 
-                        className="p-4 border border-white/10 hover:border-primary/50 text-[10px] font-bold text-white uppercase tracking-widest transition-all text-left flex justify-between items-center group"
-                      >
-                        Organizer Portal
-                        <svg className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                        </svg>
-                      </button>
-                      <button 
-                        onClick={() => router.push("/admin/editor")} 
-                        className="p-4 border border-white/10 hover:border-primary/50 text-[10px] font-bold text-white uppercase tracking-widest transition-all text-left flex justify-between items-center group"
-                      >
-                        Site Visual Editor
-                        <svg className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  onCreateClick={() => { setUserToEdit(null); setIsUserModalOpen(true); }}
+                />
               </div>
-
-              {/* Who did what, when — recorded server-side after each action
-                  succeeds (todo.md obj. 3.1). */}
-              <ActivityLog />
             </motion.div>
           ) : activeTab === "ANALYTICS" ? (
             <motion.div
@@ -681,12 +662,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "ANALYTICS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Platform Analytics</h1>
-                <p className="text-sm text-white/30 mt-4">Growth, game and format usage, and player engagement across the platform.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Analytics</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Growth, game and format usage, and player engagement across the platform.</p>
               </div>
               <AnalyticsPanel />
             </motion.div>
@@ -696,12 +676,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "SETTINGS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">System Settings</h1>
-                <p className="text-sm text-white/30 mt-4">Email delivery and security policy, applied without a redeploy.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">System Settings</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Email delivery and security policy, applied without a redeploy.</p>
               </div>
               <SettingsPanel />
             </motion.div>
@@ -711,12 +690,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "AWARDS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Awards</h1>
-                <p className="text-sm text-white/30 mt-4">Medals users can pin to their profile, and plaques shown under their name. Give them from User Management or from a profile.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Awards</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Medals users can pin to their profile, and plaques shown under their name. Give them from User Management or from a profile.</p>
               </div>
               <AwardManager />
             </motion.div>
@@ -726,12 +704,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "MODERATION" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Moderation</h1>
-                <p className="text-sm text-white/30 mt-4">Reported gallery images and tournament builds. Removed items are hidden at once and can be restored for 30 days.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Moderation</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Reported gallery images and tournament builds. Removed items are hidden at once and can be restored for 30 days.</p>
               </div>
               <ModerationPanel onCountChange={setOpenReports} />
             </motion.div>
@@ -741,12 +718,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "BACKUPS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Database Backups</h1>
-                <p className="text-sm text-white/30 mt-4">Snapshot, restore, and export a sanitized copy for a second instance.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Database Backups</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Snapshot, restore, and export a sanitized copy for a second instance.</p>
               </div>
               <BackupPanel />
             </motion.div>
@@ -756,12 +732,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "PRESETS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Format Presets</h1>
-                <p className="text-sm text-white/30 mt-4">Manage standardized tournament configurations and rulesets for organizers.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Format Presets</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Manage standardized tournament configurations and rulesets for organizers.</p>
               </div>
               <div className="bg-background border border-white/10 p-10">
                 <PresetManager />
@@ -773,12 +748,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "GAMES" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Game Catalog</h1>
-                <p className="text-sm text-white/30 mt-4">The games organizers can attach to tournaments. Requests from organizers arrive as notifications.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Games</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">The games organizers can attach to tournaments. Requests from organizers arrive as notifications.</p>
               </div>
               <div className="bg-background border border-white/10 p-10">
                 <GameManager onPendingCountChange={setPendingGameRequests} />
@@ -790,12 +764,11 @@ export default function AdminDashboard() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="max-w-7xl mx-auto w-full pb-12"
+              className="w-full pb-12"
             >
-              <div className="mb-12">
-                <Breadcrumbs items={[{ label: "ADMIN", href: "/admin" }, { label: "DEV_TOOLS" }]} />
-                <h1 className="text-4xl font-black text-white tracking-tight font-poppins uppercase leading-none mt-2">Diagnostics</h1>
-                <p className="text-sm text-white/30 mt-4">System-level diagnostic tools for direct database state management.</p>
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-white">Developer tools</h1>
+                <p className="text-sm text-[#E0E0E0]/45 mt-2">Direct database actions for development and testing. Handle with care on a live installation.</p>
               </div>
               <div className="bg-background border border-white/10 p-1">
                 <DevPanel tournaments={tournaments} onRefresh={fetchData} />

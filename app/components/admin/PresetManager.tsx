@@ -10,7 +10,10 @@ interface Template {
   system: TournamentFormat;
   config: any;
   isBuiltin: boolean;
+  /** DEPRECATED column. Kept only to label legacy rows honestly. */
   gameName?: string;
+  /** The real relation — every /tournament-formats read already includes it. */
+  game?: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -24,8 +27,8 @@ export default function PresetManager() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [system, setSystem] = useState<TournamentFormat>("SINGLE_ELIMINATION");
-  const [gameName, setGameName] = useState("");
-  const [isNewGame, setIsNewGame] = useState(false);
+  const [gameId, setGameId] = useState("");
+  const [games, setGames] = useState<{ id: string; name: string }[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingGameId, setEditingGameId] = useState<string | null>(null);
   const [editGameValue, setEditGameValue] = useState("");
@@ -99,7 +102,7 @@ export default function PresetManager() {
           description,
           system,
           config,
-          gameName: gameName || null,
+          gameId: gameId || null,
         })
       });
 
@@ -142,17 +145,17 @@ export default function PresetManager() {
       const res = await authenticatedFetch(API_ENDPOINTS.PRESETS.DETAILS(id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameName: editGameValue || null }),
+        body: JSON.stringify({ gameId: editGameValue || null }),
       });
       if (res.ok) {
         setEditingGameId(null);
         fetchTemplates();
       } else {
         const data = await safeJson(res);
-        setError(data?.message || "Failed to update game designation");
+        setError(data?.message || "Could not change the game");
       }
     } catch (err) {
-      setError("Network error while updating game designation");
+      setError("Could not reach the server.");
     }
   };
 
@@ -160,8 +163,7 @@ export default function PresetManager() {
     setName("");
     setDescription("");
     setSystem("SINGLE_ELIMINATION");
-    setGameName("");
-    setIsNewGame(false);
+    setGameId("");
     setBestOf(1);
     setAllowDraw(false);
     setSeedingMode("RANDOM");
@@ -175,13 +177,17 @@ export default function PresetManager() {
     setError("");
   };
 
-  const gameOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(templates.map(t => t.gameName).filter((g): g is string => !!g))
-      ).sort(),
-    [templates]
-  );
+  // The options are the real Game catalog. They used to be derived from
+  // `templates.map(t => t.gameName)` — the deprecated column that nothing has
+  // written since games became first-class — so the list was always empty and
+  // the field silently degraded to a free-text box that wrote the dead column
+  // again. Same failure that made the leaderboard game tabs unreachable.
+  useEffect(() => {
+    authenticatedFetch(API_ENDPOINTS.GAMES.BASE)
+      .then(async (r) => (r.ok ? await safeJson(r) : null))
+      .then((list) => { if (Array.isArray(list)) setGames(list); })
+      .catch(() => undefined);
+  }, []);
 
   const labelCls = "text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block";
   const deeperLabelCls = "text-[10px] font-black text-white/20 uppercase tracking-widest mb-1 block";
@@ -190,7 +196,7 @@ export default function PresetManager() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center border-b border-white/5 pb-4">
-        <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">Technical Presets</h3>
+        <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">Presets</h3>
         <button 
           onClick={() => {
             if (isCreating) resetForm();
@@ -220,46 +226,23 @@ export default function PresetManager() {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Game Designation</label>
-              {isNewGame || gameOptions.length === 0 ? (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={gameName}
-                    onChange={e => setGameName(e.target.value.toUpperCase())}
-                    placeholder="e.g. BEYBLADE"
-                    className={inputCls}
-                    autoFocus={isNewGame}
-                  />
-                  {gameOptions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => { setIsNewGame(false); setGameName(""); }}
-                      className="px-3 border border-white/10 text-[9px] font-black text-white/40 uppercase tracking-widest hover:border-white/30 hover:text-white transition-all shrink-0"
-                    >
-                      LIST
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <select
-                  value={gameName}
-                  onChange={e => {
-                    if (e.target.value === "__NEW__") {
-                      setIsNewGame(true);
-                      setGameName("");
-                    } else {
-                      setGameName(e.target.value);
-                    }
-                  }}
-                  className={inputCls}
-                >
-                  <option value="" className="bg-background text-white">None</option>
-                  {gameOptions.map(g => (
-                    <option key={g} value={g} className="bg-background text-white">{g}</option>
-                  ))}
-                  <option value="__NEW__" className="bg-background text-primary">+ Define new game…</option>
-                </select>
+              <label className={labelCls}>Game</label>
+              <select
+                value={gameId}
+                onChange={e => setGameId(e.target.value)}
+                className={inputCls}
+              >
+                <option value="" className="bg-background text-white">No game</option>
+                {games.map(g => (
+                  <option key={g.id} value={g.id} className="bg-background text-white">{g.name}</option>
+                ))}
+              </select>
+              {games.length === 0 && (
+                // Creating a game from inside the preset form is how half-made
+                // catalog entries happen; Catalog > Games is one tab away.
+                <p className="text-[9px] text-white/30 mt-1.5 leading-relaxed">
+                  No games in the catalog yet. Add one under Catalog &rsaquo; Games.
+                </p>
               )}
             </div>
           </div>
@@ -482,7 +465,7 @@ export default function PresetManager() {
             onClick={handleCreate}
             className="w-full py-3 bg-primary text-black font-black text-[10px] uppercase tracking-[0.3em] hover:brightness-110 transition-all"
           >
-            Deploy Preset Logic
+            Save preset
           </button>
         </div>
       )}
@@ -515,36 +498,35 @@ export default function PresetManager() {
 
              <div className="flex items-center justify-between border-t border-white/5 pt-4">
                   <div className="flex flex-col relative z-20">
-                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Designation</span>
+                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Game</span>
                     {editingGameId === tpl.id ? (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <input
+                        <select
                           autoFocus
                           value={editGameValue}
-                          onChange={e => setEditGameValue(e.target.value.toUpperCase())}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") handleUpdateGame(tpl.id);
-                            if (e.key === "Escape") setEditingGameId(null);
-                          }}
-                          placeholder="GENERAL"
-                          list="preset-game-options"
-                          className="w-24 bg-background border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
-                        />
+                          onChange={e => setEditGameValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Escape") setEditingGameId(null); }}
+                          className="w-32 bg-background border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
+                        >
+                          <option value="" className="bg-background">No game</option>
+                          {games.map(g => (
+                            <option key={g.id} value={g.id} className="bg-background">{g.name}</option>
+                          ))}
+                        </select>
                         <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] text-primary hover:text-white px-1">✓</button>
                         <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/40 hover:text-white px-1">✕</button>
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setEditingGameId(tpl.id); setEditGameValue(tpl.gameName || ""); }}
-                        title="Edit game designation"
+                        onClick={() => { setEditingGameId(tpl.id); setEditGameValue(tpl.game?.id || ""); }}
+                        title="Change the game"
                         className="text-[8px] font-bold text-primary text-left hover:underline decoration-primary/40 underline-offset-2"
                       >
-                        {tpl.gameName || "GENERAL"} <span className="text-white/30">✎</span>
+                        {tpl.game?.name
+                          ?? (tpl.gameName ? `${tpl.gameName} (legacy)` : "No game")}{" "}
+                        <span className="text-white/30">✎</span>
                       </button>
                     )}
-                    <datalist id="preset-game-options">
-                      {gameOptions.map(g => <option key={g} value={g} />)}
-                    </datalist>
                   </div>
                  <div className="flex flex-col text-right">
                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Best Of</span>

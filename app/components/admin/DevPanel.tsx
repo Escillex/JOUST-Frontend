@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { API_ENDPOINTS, authenticatedFetch, safeJson } from "../../utils/api";
 import { useToast } from "../ui/Toast";
+import { uniqueGuestNames } from "../../utils/guestName";
 
 interface Tournament {
   id: string;
@@ -32,7 +33,10 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
       const res = await authenticatedFetch(API_ENDPOINTS.DEV.BATCH_GUESTS(selectedTournament), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count: guestCount }),
+        // One pool for every guest name in the product (utils/guestName.ts):
+        // the server used to mint its own "Guest_4X9K2" style here, which is
+        // exactly the placeholder look that pool was written to replace.
+        body: JSON.stringify({ count: guestCount, names: uniqueGuestNames(guestCount) }),
       });
       if (res.ok) {
         toast(`Generated ${guestCount} guests`, "success");
@@ -241,14 +245,14 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-none relative group overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
+      <div className="bg-neutral-900 border border-neutral-800 p-5 md:p-8 rounded-none relative group overflow-hidden">
+        <div className="hidden md:block absolute top-0 right-0 p-4 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity">
           <span className="text-6xl font-black italic tracking-tighter">DEV</span>
         </div>
         
         <h2 className="text-xs font-black uppercase tracking-[0.3em] text-primary mb-8 flex items-center gap-4">
           <span className="h-px w-8 bg-primary/30"></span>
-          Player Simulation Tools
+          Test data
         </h2>
 
         {/* The switch is the gate, not a hint: with it off the server refuses
@@ -256,7 +260,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             keeps the UI honest about what will happen. */}
         <div className="relative z-10 mb-8 space-y-3">
           <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
-            Bulk Guest Creation
+            Bulk guests
           </label>
           <button
             onClick={toggleBulkGuests}
@@ -279,7 +283,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
           <div className="space-y-4">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Target Tournament</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Tournament</label>
             <select 
               value={selectedTournament}
               onChange={(e) => setSelectedTournament(e.target.value)}
@@ -293,8 +297,8 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
           </div>
 
           <div className="space-y-4">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Quantity To Generate</label>
-            <div className="flex gap-4">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">How many</label>
+            <div className="flex flex-wrap gap-3 md:gap-4">
               <input 
                 type="number"
                 value={guestCount}
@@ -304,7 +308,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               <button 
                 onClick={handleBatchAdd}
                 disabled={loading || !selectedTournament || !bulkGuests}
-                className="px-8 py-3 bg-primary text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
+                className="flex-1 md:flex-none px-8 py-3 bg-primary text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
               >
                 {loading ? "Generating..." : "Generate Guests"}
               </button>
@@ -318,7 +322,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         </div>
       </div>
 
-      <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-none relative group overflow-hidden">
+      <div className="bg-neutral-900 border border-neutral-800 p-5 md:p-8 rounded-none relative group overflow-hidden">
         <h2 className="text-xs font-black uppercase tracking-[0.3em] text-amber-500 mb-8 flex items-center gap-4">
           <span className="h-px w-8 bg-amber-500/30"></span>
           System Configuration
@@ -332,7 +336,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
               Two-Factor Enforcement
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(["all", "staff", "off"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -392,7 +396,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
               Scheduled Backups
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={async () => {
                   const next = !backupEnabled;
@@ -441,7 +445,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
               Backups Kept (Rolling)
             </label>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3 md:gap-4">
               <input
                 type="number"
                 min={1}
@@ -497,7 +501,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
 
           <div className="space-y-4">
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Guest Expiration (Days)</label>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3 md:gap-4">
               <input 
                 type="number"
                 value={expiryDays}
@@ -531,7 +535,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         </div>
       </div>
 
-      <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-none relative group overflow-hidden">
+      <div className="bg-neutral-900 border border-neutral-800 p-5 md:p-8 rounded-none relative group overflow-hidden">
         <h2 className="text-xs font-black uppercase tracking-[0.3em] text-red-500 mb-8 flex items-center gap-4">
           <span className="h-px w-8 bg-red-500/30"></span>
           System Management

@@ -41,6 +41,17 @@ export default function AuthPage() {
   const [changeToken, setChangeToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  /** Set when the account's stored address cannot receive mail (the seeded
+   *  admin's `.local`), which is the one chance to fix it. */
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+
+  // Forgot-password: ask → code → new password. `resetting` is the whole flow,
+  // `resetChallenge` the token the server hands back after the ask.
+  const [resetting, setResetting] = useState(false);
+  const [resetChallenge, setResetChallenge] = useState<string | null>(null);
+  const [resetCode, setResetCode] = useState("");
+  const [resetUsingRecovery, setResetUsingRecovery] = useState(false);
 
   // Google sign-in is offered only when this deployment has switched it on and
   // given it a Client ID (Admin → Settings). Absent, the page is unchanged.
@@ -130,6 +141,84 @@ export default function AuthPage() {
     }
   };
 
+  /** Ask for a reset code. The reply is identical for unknown accounts, so the
+   *  UI must not imply otherwise. */
+  const requestReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy || !identifier.trim()) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}${API_ENDPOINTS.AUTH.FORGOT_PASSWORD}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ identifier: identifier.trim() }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "Could not start the reset."}`);
+        return;
+      }
+      setResetChallenge(data?.challenge ?? "");
+      setMessage(data?.message ?? "Check your email for a reset code.");
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Finish the reset, with the emailed code or a recovery code. */
+  const submitReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (newPassword !== confirmPassword) {
+      setMessage("Error: Those passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const url = resetUsingRecovery
+        ? API_ENDPOINTS.AUTH.RESET_WITH_RECOVERY
+        : API_ENDPOINTS.AUTH.RESET_PASSWORD;
+      const body = resetUsingRecovery
+        ? { identifier: identifier.trim(), recoveryCode, newPassword }
+        : { challenge: resetChallenge, code: resetCode, newPassword };
+      const response = await fetch(`${API_URL}${url}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = await safeJson(response);
+      if (!response.ok) {
+        setMessage(`Error: ${data?.message || "Could not reset the password."}`);
+        return;
+      }
+      if (data?.token) localStorage.setItem("token", data.token);
+      await refreshUser();
+      setMessage("Success: Password reset");
+      setTimeout(() => router.push("/home"), 600);
+    } catch {
+      setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const leaveReset = () => {
+    setResetting(false);
+    setResetChallenge(null);
+    setResetCode("");
+    setResetUsingRecovery(false);
+    setRecoveryCode("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setMessage("");
+  };
+
   /** Step two for an account whose password was set by somebody else. */
   const submitNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,10 +234,13 @@ export default function AuthPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ changeToken, newPassword }),
+        body: JSON.stringify({ changeToken, newPassword, ...(needsEmail ? { email: newEmail.trim() } : {}) }),
       });
       const data = await safeJson(response);
       if (!response.ok) {
+        // The server asks for an address only when the stored one cannot
+        // receive mail; surfacing the field is the whole remedy.
+        if (data?.code === "EMAIL_REQUIRED") setNeedsEmail(true);
         setMessage(`Error: ${data?.message || "Could not set that password."}`);
         return;
       }
@@ -252,9 +344,12 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     setMessage("");
     if (signupNameError) {
       setMessage(`Error: ${signupNameError}`);
+      setBusy(false);
       return;
     }
 
@@ -315,6 +410,8 @@ export default function AuthPage() {
     } catch (error) {
       console.error("Auth error:", error);
       setMessage("Error: Failed to connect to server");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -457,6 +554,108 @@ export default function AuthPage() {
               )}
 
               {/* Step two: the emailed code. */}
+              {resetting && (
+                <form onSubmit={resetChallenge === null ? requestReset : submitReset} className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-white font-poppins">
+                      Reset your password
+                    </h3>
+                    <p className="text-xs text-white/50 mt-2 leading-relaxed">
+                      {resetChallenge === null
+                        ? "Enter your username or email and we will send a reset code."
+                        : resetUsingRecovery
+                          ? "Enter one of the recovery codes you saved, then choose a new password."
+                          : "Enter the code we emailed you, then choose a new password."}
+                    </p>
+                  </div>
+
+                  {resetChallenge === null ? (
+                    <div className="relative">
+                      <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                        Email or username
+                      </span>
+                      <input
+                        type="text"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        autoFocus
+                        required
+                        className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {resetUsingRecovery ? (
+                        <input
+                          type="text"
+                          value={recoveryCode}
+                          onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+                          placeholder="XXXXX-XXXXX"
+                          required
+                          className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white font-mono placeholder:text-white/10 focus:outline-none focus:border-primary transition-all"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="000000"
+                          autoFocus
+                          required
+                          className="w-full h-16 bg-transparent border-4 border-white px-6 text-3xl tracking-[0.5em] text-center text-white font-mono placeholder:text-white/10 focus:outline-none focus:border-primary transition-all"
+                        />
+                      )}
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="New password"
+                        required
+                        className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      />
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        required
+                        className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      />
+                    </>
+                  )}
+
+                  {messageBanner}
+
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="w-full h-14 bg-primary text-black font-black text-sm uppercase tracking-[0.3em] hover:brightness-90 transition-all disabled:opacity-50"
+                  >
+                    {busy ? "Working…" : resetChallenge === null ? "Send reset code" : "Set new password"}
+                  </button>
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <button type="button" onClick={leaveReset} className="text-white/40 hover:text-white transition-colors">
+                      ← Back to sign in
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // A dead inbox is exactly what recovery codes are for.
+                        setResetUsingRecovery(!resetUsingRecovery);
+                        if (!resetUsingRecovery) setResetChallenge("");
+                        setMessage("");
+                      }}
+                      className="text-white/40 hover:text-white transition-colors"
+                    >
+                      {resetUsingRecovery ? "Use an emailed code" : "Use a recovery code"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {/* A password chosen by somebody else. There is no session yet
                   and no way past this — the token the server issued authorises
                   this one call and nothing else. */}
@@ -472,6 +671,26 @@ export default function AuthPage() {
                       were given.
                     </p>
                   </div>
+
+                  {needsEmail && (
+                    <div className="relative">
+                      <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                        Email address
+                      </span>
+                      <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        required
+                        className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      />
+                      <p className="text-[11px] text-white/40 mt-2 leading-relaxed">
+                        This account has no address that can receive mail, so sign-in codes and resets
+                        would have nowhere to go. Give one you can read.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="relative">
                     <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
@@ -597,7 +816,7 @@ export default function AuthPage() {
                 </form>
               )}
 
-              {!recoveryCodes && !changeToken && !challenge && (
+              {!recoveryCodes && !changeToken && !challenge && !resetting && (
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="relative">
                   <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
@@ -676,17 +895,34 @@ export default function AuthPage() {
 
                 {messageBanner}
 
+                {mode === "login" && (
+                  <div className="flex justify-end -mt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setResetting(true); setMessage(""); }}
+                      className="text-[11px] text-white/40 hover:text-primary transition-colors"
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full h-16 bg-primary text-black font-black text-base uppercase tracking-widest flex items-center justify-between px-8 hover:translate-x-1 transition-transform duration-300"
+                  disabled={busy}
+                  className="w-full h-16 bg-primary text-black font-black text-base uppercase tracking-widest flex items-center justify-between px-8 hover:translate-x-1 transition-transform duration-300 disabled:opacity-60 disabled:translate-x-0"
                 >
-                  <span>{mode === "login" ? "Sign In" : "Sign Up"}</span>
-                  <span>→</span>
+                  <span>
+                    {busy
+                      ? (mode === "login" ? "Signing in…" : "Creating account…")
+                      : (mode === "login" ? "Sign In" : "Sign Up")}
+                  </span>
+                  <span>{busy ? "…" : "→"}</span>
                 </button>
               </form>
               )}
 
-              {!recoveryCodes && !changeToken && !challenge && googleClientId && (
+              {!recoveryCodes && !changeToken && !challenge && !resetting && googleClientId && (
                 <div className="mt-8 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="h-px flex-1 bg-white/10" />

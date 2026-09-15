@@ -54,7 +54,7 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
       <HomeFrame className="py-40">
         <div className="max-w-7xl mx-auto px-8 flex flex-col items-center justify-center text-center">
           <h2 className="text-6xl md:text-[120px] font-black text-white/5 uppercase tracking-tighter italic font-poppins mb-12">
-            EMPTY_DATA
+            Nothing scheduled
           </h2>
           <Link href="/tournaments" className="px-12 py-6 bg-primary text-black font-black text-xl uppercase tracking-widest hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[8px_8px_0px_0px_white] transition-all">
              VIEW ALL TOURNAMENTS
@@ -78,15 +78,26 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
             viewport={{ once: true }}
             className="lg:col-span-8 group"
           >
-            <Link href={`/tournaments/${featured.id}`} className="block relative w-full h-[380px] md:h-auto md:aspect-[16/9] bg-zinc-900 border-4 border-white hover:border-primary hover:shadow-[16px_16px_0px_0px_#52B946] transition-all duration-300 overflow-hidden">
-              <Image
-                src={resolveImageUrl(featured.bannerUrl, "/placeholder.png")}
-                alt={featured.name}
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 66vw"
-                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 z-0"
-              />
+            <Link href={`/tournaments/${featured.id}`} className="block relative w-full h-[380px] md:aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-[520px] bg-zinc-900 border-4 border-white hover:border-primary hover:shadow-[16px_16px_0px_0px_#52B946] transition-all duration-300 overflow-hidden">
+              {featured.bannerUrl ? (
+                <Image
+                  src={resolveImageUrl(featured.bannerUrl, "")}
+                  alt={featured.name}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 66vw"
+                  className="object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 z-0"
+                />
+              ) : (
+                <div
+                  aria-hidden
+                  className="absolute inset-0 z-0 bg-zinc-900"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 14px)",
+                  }}
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
               
               <div className="absolute bottom-0 left-0 p-6 sm:p-12 z-20 space-y-4 sm:space-y-6 w-full">
@@ -102,19 +113,6 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
                   {featured.name}
                 </h4>
 
-                <div className="flex flex-wrap items-center gap-4 sm:gap-8 pt-2 sm:pt-4">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase text-white/40">Prize Pool</span>
-                    <span className="text-xl sm:text-2xl md:text-3xl font-black text-primary truncate">{featured.prizePool ? `$${featured.prizePool}` : "PRESTIGE"}</span>
-                  </div>
-                  <div className="hidden sm:block w-px h-12 bg-white/10" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase text-white/40">Format</span>
-                    <span className="text-xl sm:text-2xl md:text-3xl font-black text-white">
-                      {((featured.format && typeof featured.format === 'object') ? featured.format.system : "UNKNOWN")?.replace("_", " ") || "UNKNOWN"}
-                    </span>
-                  </div>
-                </div>
               </div>
 
               <div className="absolute top-10 right-10 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -144,7 +142,7 @@ export default function TournamentPreview({ tournaments = [] }: TournamentPrevie
                       {t.name}
                     </h5>
                     <p className="text-[10px] text-white/30 font-black uppercase tracking-widest">
-                      {t.date ? new Date(t.date).toLocaleDateString() : "DATE_PENDING"}
+                      {t.date ? new Date(t.date).toLocaleDateString() : "Date to be announced"}
                     </p>
                   </div>
                 </Link>

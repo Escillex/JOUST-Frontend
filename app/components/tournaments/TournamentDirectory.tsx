@@ -6,7 +6,9 @@ import Link from "next/link";
 import { Tournament } from "../../tournaments/types";
 import { resolveImageUrl } from "../../utils/api";
 
-type SortField = "name" | "date" | "status" | "prizePool";
+// prizePool is free text since 2026-09-15 — alphabetising "Trophy" against
+// "₱2,000" sorts nothing anybody asked for, so it is no longer a sort key.
+type SortField = "name" | "date" | "status";
 type SortOrder = "asc" | "desc";
 
 interface TournamentDirectoryProps {
@@ -81,14 +83,14 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                     <div className="space-y-4">
                         <h3 className="text-[11px] font-black text-white/30 uppercase tracking-widest">Sort By</h3>
                         <div className="flex flex-col gap-2">
-                            {(["name", "date", "status", "prizePool"] as SortField[]).map(field => (
+                            {(["name", "date", "status"] as SortField[]).map(field => (
                                 <button
                                     key={field}
                                     onClick={() => toggleSort(field)}
                                     className={`w-full px-5 py-4 border-2 font-black text-[10px] uppercase tracking-widest transition-all flex justify-between items-center ${sortField === field ? "bg-white text-black border-white" : "bg-component-background border-component-border text-white/40 hover:border-white hover:text-white"
                                         }`}
                                 >
-                                    {field === "prizePool" ? "Prize Pool" : field}
+                                    {field}
                                     {sortField === field && <span className="text-xs">{sortOrder === "asc" ? "↑" : "↓"}</span>}
                                 </button>
                             ))}
@@ -166,7 +168,7 @@ export default function TournamentDirectory({ tournaments }: TournamentDirectory
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Prize Pool</span>
                                                     <span className={`text-xl font-black ${t.status === 'COMPLETED' ? 'text-white/20 group-hover:text-primary' : 'text-primary'}`}>
-                                                        ${t.prizePool?.toLocaleString() || "0"}
+                                                        {t.prizePool || "—"}
                                                     </span>
                                                 </div>
                                             </div>

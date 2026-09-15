@@ -14,7 +14,13 @@ interface ImageUploadProps {
   uploading?: boolean;
   /** Tailwind aspect-ratio class, e.g. "aspect-[21/9]" or "aspect-square" */
   aspectRatio?: string;
-  /** Numeric aspect ratio for the cropper, e.g. 21/9 or 1 */
+  /**
+   * Crop ratio, when it must differ from the preview box. Normally leave it
+   * unset: it is derived from `aspectRatio` below, because two independent
+   * props are two props that can disagree — and they did. The prize-picture
+   * upload showed a 4:3 preview while the cropper cut a 21/9 strip, so what the
+   * organizer framed was never what got saved.
+   */
   cropAspectRatio?: number;
   label?: string;
   placeholder?: React.ReactNode;
@@ -26,12 +32,21 @@ export default function ImageUpload({
   onDelete,
   uploading = false,
   aspectRatio = "aspect-video",
-  cropAspectRatio = 21 / 9,
+  cropAspectRatio,
   label = "UPDATE IMAGE",
   placeholder,
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  /** "aspect-[21/9]" -> 2.33, "aspect-square" -> 1, "aspect-video" -> 1.78. */
+  const ratioFromClass = (cls: string): number => {
+    const bracket = cls.match(/aspect-\[(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\]/);
+    if (bracket) return Number(bracket[1]) / Number(bracket[2]);
+    if (cls.includes("aspect-square")) return 1;
+    return 16 / 9; // aspect-video, and the fallback
+  };
+  const cropRatio = cropAspectRatio ?? ratioFromClass(aspectRatio);
 
   // Resolve display URL — prefix API base for relative server paths
   // resolveImageUrl also keeps "blob:" preview URLs unchanged, which
@@ -54,8 +69,10 @@ export default function ImageUpload({
     if (cropSrc) URL.revokeObjectURL(cropSrc);
     setCropSrc(null);
     // Convert Blob → File so consumers get a standard File object
-    const croppedFile = new File([blob], `banner_${Date.now()}.webp`, {
-      type: "image/webp",
+    // PNG, matching what CropModal now produces: lossless out of the canvas,
+    // re-encoded to WebP once by the server instead of twice.
+    const croppedFile = new File([blob], `image_${Date.now()}.png`, {
+      type: "image/png",
     });
     onUpload(croppedFile);
   };
@@ -71,7 +88,7 @@ export default function ImageUpload({
       {cropSrc && (
         <CropModal
           imageSrc={cropSrc}
-          aspectRatio={cropAspectRatio}
+          aspectRatio={cropRatio}
           onConfirm={handleCropConfirm}
           onCancel={handleCropCancel}
         />
@@ -128,7 +145,7 @@ export default function ImageUpload({
               onClick={onDelete}
               className="text-[10px] font-bold text-red-500 hover:text-red-400 tracking-widest uppercase"
             >
-              REMOVE_IMAGE
+              Remove image
             </button>
           )}
         </div>

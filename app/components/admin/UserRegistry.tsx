@@ -25,6 +25,9 @@ interface Props {
 
 export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert, onEdit, onAward, onCreateClick }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
+  /** Press twice to delete. No window.confirm (Core Rule 5), and a single click
+   *  on an irreversible action sitting beside Edit was one slip from gone. */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "REGISTERED" | "GUEST">("ALL");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -49,16 +52,16 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
   };
 
   return (
-    <div className="bg-background border border-white/5 rounded-lg shadow-2xl flex flex-col h-[700px] overflow-hidden">
+    <div className="bg-background border border-white/5 rounded-lg shadow-2xl flex flex-col h-[560px] md:h-[700px] overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-white/10 bg-white/[0.02] space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="p-4 md:p-6 border-b border-white/10 bg-white/[0.02] space-y-4 md:space-y-6">
+        <div className="flex flex-wrap gap-4 justify-between items-center">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              USER_MANAGEMENT
+              Accounts
             </h2>
-            <p className="text-[10px] text-white/40 font-medium uppercase mt-1 tracking-widest">Managing {filteredUsers.length} users</p>
+            <p className="text-[10px] text-white/40 font-medium uppercase mt-1 tracking-widest">{filteredUsers.length} shown</p>
           </div>
           <div className="flex gap-3">
             <AnimatePresence>
@@ -93,12 +96,12 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <div className="flex bg-white/5 border border-white/10 p-1 rounded-md">
+          <div className="flex shrink-0 bg-white/5 border border-white/10 p-1 rounded-md">
             {(["ALL", "REGISTERED", "GUEST"] as const).map(f => (
               <button 
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 text-[9px] font-bold uppercase tracking-widest transition-all rounded ${filter === f ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
+                className={`px-3 md:px-4 py-2 text-[9px] font-bold uppercase tracking-widest transition-all rounded ${filter === f ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
               >
                 {f}
               </button>
@@ -109,7 +112,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
 
       {/* Table */}
       <div className="flex-1 overflow-auto custom-scrollbar bg-background">
-        <table className="w-full text-left border-collapse table-fixed">
+        <table className="w-full min-w-[860px] text-left border-collapse table-fixed">
           <thead className="sticky top-0 bg-[#0A0A0A] border-b border-white/10 z-20 shadow-xl">
             <tr>
               <th className="px-6 py-4 w-16 text-center">
@@ -195,11 +198,19 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                       >
                         Edit
                       </button>
-                      <button 
-                        onClick={() => onDelete(uid)} 
-                        className="text-[10px] font-bold text-red-500/60 hover:text-red-500 uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                      <button
+                        onClick={() => {
+                          if (confirmingId === uid) { onDelete(uid); setConfirmingId(null); }
+                          else setConfirmingId(uid);
+                        }}
+                        onBlur={() => setConfirmingId((c) => (c === uid ? null : c))}
+                        className={`text-[10px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
+                          confirmingId === uid
+                            ? "text-red-500 underline decoration-red-500/60 underline-offset-2"
+                            : "text-red-500/60 hover:text-red-500"
+                        }`}
                       >
-                        Delete
+                        {confirmingId === uid ? "Confirm?" : "Delete"}
                       </button>
                     </div>
                   </td>

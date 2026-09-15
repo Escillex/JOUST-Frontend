@@ -82,7 +82,10 @@ export interface Tournament {
   name: string;
   description?: string | null;
   maxPlayers: number;
-  prizePool: number | null;
+  /** Free text since 2026-09-15 — "Trophy", "₱2,000", "Booster box". */
+  prizePool: string | null;
+  /** Optional photo of the prize; the prize text links to it when set. */
+  prizeImageUrl?: string | null;
   entranceFee: number | null;
   venue: string | null;
   date: string | null;
