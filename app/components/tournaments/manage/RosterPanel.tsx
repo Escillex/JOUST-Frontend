@@ -4,7 +4,7 @@ import { Tournament } from "../../../tournaments/types";
 import { displayNameOf } from "../../../utils/api";
 import { isManualSeeding } from "../../../utils/formatConfig";
 import { DragDropProvider, PointerSensor, DragEndEvent } from "@dnd-kit/react";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { useSortable, isSortable } from "@dnd-kit/react/sortable";
 
 interface Props {
   tournament: Tournament;
@@ -78,6 +78,8 @@ function SortableParticipantCard({
           {isAdmin && (
             <div
               ref={handleRef}
+              role="button"
+              aria-label={`Reorder ${displayNameOf(p.user)}`}
               className="cursor-grab active:cursor-grabbing text-[#888888] hover:text-white transition-colors py-2 px-3 -ml-3 touch-none flex items-center h-full"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,14 +181,21 @@ export default function RosterPanel({
   tournament, allUsers, onReorder, onShuffle, onRemove, onForfeit, onReplace, actingOn,
 }: Props) {
   const handleDragEnd = (event: DragEndEvent) => {
-    const { source, target } = event.operation;
-    if (source && target && source.id !== target.id) {
-      const oldIndex = tournament.participants.findIndex(p => p.userId === source.id);
-      const newIndex = tournament.participants.findIndex(p => p.userId === target.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        onReorder(source.id as string, newIndex);
-      }
-    }
+    const { source } = event.operation;
+    // The sortable list reorders itself live while a row is dragged, so by the
+    // time it is dropped the row under the pointer is usually the dragged row
+    // itself. The old `source.id !== target.id` check therefore discarded most
+    // drags silently — the seed order simply did not change. The row's own
+    // index is what moved, so read that instead (same fix as the home page
+    // editor's section rail, docs/history.md 2026-09-15).
+    if (event.canceled || !source || !isSortable(source)) return;
+
+    const from = source.initialIndex;
+    const to = source.index;
+    if (from === to) return;
+
+    const moved = tournament.participants[from];
+    if (moved) onReorder(moved.userId, to);
   };
 
   const isOpen = tournament.status === "OPEN";

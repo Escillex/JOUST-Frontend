@@ -1,11 +1,18 @@
-import { Metadata } from "next";
+import Image from "next/image";
 import Hero from "./components/Hero";
 import Shop from "./components/Shop";
 import TournamentPreview from "./components/TournamentPreview";
 import SectionDivider from "./components/SectionDivider";
 import Footer from "./components/Footer";
 import FadeIn, { StaggerContainer } from "./components/FadeIn";
-import { API_ENDPOINTS } from "./utils/api";
+import { API_ENDPOINTS, resolveImageUrl } from "./utils/api";
+import {
+  DEFAULT_HOME_BLOCKS,
+  HomeBlock,
+  heroContentOf,
+  labelOf,
+  normalizeHomeConfig,
+} from "./utils/homeConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +22,19 @@ export default async function Home() {
   const backendUrl = process.env.BACKEND_URL || `http://${hostIp}:${backendPort}`;
 
   let tournaments = [];
-  let heroSlides = [];
   let shopProducts = [];
+  // The page's own sections: order, visibility and every piece of editable
+  // copy (docs/home-blocks-plan.md). Hero images used to be read straight out
+  // of the site-asset list here; they are part of the hero block now, which is
+  // what the migration seeded them into.
+  let blocks: HomeBlock[] = DEFAULT_HOME_BLOCKS;
 
   try {
-    const [tRes, heroRes, shopRes] = await Promise.all([
+    const [tRes, homeRes, shopRes] = await Promise.all([
       fetch(`${backendUrl}${API_ENDPOINTS.TOURNAMENTS.BASE}`, {
         next: { revalidate: 60 },
       }),
-      fetch(`${backendUrl}${API_ENDPOINTS.IMAGES.LIST_ASSETS}`, {
+      fetch(`${backendUrl}${API_ENDPOINTS.HOME.CONFIG}`, {
         cache: "no-store",
       }),
       fetch(`${backendUrl}${API_ENDPOINTS.STORE.LIST}`, {
@@ -41,16 +52,8 @@ export default async function Home() {
       );
     }
 
-    if (heroRes.ok) {
-      const data = await heroRes.json();
-      const heroAssets = data.filter((a: any) => a.key.startsWith("hero_slide_"));
-      heroSlides = heroAssets
-        .sort((a: any, b: any) => a.key.localeCompare(b.key))
-        .map((a: any) => ({
-          image: a.url,
-          title: "LIVE EVENT CYCLE",
-          photoDesc: a.key.toUpperCase(),
-        }));
+    if (homeRes.ok) {
+      blocks = normalizeHomeConfig(await homeRes.json());
     }
 
     if (shopRes.ok) {
@@ -71,31 +74,74 @@ export default async function Home() {
     console.error("Failed to fetch landing page data server-side", e);
   }
 
+  const hero = heroContentOf(blocks.find(b => b.key === "hero"));
+  const heroSlides = (hero.slides ?? []).filter(s => !!s?.image);
+  // The stored buttons carry a logo URL; the button component takes a node, so
+  // the image is built here rather than making Hero know about uploads.
+  const heroButtons = (hero.storeButtons ?? [])
+    .filter(b => !!b?.href)
+    .map(b => ({
+      text: b.text ?? "",
+      href: b.href,
+      color: b.color || "#FFFFFF",
+      icon: b.iconUrl ? (
+        <Image
+          src={resolveImageUrl(b.iconUrl)}
+          alt={b.text || "Storefront"}
+          width={80}
+          height={32}
+          className="object-contain w-full h-full origin-center"
+          style={{ transform: `scale(${b.iconScale ?? 1})` }}
+        />
+      ) : undefined,
+    }));
+
+  const renderBlock = (block: HomeBlock) => {
+    if (!block.visible) return null;
+
+    switch (block.key) {
+      case "hero":
+        return (
+          <FadeIn key={block.key}>
+            <Hero
+              slides={heroSlides.length > 0 ? heroSlides : undefined}
+              description={hero.description || undefined}
+              storeButtons={heroButtons.length > 0 ? heroButtons : undefined}
+            />
+          </FadeIn>
+        );
+      case "shop":
+        return (
+          <div className="relative" key={block.key}>
+            <SectionDivider label={labelOf(block, "STORE")} />
+            <FadeIn>
+              {/* The real list, even when empty — Shop renders an empty state for that.
+                Passing `undefined` here fell back to the sample catalogue, which
+                advertised five nonexistent products on a fresh install (9.10). */}
+              <Shop products={shopProducts} />
+            </FadeIn>
+          </div>
+        );
+      case "tournaments":
+        return (
+          <div className="relative" key={block.key}>
+            <SectionDivider label={labelOf(block, "TOURNAMENTS")} />
+            <FadeIn>
+              <TournamentPreview tournaments={tournaments} />
+            </FadeIn>
+          </div>
+        );
+      default:
+        // A block the backend knows about and this build does not. Skipping it
+        // is right: a half-rendered section is worse than an absent one.
+        return null;
+    }
+  };
+
   return (
     <div className="flex flex-col bg-background selection:bg-primary selection:text-black min-h-screen overflow-x-hidden">
       <StaggerContainer>
-        {/* Rhythmic Landing Sequence */}
-        <FadeIn>
-          <Hero slides={heroSlides.length > 0 ? heroSlides : undefined} />
-        </FadeIn>
-
-        <div className="relative">
-          {/* Section 01 // STORE */}
-          <SectionDivider label="STORE" />
-          <FadeIn>
-            {/* The real list, even when empty — Shop renders an empty state for that.
-              Passing `undefined` here fell back to the sample catalogue, which
-              advertised five nonexistent products on a fresh install (9.10). */}
-            <Shop products={shopProducts} />
-          </FadeIn>
-
-          {/* Section 02 // TOURNAMENTS */}
-          <SectionDivider label="TOURNAMENTS" />
-          <FadeIn>
-            <TournamentPreview tournaments={tournaments} />
-          </FadeIn>
-        </div>
-
+        {blocks.map(renderBlock)}
         <Footer />
       </StaggerContainer>
     </div>

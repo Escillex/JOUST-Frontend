@@ -462,6 +462,13 @@ export const API_ENDPOINTS = {
     // GET /images/assets/:key route.
     LIST_ASSETS: '/images/assets',
   },
+  /** Landing-page sections (docs/home-blocks-plan.md). CONFIG is public and is
+   *  read on every render of the home page; the two writes are ADMIN-only. */
+  HOME: {
+    CONFIG: '/home',
+    BLOCK: (key: string) => `/home/blocks/${key}`,
+    REORDER: '/home/blocks/reorder',
+  },
   STORE: {
     LIST: '/store',
     LIST_ALL: '/store/all',
