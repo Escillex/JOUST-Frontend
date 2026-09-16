@@ -32,11 +32,13 @@ export default function DesktopView({ user, awards, data }: Props) {
   return (
     <div className="flex flex-col gap-12">
       {/* You, and where you rank — above the lanes on purpose. */}
-      {/* items-start, not stretch: the identity band has one row of content and
-          was being pulled to the board's full height, which left an avatar
-          floating in 300px of empty card. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6 items-start">
-        <HomeHeader user={user} awards={awards} stats={data.record} />
+      {/* Equal heights, and the left card earns its height: identity, the
+          record, then the games you play. An earlier pass stretched it with
+          nothing to fill it (an avatar adrift in 300px of card) and the pass
+          after that let it sit short beside a tall board, which just moved the
+          awkwardness outside the border. */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6 items-stretch">
+        <HomeHeader user={user} awards={awards} stats={data.record} games={data.boards} />
         <div className="flex flex-col">
           <RotatingGameLeaderboard limit={3} showHeading={false} />
         </div>

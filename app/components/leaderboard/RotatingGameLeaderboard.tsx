@@ -147,21 +147,27 @@ export default function RotatingGameLeaderboard({ limit = 10, showHeading = true
       {games.length > 1 && (
         <div
           ref={stripRef}
-          title="Scroll or click to change board"
+          title="Click a game to show its board"
           className="flex items-center justify-between gap-3 px-6 py-3 bg-surface border-x border-b border-white/5"
         >
-          <div className="flex items-center gap-1.5" role="tablist" aria-label="Game leaderboard">
+          {/* Named, not dotted. A dot cannot say which board it would take you
+              to, so choosing one was guesswork; the names wrap rather than
+              scroll so every board stays reachable without a gesture. */}
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0" role="tablist" aria-label="Game leaderboard">
             {games.map((g, i) => (
               <button
                 key={g}
                 role="tab"
                 aria-selected={i === index}
-                aria-label={`Show the ${g} leaderboard`}
                 onClick={() => { setIndex(i); setPinned(true); }}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === index ? "w-6 bg-primary" : "w-1.5 bg-white/20 hover:bg-white/40"
+                className={`px-2 py-1 text-[9px] font-black uppercase tracking-widest font-poppins border transition-colors ${
+                  i === index
+                    ? "bg-primary border-primary text-black"
+                    : "border-white/10 text-white/50 hover:text-white hover:border-white/30"
                 }`}
-              />
+              >
+                {g}
+              </button>
             ))}
           </div>
           <span className="text-[8px] font-black uppercase tracking-widest text-white/25">

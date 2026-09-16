@@ -37,16 +37,20 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
   if (variant === "bento") {
     return (
       <div className="h-full flex flex-col bg-surface border border-white/5 overflow-hidden">
-        <div className="p-6 border-b border-white/5 flex items-center justify-between gap-4 bg-surface shrink-0">
+        <div className="p-6 border-b border-white/5 flex items-baseline justify-between gap-4 bg-surface shrink-0">
+           {/* The board rotates, so the game it belongs to IS the heading — set
+               at full size rather than as a 9px caption beside the word
+               "LEADERBOARD", which said nothing the panel did not already. */}
+           {/* min-w-0 on the flex child and the clip on an inner span: putting
+               `truncate` on the italic heading itself cropped its ascenders. */}
+           <h3 className="min-w-0 text-2xl font-black uppercase tracking-tighter text-white font-poppins italic leading-[1.15]">
+             <span className="block truncate py-0.5">{gameLabel || "Leaderboard"}</span>
+           </h3>
            {showHeading && (
-             <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-primary font-poppins italic">LEADERBOARD</h3>
+             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/45 font-poppins shrink-0">
+               Leaderboard
+             </span>
            )}
-           {/* The board being shown rotates, so it has to name itself. Raised
-               from white/30: with no heading beside it this is the only thing
-               saying which game the ranking belongs to. */}
-           <div className="text-[9px] font-black text-white/50 uppercase tracking-widest font-poppins truncate">
-             {gameLabel || "LIVE FEED"}
-           </div>
         </div>
         {/* A visible scrollbar, matching the Recent Activity panel beside it:
             the list is taller than the fixed bento, and a hidden scrollbar gives
