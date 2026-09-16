@@ -356,6 +356,7 @@ export const API_ENDPOINTS = {
     GLOBAL_LEADERBOARD: '/tournaments/leaderboard/global',
     LEADERBOARD_GAMES: '/tournaments/leaderboard/games',
     USER_STATS: (userId: string) => `/tournaments/users/${userId}/stats`,
+
   },
   // The old FORMATS group duplicated PRESETS (both pointed at
   // /tournament-formats). It was merged into PRESETS so the same route
@@ -490,6 +491,8 @@ export const API_ENDPOINTS = {
     BLOCK: (key: string) => `/home/blocks/${key}`,
     REORDER: '/home/blocks/reorder',
   },
+  /** The signed-in home page, in one request (server/src/dashboard). */
+  DASHBOARD: '/dashboard',
   STORE: {
     LIST: '/store',
     LIST_ALL: '/store/all',

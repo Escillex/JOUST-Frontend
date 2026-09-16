@@ -8,7 +8,7 @@ import LeaderboardTable from "./LeaderboardTable";
 const ROTATE_MS = 60_000;
 
 /**
- * The home bento leaderboard. Cycles through one game board at a time rather
+ * The dashboard leaderboard panel. Cycles through one game board at a time rather
  * than showing a combined ranking — that board is admin-only now, and pooling
  * every game into one list ranks players who have never played the same thing.
  *
@@ -17,7 +17,7 @@ const ROTATE_MS = 60_000;
  * dots let them jump straight to one, which also stops the rotation — someone
  * who has chosen a board should not have it taken away a few seconds later.
  */
-export default function RotatingGameLeaderboard({ limit = 10 }: { limit?: number }) {
+export default function RotatingGameLeaderboard({ limit = 10, showHeading = true }: { limit?: number; showHeading?: boolean }) {
   const [games, setGames] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
   const [entries, setEntries] = useState<GlobalLeaderboardEntry[]>([]);
@@ -131,7 +131,7 @@ export default function RotatingGameLeaderboard({ limit = 10 }: { limit?: number
   if (!loading && games.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-surface border border-white/5 p-10 text-center">
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/45">
           No game leaderboards yet
         </p>
       </div>
@@ -141,7 +141,7 @@ export default function RotatingGameLeaderboard({ limit = 10 }: { limit?: number
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0">
-        <LeaderboardTable entries={entries} loading={loading} variant="bento" limit={limit} gameLabel={game ?? undefined} />
+        <LeaderboardTable entries={entries} loading={loading} variant="bento" limit={limit} gameLabel={game ?? undefined} showHeading={showHeading} />
       </div>
 
       {games.length > 1 && (

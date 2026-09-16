@@ -53,6 +53,7 @@ export default function MobileLeaderboard({ entries, loading, gameLabel }: Props
         return (
           <motion.div
             key={entry.userId}
+            id={`lb-row-mobile-${entry.userId}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.04 }}

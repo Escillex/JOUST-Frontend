@@ -1,80 +1,142 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../utils/api";
 import { useUser } from "../components/UserProvider";
 import HomeFrame from "../components/HomeFrame";
-import HomeDashboard from "../components/HomeDashboard";
+import DesktopView from "./device/DesktopView";
+import MobileView from "./device/MobileView";
+import { DashboardData, EMPTY_DASHBOARD } from "./types";
+import type { UserAward } from "../tournaments/types";
 
+/**
+ * The signed-in home page.
+ *
+ * Two device views over one payload: tournament lanes at desktop width, the hub
+ * on a phone. Both read the same `GET /dashboard` response and the same
+ * primitives, so the split is a difference in composition and not two separate
+ * products — which is the failure mode a device split otherwise invites.
+ */
 export default function HomePage() {
   const router = useRouter();
   const { user, loading: userLoading } = useUser();
-  const [tournaments, setTournaments] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({ wins: 0, losses: 0, rank: 0, points: 0 });
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD);
+  // Set only from inside the async load, never synchronously in an effect.
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [awards, setAwards] = useState<UserAward[]>([]);
+  // Null until measured, so neither layout flashes before the other.
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
 
-  const fetchDashboardData = async () => {
-    try {
-      // The leaderboard bento fetches its own per-game board now (it rotates),
-      // so the combined ranking — admin-only since 2026-09-10 — is not read here.
-      const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE);
-      if (tRes.ok) {
-        const data = await safeJson(tRes);
-        setTournaments(Array.isArray(data) ? data : []);
-      }
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
-      const myId = user?.id || user?.sub;
-      if (myId) {
-        const sRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.USER_STATS(myId));
-        if (sRes.ok) {
-          const sData = await safeJson(sRes);
-          setStats(sData);
+  const uid = user?.id || user?.sub;
+
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    authenticatedFetch(API_ENDPOINTS.DASHBOARD)
+      .then(async (res) => {
+        if (!alive) return;
+        if (!res.ok) {
+          setFailed(true);
+          return;
         }
-      }
-    } catch (err) {
-      console.error("Dashboard fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const body = await safeJson(res);
+        if (!alive || !body) return;
+        setData({ ...EMPTY_DASHBOARD, ...body });
+        setFailed(false);
+      })
+      // A dropped connection keeps whatever is already on screen rather than
+      // blanking the page (Core Rule 8).
+      .catch(() => {
+        if (alive) setFailed(true);
+      })
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  // The award showcase is decoration, so it stays off the critical path.
+  useEffect(() => {
+    if (!uid || user?.isGuest) return;
+    let alive = true;
+    authenticatedFetch(API_ENDPOINTS.AUTH.USER_PROFILE(uid))
+      .then(safeJson)
+      .then((b) => {
+        if (alive && Array.isArray(b?.awards)) setAwards(b.awards);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [uid, user?.isGuest]);
 
   useEffect(() => {
-    if (user) {
-      fetchDashboardData();
-    } else if (!userLoading) {
-      setLoading(false);
-    }
-  }, [user, userLoading]);
-
-  useEffect(() => {
-    if (!userLoading && !user) {
-      router.push("/auth");
-    }
+    if (!userLoading && !user) router.push("/auth");
   }, [user, userLoading, router]);
 
-  if (!user && !userLoading) {
-    return null;
-  }
+  if (!user && !userLoading) return null;
+
+  const ready = !!user && loaded && isMobile !== null;
 
   return (
-    <HomeFrame className="py-12 md:py-20" showPattern={true}>
-      <div className="max-w-7xl mx-auto px-6 md:px-8">
-        {loading ? (
-          <div className="grid grid-cols-4 gap-6 animate-pulse">
-            <div className="col-span-4 h-64 bg-background border-4 border-white/10" />
-            <div className="col-span-2 h-48 bg-background border-4 border-white/10" />
-            <div className="col-span-1 h-48 bg-background border-4 border-white/10" />
-            <div className="col-span-1 h-48 bg-background border-4 border-white/10" />
-          </div>
+    <HomeFrame className="py-8 md:py-16" showPattern={true}>
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        {failed && ready && (
+          <p className="mb-6 border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/70">
+            Some of this could not be loaded. It will fill in when the connection recovers.
+          </p>
+        )}
+
+        {!ready ? (
+          <Skeleton phone={isMobile === true} />
+        ) : isMobile ? (
+          <MobileView user={user} awards={awards} data={data} />
         ) : (
-          <HomeDashboard 
-            user={user}
-            tournaments={tournaments}
-            stats={stats}
-          />
+          <DesktopView user={user} awards={awards} data={data} />
         )}
       </div>
     </HomeFrame>
+  );
+}
+
+/** Shaped like whichever view is about to land, so nothing jumps. */
+function Skeleton({ phone }: { phone: boolean }) {
+  if (phone) {
+    return (
+      <div className="flex flex-col gap-4 animate-pulse" aria-busy="true">
+        <div className="h-11 w-48 bg-white/10" />
+        <div className="h-36 bg-surface border border-white/10" />
+        <div className="grid grid-cols-2 gap-2.5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[104px] bg-surface border border-white/10" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-12 animate-pulse" aria-busy="true">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-6">
+        <div className="h-40 bg-surface border border-white/10" />
+        <div className="h-40 bg-surface border border-white/10" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="h-5 w-56 bg-white/10" />
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="h-40 bg-surface border border-white/10" />
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,94 +1,72 @@
 "use client";
-import { displayNameOf, handleOf } from "../../utils/api";
+import { displayNameOf } from "../../utils/api";
 import React from "react";
 import { motion } from "motion/react";
 
 interface UserRankProps {
-  stats: {
+  identity: {
     username: string;
-    rank: number;
-    points: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    matchWinPct: number;
-  } | null;
+    displayName?: string | null;
+  };
+  /** null means the viewer has no rank on this board yet — rendered as
+   *  "Unranked" rather than hiding the card, so it's always clear where
+   *  they stand (or don't) on whatever's currently selected. */
+  rank: number | null;
   loading?: boolean;
+  /** Which board this is (e.g. "Beyblade board") — always the tab that's
+   *  currently selected, never a separate all-games figure. */
+  scopeLabel?: string;
+  /** Scrolls to and flashes the viewer's own row in the table below.
+   *  Only meaningful when ranked, so the card is inert without it. */
+  onJump?: () => void;
 }
 
-export default function UserRankCard({ stats, loading }: UserRankProps) {
+export default function UserRankCard({ identity, rank, loading, scopeLabel, onJump }: UserRankProps) {
   if (loading) {
-    return (
-      <div className="w-full bg-surface border-4 border-white/10 p-12 animate-pulse">
-        <div className="h-20 bg-white/5 w-1/2 mb-8" />
-        <div className="grid grid-cols-3 gap-12">
-            <div className="h-24 bg-white/5" />
-            <div className="h-24 bg-white/5" />
-            <div className="h-24 bg-white/5" />
-        </div>
-      </div>
-    );
+    return <div className="w-full h-24 md:h-28 bg-surface border border-white/5 animate-pulse" />;
   }
 
-  if (!stats) return null;
+  const ranked = rank !== null;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+    <motion.button
+      type="button"
+      disabled={!ranked}
+      onClick={ranked ? onJump : undefined}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group relative w-full bg-surface border border-white/5 p-12 hover:shadow-[24px_24px_0px_0px_rgba(82,185,70,0.05)] transition-all duration-500 overflow-hidden"
+      className="group w-full flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8 bg-surface border border-white/5 p-5 md:px-10 md:py-8 text-left transition-all duration-300 enabled:hover:border-primary/40 enabled:hover:shadow-[16px_16px_0px_0px_rgba(82,185,70,0.08)] disabled:cursor-default"
     >
-      <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-12">
-        <div className="text-center md:text-left space-y-6">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.6em] text-primary mb-4 font-poppins">CURRENT STANDING</p>
-            <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter text-white leading-none font-poppins italic">
-              {displayNameOf(stats)}
-            </h2>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-6 justify-center md:justify-start">
-            <div className="bg-primary text-black px-8 py-3 text-xl font-black uppercase tracking-widest shadow-[8px_8px_0px_0px_rgba(0,0,0,0.3)]">
-              RANK #{stats.rank}
-            </div>
-            <div className="bg-surface border-2 border-white/10 px-8 py-3 text-xl font-black uppercase tracking-widest text-white">
-              {stats.points} POINTS
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 border-t-4 md:border-t-0 md:border-l-4 border-white/10 pt-12 md:pt-0 md:pl-24 w-full md:w-auto">
-          <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">WINS</p>
-            <p className="text-4xl md:text-5xl font-black text-white italic tracking-tighter font-poppins">{stats.wins}</p>
-          </div>
-          <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">LOSSES</p>
-            <p className="text-4xl md:text-5xl font-black text-white/40 italic tracking-tighter font-poppins">{stats.losses}</p>
-          </div>
-          <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">DRAWS</p>
-            <p className="text-4xl md:text-5xl font-black text-white/20 italic tracking-tighter font-poppins">{stats.draws}</p>
-          </div>
-          {/* The OMW / OOMW tiles were removed: the backend never
-              calculates those tiebreaker values (it always sends 0 or
-              just repeats the win rate), so the tiles showed numbers
-              that were not real. */}
-          <div className="text-center md:text-left">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-2 font-poppins">WIN RATE</p>
-            <p className="text-4xl md:text-5xl font-black text-primary italic tracking-tighter font-poppins">
-              {(stats.matchWinPct * 100).toFixed(0)}%
-            </p>
-          </div>
-        </div>
+      <div className="min-w-0">
+        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.5em] text-primary font-poppins">
+          Your standing
+        </p>
+        <h2 className="mt-1 text-2xl md:text-6xl font-black uppercase tracking-tighter text-white leading-none font-poppins italic truncate">
+          {displayNameOf(identity)}
+        </h2>
+        {scopeLabel && (
+          <p className="mt-1.5 text-[11px] md:text-xs text-white/35 font-poppins normal-case truncate">
+            on the {scopeLabel}
+          </p>
+        )}
       </div>
 
-      {/* Industrial Accents */}
-      <div className="absolute top-0 right-0 p-4 opacity-10">
-        <div className="text-[8px] font-black uppercase tracking-widest text-white rotate-90 origin-top-right font-poppins">
-          SESSION ACTIVE // {new Date().getFullYear()}
-        </div>
+      <div className="flex items-center justify-between md:justify-end gap-4 shrink-0">
+        {ranked ? (
+          <div className="bg-primary text-black px-6 py-2.5 md:px-8 md:py-3 text-base md:text-xl font-black uppercase tracking-widest shadow-[6px_6px_0px_0px_rgba(0,0,0,0.3)] md:shadow-[8px_8px_0px_0px_rgba(0,0,0,0.3)]">
+            Rank #{rank}
+          </div>
+        ) : (
+          <div className="border-2 border-white/10 text-white/40 px-6 py-2.5 md:px-8 md:py-3 text-base md:text-xl font-black uppercase tracking-widest">
+            Unranked
+          </div>
+        )}
+        {ranked && (
+          <span className="text-white/20 group-hover:text-primary group-hover:translate-y-0.5 transition-all text-xl md:text-2xl" aria-hidden="true">
+            ↓
+          </span>
+        )}
       </div>
-    </motion.div>
+    </motion.button>
   );
 }

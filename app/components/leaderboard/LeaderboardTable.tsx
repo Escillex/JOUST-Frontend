@@ -13,9 +13,12 @@ interface LeaderboardTableProps {
   variant?: "default" | "bento";
   limit?: number;
   gameLabel?: string;
+  /** The bento panel's own heading. The dashboard supplies a section heading
+   *  above the panel, so it passes false and the row names only the board. */
+  showHeading?: boolean;
 }
 
-export default function LeaderboardTable({ entries, loading, variant = "default", limit, gameLabel }: LeaderboardTableProps) {
+export default function LeaderboardTable({ entries, loading, variant = "default", limit, gameLabel, showHeading = true }: LeaderboardTableProps) {
   const displayEntries = React.useMemo(() => 
     limit ? (entries || []).slice(0, limit) : (entries || []),
   [entries, limit]);
@@ -35,9 +38,13 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
     return (
       <div className="h-full flex flex-col bg-surface border border-white/5 overflow-hidden">
         <div className="p-6 border-b border-white/5 flex items-center justify-between gap-4 bg-surface shrink-0">
-           <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-primary font-poppins italic">LEADERBOARD</h3>
-           {/* The board being shown rotates, so it has to name itself. */}
-           <div className="text-[8px] font-black text-white/30 uppercase tracking-widest font-poppins truncate">
+           {showHeading && (
+             <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-primary font-poppins italic">LEADERBOARD</h3>
+           )}
+           {/* The board being shown rotates, so it has to name itself. Raised
+               from white/30: with no heading beside it this is the only thing
+               saying which game the ranking belongs to. */}
+           <div className="text-[9px] font-black text-white/50 uppercase tracking-widest font-poppins truncate">
              {gameLabel || "LIVE FEED"}
            </div>
         </div>
@@ -111,9 +118,8 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
           </p>
         </div>
         <div className="flex flex-col items-end">
-           <div className="text-white/20 text-[10px] font-black uppercase tracking-widest mb-1">DATA STATUS</div>
            <div className="px-4 py-1.5 bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">
-             {entries.length} ENTRIES LOADED
+             {entries.length} {entries.length === 1 ? "PLAYER" : "PLAYERS"}
            </div>
         </div>
       </div>
@@ -139,12 +145,12 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
           </thead>
           <tbody className="divide-y-2 divide-white/10">
             {displayEntries.map((entry, idx) => (
-              <motion.tr 
-                key={entry.userId} 
+              <motion.tr
+                key={entry.userId}
+                id={`lb-row-desktop-${entry.userId}`}
                 initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.03 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.03, 0.6) }}
                 className="group hover:bg-primary/5 transition-colors bg-background"
               >
                 <td className="py-8 px-10">
