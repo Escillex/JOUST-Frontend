@@ -1,31 +1,40 @@
 "use client";
-import { LeaderboardStats, UserProfile, ProfileTournamentResult, UserAward, GalleryImage } from "../../tournaments/types";
+import {
+  UserProfile,
+  ProfileTournamentResult,
+  ProfileStats,
+  ProfileMatch,
+  UserAward,
+  GalleryImage,
+} from "../../tournaments/types";
 
 import React, { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS } from "../../utils/api";
-import { useUser } from "../../components/UserProvider";
-import HomeFrame from "../../components/HomeFrame";
-import FadeIn, { StaggerContainer } from "../../components/FadeIn";
-import ProfileHeader from "../../components/profile/ProfileHeader";
-import StatsGrid from "../../components/profile/StatsGrid";
-import MatchHistory from "../../components/profile/MatchHistory";
-import TournamentHistory from "../../components/profile/TournamentHistory";
-import AwardsCase from "../../components/profile/AwardsCase";
-import GallerySection from "../../components/profile/GallerySection";
+import { motion } from "motion/react";
+import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 import GrantAwardModal from "../../components/awards/GrantAwardModal";
 import { Skeleton, SkeletonPanel, SkeletonStatus } from "../../components/ui/Skeleton";
+import DesktopView from "./device/DesktopView";
+import MobileView from "./device/MobileView";
 
-
-
+/**
+ * A person's public profile. The page owns the data; the device views own the
+ * layout — an identity sidebar beside the record on desktop, a single column
+ * with tabs on a phone (docs/profile-ux-report.md).
+ */
 function ProfileContent() {
   const router = useRouter();
   const params = useParams();
   const profileId = params.id as string;
-  
+
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<LeaderboardStats | null>(null);
+  const [stats, setStats] = useState<ProfileStats | null>(null);
   const [tournaments, setTournaments] = useState<ProfileTournamentResult[]>([]);
+  // The history arrives after the profile, so a slow link shows the person
+  // first rather than waiting on both requests. Kept with the id it belongs
+  // to, so following a name link never shows the last person's matches.
+  const [matchState, setMatchState] = useState<{ userId: string; list: ProfileMatch[] } | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [awards, setAwards] = useState<UserAward[]>([]);
   // Admins may give awards from here; guests cannot hold them (the cleanup
@@ -38,17 +47,24 @@ function ProfileContent() {
   // Bumped after a give/revoke so the effect below re-reads the profile.
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
-  // Sign-out logic now lives in one place: UserProvider.logout.
-  // This page previously had its own copy of the same steps.
-  const { logout: handleLogout } = useUser();
+  // Null until measured, so neither layout flashes before the other.
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const fetchProfileData = async () => {
+      let resolvedId: string | null = null;
       try {
         const meRes = await authenticatedFetch(API_ENDPOINTS.AUTH.ME);
         const myData = meRes.ok ? await meRes.json() : null;
 
-        // The URL segment is now a username handle (slug), but old UUID links
+        // The URL segment is a username handle (slug), but old UUID links
         // still work — the backend resolves either. Falls back to the signed-in
         // user's own handle when the route has none.
         const handle =
@@ -58,9 +74,8 @@ function ProfileContent() {
           return;
         }
 
-        // One call now returns identity, lifetime stats, and recent tournament
-        // results (with placement) — resolved by slug or id. This replaces the
-        // old leaderboard-entry + basic-stats dance.
+        // One call returns identity, lifetime stats, recent tournament results
+        // (with placement), awards and the gallery — resolved by slug or id.
         const profRes = await authenticatedFetch(
           API_ENDPOINTS.AUTH.USER_PROFILE(handle),
         );
@@ -69,6 +84,7 @@ function ProfileContent() {
           return;
         }
         const bundle = await profRes.json();
+        resolvedId = bundle.id;
 
         const isMe = !!(
           myData &&
@@ -82,7 +98,7 @@ function ProfileContent() {
 
         setUser(
           isMe
-            ? { ...myData, ...bundle, id: bundle.id }
+            ? { ...myData, ...bundle, id: bundle.id, createdAt: bundle.memberSince ?? myData.createdAt }
             : {
                 id: bundle.id,
                 username: bundle.username,
@@ -99,17 +115,26 @@ function ProfileContent() {
         const s = bundle.stats;
         setStats({
           points: s?.globalPoints ?? 0,
-          tournamentsPlayed: s?.tournamentsPlayed ?? 0,
+          winRate: s?.winRate ?? 0,
           wins: s?.wins ?? 0,
           losses: s?.losses ?? 0,
           draws: s?.draws ?? 0,
-          matchWinPct: s?.winRate ?? 0,
+          tournamentsPlayed: s?.tournamentsPlayed ?? 0,
+          tournamentsWon: s?.tournamentsWon ?? 0,
         });
         setTournaments(
           Array.isArray(bundle.recentTournaments) ? bundle.recentTournaments : [],
         );
-      } catch {
-        // Silently fail or handle error if needed
+
+        setLoading(false);
+
+        // The match history needs the resolved id, so it follows the profile.
+        const mRes = await authenticatedFetch(API_ENDPOINTS.AUTH.USER_MATCHES(bundle.id));
+        const mData = mRes.ok ? await safeJson(mRes) : null;
+        setMatchState({ userId: bundle.id, list: Array.isArray(mData) ? mData : [] });
+      } catch (err) {
+        console.error("Failed to fetch profile data:", err);
+        if (resolvedId) setMatchState({ userId: resolvedId, list: [] });
       } finally {
         setLoading(false);
       }
@@ -118,127 +143,95 @@ function ProfileContent() {
     fetchProfileData();
   }, [profileId, router, reloadKey]);
 
-  // Placeholders shaped like the profile itself — header block, then the two
-  // column panels — rather than a centred spinner, so the layout the user is
-  // about to see is already on screen while the request is in flight.
-  if (loading && !user) {
+  // Placeholders shaped like the layout about to appear, rather than a
+  // centred spinner.
+  if ((loading && !user) || isMobile === null) {
     return (
-      <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
-        <HomeFrame className="pt-32 pb-20" showPattern={false}>
-          <div className="w-full max-w-7xl mx-auto px-6 md:px-8 space-y-10">
-            <SkeletonStatus label="Loading profile" />
-            <div className="flex items-center gap-6">
-              <Skeleton className="w-24 h-24 rounded-full" />
-              <div className="space-y-3 flex-1">
-                <Skeleton className="h-8 w-64" />
-                <Skeleton className="h-3 w-40" />
+      <div className="min-h-screen w-full bg-background pt-6 lg:pt-10 pb-20">
+        <SkeletonStatus label="Loading profile" />
+        {isMobile ? (
+          <div className="px-4 space-y-5">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-16 h-16" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-3 w-32" />
               </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <SkeletonPanel rows={5} />
+            <Skeleton className="h-28 w-full" />
+            <SkeletonPanel rows={4} />
+          </div>
+        ) : (
+          <div className="w-full max-w-7xl mx-auto px-8 grid grid-cols-[280px_minmax(0,1fr)] min-[1180px]:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)] gap-8">
+            <Skeleton className="h-[560px] w-full" />
+            <div className="space-y-10">
+              <Skeleton className="h-24 w-full" />
               <SkeletonPanel rows={5} />
             </div>
           </div>
-        </HomeFrame>
+        )}
       </div>
     );
   }
 
-  if (!user) {
+  if (!user || !stats) {
     return (
-      <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
-        <div className="flex-1 flex items-center justify-center text-center p-8">
-          <div>
-            <h2 className="text-3xl font-black uppercase tracking-tighter text-foreground mb-4 font-poppins">User not found</h2>
-            <p className="text-foreground/40 font-bold uppercase tracking-widest font-questrial">
-              This user may not exist, or they haven&apos;t established a competitive record yet.
-            </p>
+      <div className="min-h-screen w-full bg-background flex items-center justify-center text-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <h2 className="text-3xl font-black uppercase tracking-tighter text-foreground font-poppins">User not found</h2>
+          <p className="text-white/70">No profile at this address.</p>
+          <div className="flex gap-3">
+            <Link href="/community" className="h-11 px-5 flex items-center border border-component-border text-[11px] font-bold uppercase tracking-[0.12em] text-white/85 hover:border-primary/60 font-poppins">
+              Search people
+            </Link>
+            <Link href="/leaderboards" className="h-11 px-5 flex items-center border border-component-border text-[11px] font-bold uppercase tracking-[0.12em] text-white/85 hover:border-primary/60 font-poppins">
+              Leaderboards
+            </Link>
           </div>
         </div>
       </div>
     );
   }
+
+  const matches = matchState && matchState.userId === user.id ? matchState.list : null;
+
+  const viewProps = {
+    user,
+    stats,
+    matches,
+    tournaments,
+    awards,
+    gallery,
+    viewerRoles,
+    isOwnProfile,
+    onAward: viewerIsAdmin && !user.isGuest ? () => setGranting(true) : undefined,
+    onGalleryRemoved: () => setReloadKey((k) => k + 1),
+  };
 
   return (
-    <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
-      <HomeFrame className="pt-32 pb-20" showPattern={false}>
-        <div className="w-full max-w-7xl mx-auto px-6 md:px-8">
-          <StaggerContainer className="space-y-10">
-            <FadeIn>
-              <ProfileHeader 
-                user={user} 
-                isOwnProfile={isOwnProfile} 
-                onLogout={handleLogout} 
-                awards={awards}
-                onAward={viewerIsAdmin && !user.isGuest ? () => setGranting(true) : undefined}
-              />
-            </FadeIn>
+    // overflow-x-clip, not -hidden: "hidden" makes this a scroll container,
+    // which would stop the desktop sidebar from sticking.
+    <div className="min-h-screen w-full bg-background overflow-x-clip pt-6 lg:pt-10 pb-28 lg:pb-20">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
+        {isMobile ? <MobileView {...viewProps} /> : <DesktopView {...viewProps} />}
+      </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <FadeIn>
-                <MatchHistory userId={user.id} />
-              </FadeIn>
-
-              <FadeIn>
-                <div className="flex flex-col h-full">
-                   <div className="flex items-center justify-between mb-8">
-                      <h3 className="text-xl font-black uppercase tracking-widest text-foreground font-poppins flex items-center gap-3">
-                        <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2 2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        Performance Stats
-                      </h3>
-                    </div>
-                  <StatsGrid stats={stats} />
-                </div>
-              </FadeIn>
-            </div>
-
-            {awards.length > 0 && (
-              <FadeIn>
-                <AwardsCase awards={awards} />
-              </FadeIn>
-            )}
-
-            {gallery.length > 0 && (
-              <FadeIn>
-                <GallerySection
-                  images={gallery}
-                  viewerRoles={viewerRoles}
-                  isOwnProfile={isOwnProfile}
-                  onRemoved={() => setReloadKey((k) => k + 1)}
-                />
-              </FadeIn>
-            )}
-
-            <FadeIn>
-              <TournamentHistory results={tournaments} />
-            </FadeIn>
-          </StaggerContainer>
-
-          {viewerIsAdmin && granting && (
-            <GrantAwardModal
-              userId={user.id}
-              userName={user.displayName || user.username}
-              isOpen={granting}
-              onClose={() => setGranting(false)}
-              onChanged={() => setReloadKey((k) => k + 1)}
-            />
-          )}
-        </div>
-      </HomeFrame>
+      {viewerIsAdmin && granting && (
+        <GrantAwardModal
+          userId={user.id}
+          userName={user.displayName || user.username}
+          isOpen={granting}
+          onClose={() => setGranting(false)}
+          onChanged={() => setReloadKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }
 
 export default function ProfilePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen w-full bg-background flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-primary font-black uppercase tracking-widest text-sm font-poppins">Loading...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<div className="min-h-screen w-full bg-background" />}>
       <ProfileContent />
     </Suspense>
   );

@@ -258,6 +258,17 @@ export async function authenticatedFetch(
 export const API_ENDPOINTS = {
   AUTH: {
     ME: '/auth/me',
+    /** Account settings (2026-09-16). Anything that could hand the account to
+     *  someone else takes proof — `security.proof` says which: the emailed code
+     *  (ME_CODE sends it) when the site can send mail, else the current password. */
+    ME_SECURITY: '/auth/me/security',
+    ME_CODE: '/auth/me/code',
+    ME_PASSWORD: '/auth/me/password',
+    ME_EMAIL: '/auth/me/email',
+    ME_RECOVERY_CODES: '/auth/me/recovery-codes',
+    ME_DEVICE: (id: string) => `/auth/me/devices/${id}`,
+    ME_DELETE: '/auth/me/delete',
+    ME_SIGN_OUT_EVERYWHERE: '/auth/me/sign-out-everywhere',
     /** Public: which sign-in methods this deployment offers (Google, and its
      *  Client ID from Admin → Settings). */
     PROVIDERS: '/auth/providers',
@@ -290,6 +301,10 @@ export const API_ENDPOINTS = {
     // Public profile bundle resolved by slug OR legacy UUID: identity, lifetime
     // stats, and recent tournaments with placement (top-3 showcase).
     USER_PROFILE: (handle: string) => `/users/${handle}/profile`,
+    /** Full match history, grouped by tournament and paged by tournament —
+     *  the page behind the profile's "View all matches". */
+    USER_MATCH_HISTORY: (handle: string, offset = 0, limit = 8) =>
+      `/users/${handle}/match-history?offset=${offset}&limit=${limit}`,
   },
   // Unified fuzzy search (people + tournaments) and the Community discovery feed.
   SEARCH: {
@@ -326,6 +341,8 @@ export const API_ENDPOINTS = {
     REPLACE: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/replace`,
     LEADERBOARD: (id: string) => `/tournaments/${id}/leaderboard`,
     GET_ONE: (id: string) => `/tournaments/${id}`,
+    /** Staff only, and refused once the tournament has finished. */
+    DELETE: (id: string) => `/tournaments/${id}`,
     // Same record without the rounds/matches tree (plan 7.1). Use this on any
     // screen that does not draw a bracket: the full response is 7.7 KB at 8
     // players but 106.8 KB at 128, and polling it re-ships all of that.

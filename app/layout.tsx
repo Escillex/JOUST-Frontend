@@ -46,7 +46,7 @@ export default function RootLayout({
       lang="en"
       className={`${poppins.variable} ${questrial.variable} h-full w-full overflow-x-hidden antialiased`}
     >
-      <body className="min-h-full w-full overflow-x-hidden flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
+      <body className="min-h-full w-full overflow-x-clip flex flex-col bg-background text-foreground tracking-tight selection:bg-primary selection:text-background">
         {/* Enables on-device caching of build files and images
             (production only) and makes the site installable. */}
         <ServiceWorkerRegister />
@@ -62,8 +62,10 @@ export default function RootLayout({
               <Navibar />
             </div>
 
-            {/* Mobile Navigation */}
-            <div className="md:hidden">
+            {/* Mobile Navigation — sticky on the wrapper, like the desktop
+                bar: a sticky element can only travel within its parent, and
+                this wrapper is exactly the bar's height. */}
+            <div className="md:hidden sticky top-0 z-50">
               <MobileTopBar />
             </div>
 

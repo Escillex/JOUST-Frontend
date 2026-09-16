@@ -17,6 +17,7 @@ import BuildsReviewPanel from "../../../components/tournaments/manage/BuildsRevi
 import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
+import DeleteTournamentPanel from "../../../components/tournaments/manage/DeleteTournamentPanel";
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
 import { uniqueGuestNames } from "../../../utils/guestName";
 
@@ -588,6 +589,13 @@ function ControlRoomContent() {
               onBatchAddGuests={handleBatchAddGuests}
               onInvitePlayer={() => selectedUserId && handleJoin(selectedUserId)}
               batchLoading={batchLoading}
+            />
+            <DeleteTournamentPanel
+              tournamentId={tournamentId!}
+              name={tournament.name}
+              status={tournament.status}
+              participants={tournament.participants?.length ?? 0}
+              onMessage={toast}
             />
           </div>
         </div>

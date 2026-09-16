@@ -6,6 +6,8 @@ import type { UserAward } from "../../tournaments/types";
 import Medal from "../awards/Medal";
 import Plaque from "../awards/Plaque";
 import { groupAwards } from "../awards/group";
+import ProfileSection, { Icons } from "./ProfileSection";
+import { formStyles } from "./formStyles";
 
 /**
  * Choosing what a profile shows: up to three medals, in order, and one plaque
@@ -87,33 +89,28 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-[9px] font-black uppercase tracking-widest text-white/20 flex items-center gap-3">
-        <div className="w-2 h-2 bg-primary" />
-        SHOWCASE
-      </div>
-
+    <ProfileSection title="Showcase" icon={Icons.awards}>
       {awards === null ? (
-        <p className="text-xs text-white/30">Loading your awards...</p>
+        <p className={formStyles.help}>Loading your awards…</p>
       ) : groups.length === 0 ? (
-        <div className="bg-component-background border border-component-border p-8">
-          <p className="text-sm text-white/50">You have no awards yet.</p>
-          <p className="text-[10px] text-white/30 mt-2 leading-relaxed">
+        <div className={`${formStyles.card} flex flex-col gap-2`}>
+          <p className="text-sm text-white/80">You have no awards yet.</p>
+          <p className={formStyles.help}>
             Administrators give medals and plaques for achievements. When you receive one it appears here, and you
             choose what your profile shows.
           </p>
         </div>
       ) : (
-        <div className="bg-component-background border border-component-border p-6 md:p-8 space-y-8">
+        <div className={`${formStyles.card} flex flex-col gap-8`}>
           {medals.length > 0 && (
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-white">
-                Pinned medals <span className="text-white/30">({pinned.length}/{MAX_PINS})</span>
-              </p>
-              <p className="text-[10px] text-white/40 mt-1 mb-5">
-                Tap to pin, in the order you tap. Tap again to unpin.
-              </p>
-              <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <p className={formStyles.label}>
+                  Pinned medals <span className="text-white/60 font-normal">({pinned.length}/{MAX_PINS})</span>
+                </p>
+                <p className={formStyles.help}>Tap to pin, in the order you tap. Tap again to unpin. Your profile shows only what you pin here.</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
                 {medals.map((g) => {
                   const slot = pinned.indexOf(g.awardId) + 1 || null;
                   const full = !slot && pinned.length >= MAX_PINS;
@@ -123,9 +120,10 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
                       type="button"
                       onClick={() => toggle(g.awardId)}
                       disabled={full}
-                      className={`w-24 p-2 border transition-all ${
-                        slot ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/30"
-                      } ${full ? "opacity-30 cursor-not-allowed" : ""}`}
+                      aria-pressed={!!slot}
+                      className={`w-28 p-2.5 border transition-colors ${
+                        slot ? "border-primary bg-primary/10" : "border-component-border hover:border-white/40"
+                      } ${full ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       <Medal
                         name={g.name}
@@ -135,7 +133,7 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
                         sizeClass="w-16 h-16 mx-auto"
                         showDetail={false}
                       />
-                      <p className="text-[9px] font-bold text-white/70 mt-1.5 leading-tight line-clamp-2">{g.name}</p>
+                      <p className="text-[11px] font-semibold text-white/85 mt-2 leading-tight line-clamp-2">{g.name}</p>
                     </button>
                   );
                 })}
@@ -144,15 +142,18 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
           )}
 
           {plaques.length > 0 && (
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest text-white">Plaque under your name</p>
-              <p className="text-[10px] text-white/40 mt-1 mb-5">One, or none.</p>
-              <div className="space-y-3">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <p className={formStyles.label}>Plaque under your name</p>
+                <p className={formStyles.help}>One, or none.</p>
+              </div>
+              <div className="flex flex-col gap-3">
                 <button
                   type="button"
                   onClick={() => { setPlaque(null); setMessage(null); }}
-                  className={`w-full text-left px-4 py-3 border text-[10px] font-black uppercase tracking-widest transition-all ${
-                    plaque === null ? "border-primary text-primary bg-primary/10" : "border-white/10 text-white/40 hover:border-white/30"
+                  aria-pressed={plaque === null}
+                  className={`w-full min-h-11 text-left px-4 border text-[11px] font-bold uppercase tracking-[0.12em] font-poppins transition-colors ${
+                    plaque === null ? "border-primary text-primary bg-primary/10" : "border-component-border text-white/70 hover:border-white/40"
                   }`}
                 >
                   None
@@ -162,8 +163,9 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
                     key={g.awardId}
                     type="button"
                     onClick={() => { setPlaque(g.awardId); setMessage(null); }}
-                    className={`block w-full p-2 border transition-all ${
-                      plaque === g.awardId ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/30"
+                    aria-pressed={plaque === g.awardId}
+                    className={`block w-full p-2 border transition-colors ${
+                      plaque === g.awardId ? "border-primary bg-primary/10" : "border-component-border hover:border-white/40"
                     }`}
                   >
                     <Plaque name={g.name} imageUrl={g.imageUrl} size="md" count={g.grants.length} />
@@ -173,20 +175,14 @@ export default function ShowcaseEditor({ handle }: { handle: string }) {
             </div>
           )}
 
-          <div className="flex items-center gap-4">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="px-8 py-3 bg-primary text-black text-[10px] font-black uppercase tracking-[0.3em] disabled:opacity-50 transition-all active:scale-95"
-            >
-              {saving ? "Saving..." : "Save Showcase"}
+          <div className="flex items-center gap-4 flex-wrap">
+            <button onClick={save} disabled={saving} className={formStyles.btnPrimary}>
+              {saving ? "Saving…" : "Save showcase"}
             </button>
-            {message && (
-              <p className={`text-xs ${message.ok ? "text-primary" : "text-[#FF4D4D]"}`}>{message.text}</p>
-            )}
+            {message && <p className={message.ok ? formStyles.ok : formStyles.error} role="status">{message.text}</p>}
           </div>
         </div>
       )}
-    </div>
+    </ProfileSection>
   );
 }

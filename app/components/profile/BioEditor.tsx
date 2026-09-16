@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { API_ENDPOINTS, authenticatedFetch, safeJson } from "../../utils/api";
+import ProfileSection, { Icons } from "./ProfileSection";
+import { formStyles } from "./formStyles";
 
 /** Mirrors BIO_MAX_LENGTH in server/src/auth/dto/auth.dto.ts. */
 const MAX = 300;
@@ -45,13 +47,9 @@ export default function BioEditor({ initial, onSaved }: { initial: string | null
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-[9px] font-black uppercase tracking-widest text-white/20 flex items-center gap-3">
-        <div className="w-2 h-2 bg-primary" />
-        ABOUT
-      </div>
-      <div className="bg-component-background border border-component-border p-6 md:p-8 space-y-4">
-        <label htmlFor="bio" className="block text-[11px] font-black uppercase tracking-widest text-white">
+    <ProfileSection title="About" icon={Icons.about}>
+      <div className={`${formStyles.card} flex flex-col gap-3`}>
+        <label htmlFor="bio" className={formStyles.label}>
           Bio
         </label>
         <textarea
@@ -61,25 +59,22 @@ export default function BioEditor({ initial, onSaved }: { initial: string | null
           rows={4}
           onChange={(e) => { setBio(e.target.value); setMessage(null); }}
           placeholder="A line or two about you — what you play, where you compete."
-          className="w-full bg-background border border-component-border px-4 py-3 text-sm text-white leading-relaxed focus:outline-none focus:border-primary transition-all placeholder:text-white/20 resize-y"
+          aria-describedby="bio-help"
+          className="w-full bg-background border border-component-border px-3 py-2.5 text-sm text-white leading-relaxed focus:outline-none focus:border-primary placeholder:text-white/40 resize-y"
         />
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={save}
-              disabled={busy || !dirty}
-              className="px-8 py-3 bg-primary text-black text-[10px] font-black uppercase tracking-[0.3em] disabled:opacity-40 transition-all active:scale-95"
-            >
-              {busy ? "Saving..." : "Save Bio"}
-            </button>
-            {message && <p className={`text-xs ${message.ok ? "text-primary" : "text-[#FF4D4D]"}`}>{message.text}</p>}
-          </div>
-          <span className={`text-[10px] font-bold tabular-nums ${bio.length > MAX - 20 ? "text-amber-400" : "text-white/30"}`}>
+        <div className="flex items-center justify-between gap-4">
+          <p id="bio-help" className={formStyles.help}>Shown on your public profile. Leave it empty to remove it.</p>
+          <span className={`shrink-0 text-xs tabular-nums ${bio.length > MAX - 20 ? "text-amber-400" : "text-white/60"}`}>
             {bio.length} / {MAX}
           </span>
         </div>
-        <p className="text-[10px] text-white/30">Shown on your public profile. Leave it empty to remove it.</p>
+        <div className="flex items-center gap-4 flex-wrap pt-1">
+          <button onClick={save} disabled={busy || !dirty} className={formStyles.btnPrimary}>
+            {busy ? "Saving…" : "Save bio"}
+          </button>
+          {message && <p className={message.ok ? formStyles.ok : formStyles.error} role="status">{message.text}</p>}
+        </div>
       </div>
-    </div>
+    </ProfileSection>
   );
 }

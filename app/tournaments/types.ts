@@ -343,6 +343,108 @@ export interface ProfileTournamentResult {
   game?: string | null;
 }
 
+/** One completed match from `GET /users/:id/matches` (newest first, at most
+ *  15). `type` is the result for the profile owner; `time` is a bare
+ *  YYYY-MM-DD date. */
+export interface ProfileMatchPlayer {
+  id: string | null;
+  slug?: string | null;
+  name: string;
+  avatarUrl: string | null;
+  score: number;
+}
+
+export interface ProfileMatch {
+  id: string;
+  type: "win" | "loss" | "draw" | "entry";
+  /** The tournament's name. */
+  subtitle: string;
+  time: string;
+  player1: ProfileMatchPlayer;
+  player2: ProfileMatchPlayer;
+  /** True when the profile owner is player 1. */
+  isPlayer1: boolean;
+}
+
+/** The record shown on a profile, from `GET /users/:handle/profile`'s `stats`
+ *  (`globalPoints` arrives as `points`). */
+export interface ProfileStats {
+  points: number;
+  winRate: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  tournamentsPlayed: number;
+  tournamentsWon: number;
+}
+
+/** `GET /users/:handle/match-history` — every match, grouped by tournament and
+ *  told from that player's side. */
+export interface MatchHistoryMatch {
+  id: string;
+  round: number;
+  /** "round 2", "losers round 1", "grand final". */
+  roundLabel: string;
+  result: "win" | "loss" | "draw";
+  myScore: number;
+  oppScore: number;
+  opponent: { id: string | null; slug: string | null; name: string; avatarUrl: string | null };
+  completedAt: string;
+}
+
+export interface MatchHistoryGroup {
+  tournament: {
+    id: string;
+    name: string;
+    date: string;
+    status: string;
+    format: string | null;
+    game: string | null;
+    placement: number | null;
+  };
+  matches: MatchHistoryMatch[];
+}
+
+export interface MatchHistoryPage {
+  totalTournaments: number;
+  offset: number;
+  /** Null on the last page. */
+  nextOffset: number | null;
+  groups: MatchHistoryGroup[];
+}
+
+// ─── Account settings (GET /auth/me/security) ───────────────────────────────
+
+/** How a sensitive change is confirmed. `code`: an emailed code (the site can
+ *  send mail). `password`: the current password. `none`: neither is available
+ *  — a Google-only account on a site without mail — so the change is refused. */
+export type ProofMethod = "code" | "password" | "google" | "none";
+
+export interface RememberedDevice {
+  id: string;
+  userAgent: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+  /** The browser making the request. */
+  current: boolean;
+}
+
+export interface AccountSecurity {
+  email: string | null;
+  maskedEmail: string | null;
+  emailVerified: boolean;
+  hasPassword: boolean;
+  googleLinked: boolean;
+  proof: ProofMethod;
+  /** Google is connected, so signing in with it again is accepted as proof —
+   *  whatever the primary method is. */
+  canUseGoogle: boolean;
+  twoFactor: { mode: "off" | "staff" | "all"; requiredForYou: boolean };
+  recoveryCodesLeft: number;
+  devices: RememberedDevice[];
+}
+
 // ─── Builds, galleries and moderation (obj. 4.3) ─────────────────────────────
 
 /** Mirrors BuildKind / BuildStatus / BuildVisibility in server/prisma/schema.prisma. */

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_ENDPOINTS, UPLOAD_TIMEOUT_MS, authenticatedFetch, resolveImageUrl, safeJson } from "../../utils/api";
 import type { Game, GalleryImage } from "../../tournaments/types";
+import ProfileSection, { Icons } from "./ProfileSection";
+import { formStyles } from "./formStyles";
 
 /**
  * Edit Profile → Gallery (todo.md obj. 4.3). One image per game; posting is
@@ -49,25 +51,21 @@ export default function GalleryEditor() {
   const open = games.filter((g) => !taken.has(g.id));
 
   return (
-    <div className="space-y-6">
-      <div className="text-[9px] font-black uppercase tracking-widest text-white/20 flex items-center gap-3">
-        <div className="w-2 h-2 bg-primary" />
-        GALLERY
-      </div>
-      <div className="bg-component-background border border-component-border p-6 md:p-8 space-y-6">
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-white">One image per game</p>
-          <p className="text-[10px] text-white/30 mt-1 leading-relaxed">
-            Shown on your public profile. Other players can report an image; admins can remove it.
+    <ProfileSection title="Gallery" icon={Icons.gallery}>
+      <div className={`${formStyles.card} flex flex-col gap-5`}>
+        <div className="flex flex-col gap-1">
+          <p className={formStyles.label}>One image per game</p>
+          <p className={formStyles.help}>
+            Shown at the top of your public profile. Other players can report an image; admins can remove it.
           </p>
         </div>
 
         {failed && !mine ? (
-          <p className="text-xs text-[#FF4D4D]">Could not load your gallery. Check the connection and reload.</p>
+          <p className={formStyles.error}>Could not load your gallery. Check the connection and reload.</p>
         ) : !mine ? (
-          <p className="text-xs text-white/30">Loading…</p>
+          <p className={formStyles.help}>Loading…</p>
         ) : !mine.eligible ? (
-          <p className="text-xs text-white/50 border border-white/10 px-4 py-3">{mine.requirement}</p>
+          <p className="text-sm text-white/75 border border-component-border px-4 py-3">{mine.requirement}</p>
         ) : (
           <>
             {mine.images.length > 0 && (
@@ -80,14 +78,14 @@ export default function GalleryEditor() {
             {open.length > 0 ? (
               <AddImage games={open} onAdded={load} />
             ) : (
-              <p className="text-[10px] text-white/30">
+              <p className={formStyles.help}>
                 {games.length === 0 ? "No games are set up yet." : "You have an image for every game."}
               </p>
             )}
           </>
         )}
       </div>
-    </div>
+    </ProfileSection>
   );
 }
 
@@ -105,11 +103,11 @@ function FilePicker({ file, onFile, label = "Browse" }: { file: File | null; onF
       <button
         type="button"
         onClick={() => input.current?.click()}
-        className="shrink-0 px-6 py-2.5 bg-background border border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all active:scale-95"
+        className={`shrink-0 ${formStyles.btnSecondary}`}
       >
         {file ? "Change file" : label}
       </button>
-      <span className={`text-xs truncate ${file ? "text-white/70" : "text-white/25"}`}>{file ? file.name : "No file chosen"}</span>
+      <span className={`text-xs truncate ${file ? "text-white/80" : "text-white/55"}`}>{file ? file.name : "No file chosen"}</span>
     </div>
   );
 }
@@ -151,12 +149,13 @@ function AddImage({ games, onAdded }: { games: Game[]; onAdded: () => void }) {
   };
 
   return (
-    <div className="border border-dashed border-white/15 p-5 space-y-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-white/50">Add an image</p>
+    <div className="border border-dashed border-component-border p-4 md:p-5 flex flex-col gap-3">
+      <p className={formStyles.label}>Add an image</p>
       <select
+        aria-label="Game"
         value={gameId}
         onChange={(e) => setGameId(e.target.value)}
-        className="w-full h-11 bg-background border border-component-border px-3 text-sm text-white focus:outline-none focus:border-primary"
+        className={formStyles.input}
       >
         <option value="">Choose a game…</option>
         {games.map((g) => (
@@ -168,17 +167,16 @@ function AddImage({ games, onAdded }: { games: Game[]; onAdded: () => void }) {
         value={caption}
         onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
         placeholder="Caption (optional)"
-        className="w-full h-11 bg-background border border-component-border px-3 text-sm text-white focus:outline-none focus:border-primary placeholder:text-white/20"
+        aria-label="Caption"
+        className={formStyles.input}
       />
-      <p className="text-[10px] text-white/30">PNG, JPEG or WebP, up to 8 MB. Large images are scaled down to 1600px.</p>
-      {error && <p className="text-xs text-[#FF4D4D]">{error}</p>}
-      <button
-        onClick={save}
-        disabled={busy}
-        className="px-8 py-3 bg-primary text-black text-[10px] font-black uppercase tracking-[0.3em] disabled:opacity-40 transition-all active:scale-95"
-      >
-        {busy ? "Uploading..." : "Add to gallery"}
-      </button>
+      <p className={formStyles.help}>PNG, JPEG or WebP, up to 8 MB. Large images are scaled down to 1600px.</p>
+      {error && <p className={formStyles.error} role="alert">{error}</p>}
+      <div>
+        <button onClick={save} disabled={busy} className={formStyles.btnPrimary}>
+          {busy ? "Uploading…" : "Add to gallery"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -227,29 +225,24 @@ function GalleryRow({ image, onChanged }: { image: GalleryImage; onChanged: () =
         className="w-full sm:w-28 aspect-square object-cover border border-white/10 shrink-0"
       />
       <div className="flex-1 min-w-0 space-y-3">
-        <p className="text-[10px] font-black uppercase tracking-widest text-primary">{image.gameName}</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary font-poppins">{image.gameName}</p>
         <input
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
           placeholder="Caption (optional)"
-          className="w-full h-10 bg-background border border-component-border px-3 text-sm text-white focus:outline-none focus:border-primary placeholder:text-white/20"
+          aria-label={`Caption for ${image.gameName}`}
+          className={formStyles.input}
         />
         <FilePicker file={file} onFile={setFile} label="Replace image" />
-        {error && <p className="text-xs text-[#FF4D4D]">{error}</p>}
+        {error && <p className={formStyles.error} role="alert">{error}</p>}
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={save}
-            disabled={busy || !dirty}
-            className="px-6 py-2.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
-          >
-            {busy ? "Saving..." : "Save"}
+          <button onClick={save} disabled={busy || !dirty} className={formStyles.btnPrimary}>
+            {busy ? "Saving…" : "Save"}
           </button>
           <button
             onClick={remove}
             disabled={busy}
-            className={`px-6 py-2.5 border text-[10px] font-black uppercase tracking-widest disabled:opacity-40 transition-all ${
-              armed ? "border-[#FF4D4D] text-[#FF4D4D]" : "border-component-border text-white/40 hover:text-white"
-            }`}
+            className={armed ? formStyles.btnDanger : formStyles.btnSecondary}
           >
             {armed ? "Press again to delete" : "Delete"}
           </button>

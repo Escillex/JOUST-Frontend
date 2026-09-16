@@ -55,7 +55,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-questrial), Arial, Helvetica, sans-serif;
-  overflow-x: hidden;
+  /* clip, not hidden: both stop sideways scrolling, but "hidden" makes the
+     body a scroll container that never scrolls, and every position: sticky
+     inside it (navbar, offline banner, sidebars) then silently stays put. */
+  overflow-x: clip;
 }
 
 h1,

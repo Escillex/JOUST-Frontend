@@ -8,6 +8,8 @@ export type User = {
   id: string;
   /** The `@handle`. Use `displayNameOf(user)` to render a person. */
   username: string;
+  /** The profile address segment; follows the username on a rename. */
+  slug?: string | null;
   displayName?: string | null;
   email?: string;
   roles?: string[];

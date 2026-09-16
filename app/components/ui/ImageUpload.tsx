@@ -128,13 +128,16 @@ export default function ImageUpload({
         {/* Scanline overlay */}
         <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_2px]" />
 
-        {/* Hover action overlay */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">
+        {/* Action overlay. On a pointer device it appears on hover (or when a
+            control has keyboard focus); a touch screen has no hover, so there
+            it is a permanent bar along the bottom instead of an invisible
+            layer the owner could never find. */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 [@media(hover:none)]:opacity-100 [@media(hover:none)]:top-auto [@media(hover:none)]:flex-row [@media(hover:none)]:flex-wrap [@media(hover:none)]:justify-center [@media(hover:none)]:gap-2 [@media(hover:none)]:p-2 [@media(hover:none)]:bg-black/75">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="px-6 py-2 bg-primary text-black font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:scale-100"
+            className="min-h-11 px-6 py-2 bg-primary text-black font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:scale-100"
           >
             {uploading ? "UPLOADING..." : label}
           </button>
@@ -143,7 +146,7 @@ export default function ImageUpload({
             <button
               type="button"
               onClick={onDelete}
-              className="text-[10px] font-bold text-red-500 hover:text-red-400 tracking-widest uppercase"
+              className="min-h-11 px-3 text-[11px] font-bold text-red-400 hover:text-red-300 tracking-widest uppercase"
             >
               Remove image
             </button>

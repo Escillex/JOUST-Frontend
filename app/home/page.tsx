@@ -9,7 +9,7 @@ import HomeDashboard from "../components/HomeDashboard";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, loading: userLoading, logout } = useUser();
+  const { user, loading: userLoading } = useUser();
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({ wins: 0, losses: 0, rank: 0, points: 0 });
   const [loading, setLoading] = useState(true);
@@ -47,10 +47,6 @@ export default function HomePage() {
     }
   }, [user, userLoading]);
 
-  // Sign-out logic now lives in one place: UserProvider.logout.
-  // This page previously had its own copy of the same steps.
-  const handleLogout = logout;
-
   useEffect(() => {
     if (!userLoading && !user) {
       router.push("/auth");
@@ -76,7 +72,6 @@ export default function HomePage() {
             user={user}
             tournaments={tournaments}
             stats={stats}
-            handleLogout={handleLogout}
           />
         )}
       </div>

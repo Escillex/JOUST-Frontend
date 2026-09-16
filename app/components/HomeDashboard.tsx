@@ -12,10 +12,9 @@ interface HomeDashboardProps {
     user: any;
     tournaments: any[];
     stats: any;
-    handleLogout: () => void;
 }
 
-export default function HomeDashboard({ user, tournaments, stats, handleLogout }: HomeDashboardProps) {
+export default function HomeDashboard({ user, tournaments, stats }: HomeDashboardProps) {
     const canManage = user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER");
 
     // The signed-in user's plaque and pinned medals for the bento header. Not
@@ -47,13 +46,7 @@ export default function HomeDashboard({ user, tournaments, stats, handleLogout }
 
                 {/* PROFILE: TOP RIGHT (Row 1) */}
                 <div className="lg:col-start-2 lg:row-start-1 flex flex-col">
-                    <ProfileHeader 
-                        user={user} 
-                        variant="bento" 
-                        isOwnProfile={true}
-                        onLogout={handleLogout}
-                        awards={awards}
-                    />
+                    <ProfileHeader user={user} awards={awards} />
                 </div>
 
                 {/* TACTICAL STATS: MIDDLE RIGHT (Row 2) */}
