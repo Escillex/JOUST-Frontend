@@ -28,7 +28,7 @@ export function useImageUpload() {
         throw new Error(data?.message || 'Upload failed');
       }
 
-      return data.bannerUrl || data.avatarUrl || data.url || null;
+      return data.bannerUrl || data.avatarUrl || data.iconUrl || data.url || null;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error during upload';
       setError(msg);

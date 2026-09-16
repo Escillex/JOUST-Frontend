@@ -129,14 +129,14 @@ export default function AwardManager() {
         <button
           onClick={() => { setReplacing(a.id); replaceInput.current?.click(); }}
           disabled={busyId === a.id}
-          className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest border border-white/10 text-white/60 hover:border-white/30 disabled:opacity-40"
+          className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-white/10 text-white/60 hover:border-white/30 disabled:opacity-40"
         >
           Replace art
         </button>
         <button
           onClick={() => void patch(a, { archived: !a.archivedAt })}
           disabled={busyId === a.id}
-          className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-black disabled:opacity-40"
+          className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-black disabled:opacity-40"
         >
           {a.archivedAt ? "Unarchive" : "Archive"}
         </button>
@@ -146,7 +146,7 @@ export default function AwardManager() {
           <button
             onClick={() => void remove(a)}
             disabled={busyId === a.id}
-            className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest border border-[#FF4D4D]/30 text-[#FF4D4D] hover:bg-[#FF4D4D] hover:text-white disabled:opacity-40"
+            className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-[#FF4D4D]/30 text-[#FF4D4D] hover:bg-[#FF4D4D] hover:text-white disabled:opacity-40"
           >
             {busyId === a.id ? "Working..." : "Delete"}
           </button>
@@ -182,7 +182,7 @@ export default function AwardManager() {
               key={k}
               onClick={() => setKind(k)}
               className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${
-                kind === k ? "bg-primary text-black border-primary" : "bg-background border-white/10 text-white/50 hover:border-white/30"
+                kind === k ? "bg-primary text-black border-primary" : "bg-background border-white/10 text-white/60 hover:border-white/30"
               }`}
             >
               {k === "MEDAL" ? "Medal — square, pinned (up to 3)" : "Plaque — 4:1, under the name"}
@@ -193,7 +193,7 @@ export default function AwardManager() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Name</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -203,7 +203,7 @@ export default function AwardManager() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Description (optional)</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Description (optional)</label>
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -213,7 +213,7 @@ export default function AwardManager() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Artwork</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Artwork</label>
               {/* The native control stays hidden: browsers render it differently
                   (Firefox shows a faint "Browse…" that reads as plain text), so
                   a real button opens the picker, as the other uploads do. */}
@@ -236,7 +236,7 @@ export default function AwardManager() {
                   {file ? file.name : "No file chosen"}
                 </span>
               </div>
-              <p className="text-[10px] text-white/30 leading-relaxed">{GUIDE[kind]}</p>
+              <p className="text-[10px] text-white/60 leading-relaxed">{GUIDE[kind]}</p>
             </div>
             <button
               onClick={create}
@@ -249,27 +249,27 @@ export default function AwardManager() {
 
           {/* Preview at real display sizes, on the profile's dark surface. */}
           <div className="bg-black border border-white/10 p-6 flex flex-col justify-center gap-5 min-h-[220px]">
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Preview — as it appears on a profile</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Preview — as it appears on a profile</p>
             {preview ? (
               kind === "MEDAL" ? (
                 <div className="flex items-end gap-6">
                   <div className="text-center">
                     <Medal name={name || "Medal"} imageUrl={preview} sizeClass="w-[72px] h-[72px]" showDetail={false} />
-                    <p className="text-[9px] text-white/30 mt-2">Pinned, 72px</p>
+                    <p className="text-[10px] text-white/60 mt-2">Pinned, 72px</p>
                   </div>
                   <div className="text-center">
                     <Medal name={name || "Medal"} imageUrl={preview} sizeClass="w-[160px] h-[160px]" showDetail={false} />
-                    <p className="text-[9px] text-white/30 mt-2">Detail</p>
+                    <p className="text-[10px] text-white/60 mt-2">Detail</p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <Plaque name={name || "Award name"} imageUrl={preview} size="lg" />
-                  <p className="text-[9px] text-white/30">Under the name, ~360×90</p>
+                  <p className="text-[10px] text-white/60">Under the name, ~360×90</p>
                 </div>
               )
             ) : (
-              <p className="text-xs text-white/20">Choose artwork to see it here.</p>
+              <p className="text-xs text-white/60">Choose artwork to see it here.</p>
             )}
           </div>
         </div>
@@ -278,20 +278,20 @@ export default function AwardManager() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-white/30">Loading the award catalog...</p>
+        <p className="text-sm text-white/60">Loading the award catalog...</p>
       ) : (
         <>
           <section>
-            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/50 mb-5">Medals ({medals.length})</h2>
+            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/60 mb-5">Medals ({medals.length})</h2>
             {medals.length === 0 ? (
-              <p className="text-sm text-white/30">No medals yet.</p>
+              <p className="text-sm text-white/60">No medals yet.</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {medals.map((a) => (
                   <div key={a.id} className={`bg-background border p-5 ${a.archivedAt ? "border-white/5 opacity-50" : "border-white/10"}`}>
                     <Medal name={a.name} imageUrl={a.imageUrl} description={a.description} sizeClass="w-24 h-24 mx-auto" showDetail={false} />
                     <p className="text-sm font-bold text-white mt-3 truncate">{a.name}</p>
-                    <p className="text-[10px] text-white/40">{heldLabel(a)}{a.archivedAt ? " · Archived" : ""}</p>
+                    <p className="text-[10px] text-white/60">{heldLabel(a)}{a.archivedAt ? " · Archived" : ""}</p>
                     {actions(a)}
                   </div>
                 ))}
@@ -300,15 +300,15 @@ export default function AwardManager() {
           </section>
 
           <section>
-            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/50 mb-5">Plaques ({plaques.length})</h2>
+            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/60 mb-5">Plaques ({plaques.length})</h2>
             {plaques.length === 0 ? (
-              <p className="text-sm text-white/30">No plaques yet.</p>
+              <p className="text-sm text-white/60">No plaques yet.</p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {plaques.map((a) => (
                   <div key={a.id} className={`bg-background border p-5 ${a.archivedAt ? "border-white/5 opacity-50" : "border-white/10"}`}>
                     <Plaque name={a.name} imageUrl={a.imageUrl} size="lg" />
-                    <p className="text-[10px] text-white/40 mt-3">
+                    <p className="text-[10px] text-white/60 mt-3">
                       {heldLabel(a)}{a.archivedAt ? " · Archived" : ""}{a.description ? ` · ${a.description}` : ""}
                     </p>
                     {actions(a)}

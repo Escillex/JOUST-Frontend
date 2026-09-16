@@ -112,19 +112,19 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
           {/* Reworded: subtitle and placeholders below used sci-fi style
               wording ("Identity Configuration Service", "Identity Label").
               Project rule: admin screens use plain, professional language. */}
-          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">User Account Settings</p>
+          <p className="text-[11px] text-white/60 uppercase tracking-widest mt-1">User Account Settings</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Username</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Username</label>
               <input
                 type="text" required
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
                 aria-invalid={!!usernameError}
-                className={`w-full h-10 bg-background border px-3 text-sm text-white focus:outline-none transition-all placeholder:text-white/10 rounded-sm ${
+                className={`w-full h-10 bg-background border px-3 text-sm text-white focus:outline-none transition-all placeholder:text-white/40 rounded-sm ${
                   usernameError ? "border-[#FF4D4D] focus:border-[#FF4D4D]" : "border-white/10 focus:border-primary"
                 }`}
                 placeholder="Username"
@@ -135,18 +135,18 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Email Address</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Email Address</label>
               <input
                 type="email" required
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
                 placeholder="user@example.com"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Roles</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Roles</label>
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
@@ -160,7 +160,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                   <span className="text-xs text-white uppercase font-medium">
                     {formData.roles.length > 0 ? formData.roles.join(", ") : "Select roles"}
                   </span>
-                  <svg className={`w-3 h-3 text-white/20 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-3 h-3 text-white/60 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7"/>
                   </svg>
                 </button>
@@ -187,7 +187,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">
                 {user ? "New Password (Optional)" : "Password"}
               </label>
               <input
@@ -195,7 +195,7 @@ export default function UserModal({ isOpen, onClose, user, onSubmit }: Props) {
                 required={!user}
                 value={formData.password}
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
                 placeholder={user ? "Unchanged" : "••••••••"}
               />
             </div>

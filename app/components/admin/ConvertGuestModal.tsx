@@ -48,12 +48,12 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
               Elevation Service"). Project rule: admin screens use plain,
               professional language. */}
           <h3 className="text-lg font-semibold text-white tracking-tight">Convert Guest to Account</h3>
-          <p className="text-[11px] text-white/40 uppercase tracking-widest mt-1">Guest Account Conversion</p>
+          <p className="text-[11px] text-white/60 uppercase tracking-widest mt-1">Guest Account Conversion</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="p-4 bg-white/5 border border-white/5 rounded-sm">
-            <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] leading-relaxed">
+            <p className="text-[10px] text-white/60 uppercase tracking-[0.2em] leading-relaxed">
               Converting <span className="text-primary font-bold">{guest.username}</span> to a permanent registered account.
               This will preserve all match history and statistics.
             </p>
@@ -61,33 +61,33 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Username</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Username</label>
               <input
                 type="text" required
                 value={formData.username}
                 onChange={e => setFormData({ ...formData, username: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Email Address</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Email Address</label>
               <input
                 type="email" required
                 value={formData.email}
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
                 placeholder="user@example.com"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-0.5">Password</label>
+              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Password</label>
               <input
                 type="password" required
                 value={formData.password}
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/10 rounded-sm"
+                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
                 placeholder="••••••••"
               />
             </div>

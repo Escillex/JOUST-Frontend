@@ -258,3 +258,33 @@ export function writeRuleValue(
       return { ...base, phase1: { ...(base.phase1 ?? {}), [key]: value } };
   }
 }
+
+/** The bracket system, said the way an organizer says it. */
+const SYSTEM_LABELS: Record<string, string> = {
+  SINGLE_ELIMINATION: 'Single Elimination',
+  DOUBLE_ELIMINATION: 'Double Elimination',
+  SWISS: 'Swiss',
+  ROUND_ROBIN: 'Round Robin',
+  HYBRID: 'Swiss → Top Cut',
+};
+
+export function systemLabel(system: string | null | undefined): string | null {
+  if (!system) return null;
+  return SYSTEM_LABELS[system] ?? system.replace(/_/g, ' ');
+}
+
+/** One sentence on what the system means for the person playing it. Written for
+ *  somebody who has never heard "Swiss" — the old page hid this in a tooltip
+ *  that only appeared on hover, so no phone ever saw it. */
+const SYSTEM_EXPLANATIONS: Record<string, string> = {
+  SINGLE_ELIMINATION: 'One loss and you are out.',
+  DOUBLE_ELIMINATION: 'You stay in until you lose twice.',
+  SWISS: 'You play every round against someone with a similar record. Nobody is knocked out early.',
+  ROUND_ROBIN: 'Everyone plays everyone. The final ranking is your overall record.',
+  HYBRID: 'Swiss rounds for everyone, then the top players go into a knockout bracket.',
+};
+
+export function systemExplanation(system: string | null | undefined): string | null {
+  if (!system) return null;
+  return SYSTEM_EXPLANATIONS[system] ?? null;
+}

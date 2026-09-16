@@ -473,6 +473,10 @@ export const API_ENDPOINTS = {
     /** Photo of the prize on offer; the prize text links to it. */
     UPLOAD_PRIZE: (tournamentId: string) => `/images/prize/${tournamentId}`,
     DELETE_PRIZE: (tournamentId: string) => `/images/prize/${tournamentId}`,
+    /** The catalog's 1:1 game icon (ADMIN). Cropped to a square and stored at
+     *  256x256 server-side, so the upload need not be square. */
+    UPLOAD_GAME_ICON: (gameId: string) => `/images/game/${gameId}`,
+    DELETE_GAME_ICON: (gameId: string) => `/images/game/${gameId}`,
     UPSERT_ASSET: (key: string) => `/images/assets/${key}`,
     DELETE_ASSET: (key: string) => `/images/assets/${key}`,
     // Single assets are read out of the LIST_ASSETS response; the server has no

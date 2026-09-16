@@ -274,7 +274,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             <span className={`w-1.5 h-1.5 rounded-full ${bulkGuests ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
             {bulkBusy ? "Saving..." : bulkGuests ? "Allowed" : "Blocked"}
           </button>
-          <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+          <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
             {bulkGuests
               ? "Generated placeholder entrants can be minted in bulk right now. Turn this off when you are finished testing."
               : "Off by default — this is the bulk generator only. Adding a walk-in guest to a roster is an ordinary organizer action and is never affected by this switch."}
@@ -314,7 +314,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               </button>
             </div>
             {!bulkGuests && (
-              <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
                 Allow bulk guest creation above to use this. Adding guests one at a time on a roster still works.
               </p>
             )}
@@ -355,11 +355,11 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               ))}
             </div>
             {twoFactorMode === "off" ? (
-              <p className="text-[9px] font-black text-[#FF4D4D] uppercase tracking-widest">
+              <p className="text-[10px] font-black text-[#FF4D4D] uppercase tracking-widest">
                 ⚠ Sign-in requires only a password right now. Resets to the configured mode on server restart.
               </p>
             ) : (
-              <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
                 {twoFactorMode
                   ? "Overriding the stored setting until the server restarts."
                   : "Using the stored setting from Admin → Settings. Overrides here last until restart and are refused in production."}
@@ -382,7 +382,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               <span className={`w-1.5 h-1.5 rounded-full ${debugMode ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
               {debugMode ? "Debug Mode: ON" : "Debug Mode: OFF"}
             </button>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               {debugMode
                 ? "Insta-win and random-advance shortcuts are showing on brackets. This browser only."
                 : "Unlocks insta-win / auto-resolve on tournament brackets. Admin-only, stored per browser — not a server setting."}
@@ -434,7 +434,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
                 </button>
               ))}
             </div>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               {backupEnabled
                 ? `Running on "${backupCron}". Takes effect immediately — no restart.`
                 : "Nothing is scheduled. Manual backups still work from the Backups tab."}
@@ -465,7 +465,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
                 Apply
               </button>
             </div>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               Oldest roll off first. Pinned and aliased backups are never deleted.
             </p>
           </div>
@@ -492,7 +492,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               <span className={`w-1.5 h-1.5 rounded-full ${allowRestore ? "bg-background animate-pulse" : "bg-neutral-600"}`} />
               {allowRestore ? "Allowed" : "Blocked"}
             </button>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               {allowRestore
                 ? "⚠ A restore can overwrite this database right now. Turn it off when you are done."
                 : "Off by default. A restore replaces every row in the database, so it must be allowed explicitly."}
@@ -516,7 +516,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
                 Apply Period
               </button>
             </div>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">Default: 30 days. Resets on server restart.</p>
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">Default: 30 days. Resets on server restart.</p>
           </div>
 
           <div className="space-y-4">
@@ -528,7 +528,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             >
               {backfillLoading ? "Rebuilding..." : "Rebuild From History"}
             </button>
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               {backfillResult || "Recomputes game-specific standings from all past tournaments."}
             </p>
           </div>
@@ -555,7 +555,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
                 <tr key={t.id} className="hover:bg-red-500/5 transition-colors group/row">
                   <td className="py-4 px-2 font-bold">{t.name}</td>
                   <td className="py-4 px-2">
-                    <span className="text-[9px] px-2 py-0.5 bg-neutral-800 text-neutral-400 uppercase tracking-widest">{t.status}</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-neutral-800 text-neutral-400 uppercase tracking-widest">{t.status}</span>
                   </td>
                   <td className="py-4 px-2 text-right">
                     <button

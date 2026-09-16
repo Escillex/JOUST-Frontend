@@ -75,6 +75,13 @@ export default function MobileView({ ctx, keys, onSignOut }: { ctx: SectionConte
   const summary = (k: SectionKey): React.ReactNode => {
     if (k === "name") return `@${ctx.user.username}`;
     if (k === "email") return ctx.security?.email ?? null;
+    if (k === "games") {
+      const g = ctx.user.games ?? [];
+      if (g.length === 0) return null;
+      return g.length <= 2
+        ? g.map((x) => x.name).join(", ")
+        : `${g[0].name}, ${g[1].name} +${g.length - 2}`;
+    }
     if (k === "security" && ctx.user.googleLinked) {
       return <span className="text-[10px] font-bold uppercase tracking-[0.1em] border border-primary/45 text-primary px-1.5 py-0.5 font-poppins">Google</span>;
     }

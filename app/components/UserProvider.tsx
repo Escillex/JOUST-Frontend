@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, SESSION_EXPIRED_EVENT } from "../utils/api";
+import { GamePlayed } from "../tournaments/types";
 
 export type User = {
   id: string;
@@ -21,6 +22,9 @@ export type User = {
   googleLinked?: boolean;
   hasPassword?: boolean;
   bio?: string | null;
+  /** The games this person says they play (`UserGame`). Orders the tournament
+   *  browse list and shows as a row of icons on their profile. */
+  games?: GamePlayed[];
 } | null;
 
 type UserContextType = {

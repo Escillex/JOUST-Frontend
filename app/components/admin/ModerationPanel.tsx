@@ -87,7 +87,7 @@ export default function ModerationPanel({ onCountChange }: { onCountChange?: (n:
               key={v}
               onClick={() => switchView(v)}
               className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                view === v ? "bg-primary text-black border-primary" : "border-white/10 text-white/40 hover:text-white hover:border-white/30"
+                view === v ? "bg-primary text-black border-primary" : "border-white/10 text-white/60 hover:text-white hover:border-white/30"
               }`}
             >
               {v === "open" ? "Reported" : "Removed (30-day hold)"}
@@ -96,7 +96,7 @@ export default function ModerationPanel({ onCountChange }: { onCountChange?: (n:
         </div>
         <button
           onClick={load}
-          className="h-9 px-4 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white hover:border-white/30"
+          className="h-9 px-4 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white hover:border-white/30"
         >
           Refresh
         </button>
@@ -105,9 +105,9 @@ export default function ModerationPanel({ onCountChange }: { onCountChange?: (n:
       {failed ? (
         <p className="text-xs text-[#FF4D4D]">Could not load the queue. Check the connection and refresh.</p>
       ) : !items ? (
-        <p className="text-xs text-white/30 py-8 text-center">Loading…</p>
+        <p className="text-xs text-white/60 py-8 text-center">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-xs text-white/30 py-8 text-center">
+        <p className="text-xs text-white/60 py-8 text-center">
           {view === "open" ? "Nothing reported. The queue is clear." : "Nothing has been removed in the last 30 days."}
         </p>
       ) : (
@@ -158,14 +158,14 @@ function QueueItem({
     <div className={`border p-4 grid grid-cols-1 md:grid-cols-[180px_1fr] gap-4 ${staffRequest && view === "open" ? "border-violet-400/40" : "border-white/10"}`}>
       <div className="min-w-0">
         <BuildView build={item.preview} alt={`${what} by ${item.owner.name}`} compact />
-        {item.preview.caption && <p className="text-[10px] text-white/50 mt-2">{item.preview.caption}</p>}
+        {item.preview.caption && <p className="text-[10px] text-white/60 mt-2">{item.preview.caption}</p>}
       </div>
 
       <div className="min-w-0 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[8px] font-bold uppercase tracking-widest border border-white/15 text-white/50 px-1.5 py-0.5">{what}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest border border-white/15 text-white/60 px-1.5 py-0.5">{what}</span>
           {staffRequest && view === "open" && (
-            <span className="text-[8px] font-bold uppercase tracking-widest border border-violet-400/40 text-violet-400 px-1.5 py-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest border border-violet-400/40 text-violet-400 px-1.5 py-0.5">
               Organizer request
             </span>
           )}
@@ -175,7 +175,7 @@ function QueueItem({
           <Link href={profileHref(item.owner)} className="font-semibold hover:text-primary">
             {item.owner.name}
           </Link>{" "}
-          <span className="text-white/40">·</span>{" "}
+          <span className="text-white/60">·</span>{" "}
           {item.context.kind === "tournament" && item.context.id ? (
             <Link href={`/tournaments/${item.context.id}`} className="text-white/60 hover:text-primary">
               {item.context.name}
@@ -203,7 +203,7 @@ function QueueItem({
                 value={reason}
                 onChange={(e) => setReason(e.target.value.slice(0, 300))}
                 placeholder="Reason, shown to the owner"
-                className="flex-1 h-9 bg-black border border-white/10 px-3 text-xs text-white focus:outline-none focus:border-primary placeholder:text-white/20"
+                className="flex-1 h-9 bg-black border border-white/10 px-3 text-xs text-white focus:outline-none focus:border-primary placeholder:text-white/60"
               />
               <div className="flex gap-2">
                 <button
@@ -230,7 +230,7 @@ function QueueItem({
               {item.removedByName ? ` by ${item.removedByName}` : ""}
               {item.removalReason ? ` — “${item.removalReason}”` : ""}
             </p>
-            <p className="text-[10px] text-white/30">Deleted permanently on {when(item.purgeAt)}.</p>
+            <p className="text-[10px] text-white/60">Deleted permanently on {when(item.purgeAt)}.</p>
             <button
               onClick={() => void run(onRestore)}
               disabled={busy}

@@ -60,7 +60,7 @@ export function TournamentHeroContent({ tournaments, canManage, currentUserId: i
     if (loadingUser) {
         return (
             <div className="h-full w-full bg-surface border-2 border-white/5 animate-pulse flex items-center justify-center">
-                <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">Synchronizing...</div>
+                <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">Loading…</div>
             </div>
         );
     }

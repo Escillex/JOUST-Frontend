@@ -50,6 +50,7 @@ export default function SettingsPage() {
       bio: user.bio,
       isGuest: user.isGuest,
       googleLinked: user.googleLinked,
+      games: user.games,
     },
     refreshUser,
     security,

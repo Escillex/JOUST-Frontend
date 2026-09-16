@@ -234,7 +234,7 @@ export default function BackupPanel() {
               placeholder="defense-baseline"
               className="w-full bg-neutral-950 border border-neutral-800 px-4 py-3 text-sm focus:outline-none focus:border-primary transition-all text-foreground"
             />
-            <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic">
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               An aliased backup is pinned, so rolling deletion never takes it.
             </p>
           </div>
@@ -264,7 +264,7 @@ export default function BackupPanel() {
               Sanitized export {sanitized ? "— on" : "— off"}
             </span>
           </div>
-          <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest italic mt-2 leading-relaxed">
+          <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest italic mt-2 leading-relaxed">
             {sanitized
               ? `Addresses become @example.invalid and every account gets the password "${demoPassword}". Tournaments, matches and standings are untouched. This is the copy that may leave the building.`
               : "A full backup holds real addresses and password hashes. It is encrypted at rest, and is the one to restore from."}
@@ -297,7 +297,7 @@ export default function BackupPanel() {
         </div>
 
         {directory && (
-          <p className="text-[8px] font-bold text-neutral-600 uppercase tracking-widest italic mt-6">
+          <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic mt-6">
             Stored in {directory} · retention and schedule are set in Dev Tools
           </p>
         )}
@@ -325,26 +325,26 @@ export default function BackupPanel() {
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-sm font-black text-white">{when(b.createdAt)}</span>
                       {b.alias && (
-                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-primary/15 text-primary">
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-primary/15 text-primary">
                           {b.alias}
                         </span>
                       )}
                       {b.pinned && (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Pinned</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Pinned</span>
                       )}
                       {b.sanitized && (
-                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-neutral-800 text-neutral-300">
+                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-neutral-800 text-neutral-300">
                           Sanitized
                         </span>
                       )}
                       {b.encrypted && (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">Encrypted</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Encrypted</span>
                       )}
                     </div>
                     {b.description && (
                       <p className="text-xs text-neutral-400 mt-1.5">{b.description}</p>
                     )}
-                    <p className="text-[9px] font-bold text-neutral-600 uppercase tracking-widest mt-1.5">
+                    <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest mt-1.5">
                       {TRIGGER_LABEL[b.trigger]} · {bytes(b.fileBytes)} · schema {b.schemaMigration ?? "unknown"}
                     </p>
                   </div>

@@ -2,18 +2,29 @@
 import { Skeleton, SkeletonStatus } from "../../components/ui/Skeleton";
 import dynamic from "next/dynamic";
 
-import { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { authenticatedFetch, API_ENDPOINTS, safeJson, resolveImageUrl, displayNameOf } from "../../utils/api";
+import { useState, useEffect, Suspense, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+  authenticatedFetch,
+  API_ENDPOINTS,
+  safeJson,
+  resolveImageUrl,
+  displayNameOf,
+  profileHref,
+} from "../../utils/api";
 import { Tournament } from "../types";
-import { getTournamentConfig } from "../../utils/formatConfig";
+import {
+  getTournamentConfig,
+  systemExplanation,
+  systemLabel,
+} from "../../utils/formatConfig";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 // Lazy-loaded: BracketPreview pulls in @xyflow/react, which is by far the
 // largest dependency in the app. Loading it up front made every visitor to a
 // tournament page download the whole bracket renderer even when they never
-// scrolled to it. ssr is disabled because the canvas measures the DOM.
+// opened the Bracket tab. ssr is disabled because the canvas measures the DOM.
 const BracketPreview = dynamic(
   () => import("../../components/tournaments/bracket/BracketPreview"),
   {
@@ -28,63 +39,43 @@ const BracketPreview = dynamic(
 );
 import { useToast } from "../../components/ui/Toast";
 import TournamentBuildsPanel from "../../components/tournaments/TournamentBuildsPanel";
+import GameIcon from "../../components/ui/GameIcon";
+import ProfileAvatar from "../../components/profile/ProfileAvatar";
+import { describeStatus, formatWhen } from "../../utils/tournamentStatus";
+import { actionFor } from "../../utils/tournamentAction";
+
+type TabId = "overview" | "players" | "bracket" | "builds";
+const TAB_IDS: TabId[] = ["overview", "players", "bracket", "builds"];
 
 function TournamentViewContent() {
   const { toast } = useToast();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const tournamentId = params.id as string;
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [user, setUser] = useState<{ sub: string; id?: string } | null>(null);
+  const [user, setUser] = useState<{ sub: string; id?: string; roles?: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
-  const [activeTab, setActiveTab] = useState<"DETAILS" | "PLAYERS" | "BUILDS" | "BRACKET">("DETAILS");
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
   const [respondingToInvite, setRespondingToInvite] = useState(false);
 
-  useEffect(() => {
-    if (tournamentId) {
-      fetchData();
-    } else {
-      router.push("/tournaments");
-    }
-  }, [tournamentId]);
-
-  useEffect(() => {
-    if (tournament?.name) {
-      document.title = `Joust | ${tournament.name}`;
-    }
-  }, [tournament?.name]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [meRes, tRes] = await Promise.all([
-        authenticatedFetch(API_ENDPOINTS.AUTH.ME),
-        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!))
-      ]);
-      
-      if (meRes.ok) {
-        const data = await safeJson(meRes);
-        if (data) setUser(data);
-        await loadInvitation(data);
-      }
-      if (tRes.ok) {
-        const data = await safeJson(tRes);
-        if (data) setTournament(data);
-      }
-      
-    } catch (error) {
-      console.error("Fetch failed:", error);
-    } finally {
-      setLoading(false);
-    }
+  // The open tab lives in the URL, so a player can be sent straight to the
+  // roster or the bracket and Back returns where it should.
+  const tabParam = searchParams.get("tab");
+  const activeTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : "overview";
+  const setTab = (tab: TabId) => {
+    const next = new URLSearchParams(Array.from(searchParams.entries()));
+    if (tab === "overview") next.delete("tab");
+    else next.set("tab", tab);
+    const qs = next.toString();
+    router.replace(qs ? `?${qs}` : `/tournaments/${tournamentId}`, { scroll: false });
   };
 
   // Only organizers can be invited to co-manage, so this request is skipped for
   // everyone else rather than fired on every tournament page view.
-  const loadInvitation = async (me: { roles?: string[] } | null) => {
+  const loadInvitation = useCallback(async (me: { roles?: string[] } | null) => {
     const canBeInvited = me?.roles?.some((r) => r === "ORGANIZER" || r === "ADMIN");
     if (!canBeInvited) return;
     const res = await authenticatedFetch(API_ENDPOINTS.ORGANIZERS.MY_INVITATIONS);
@@ -94,7 +85,46 @@ function TournamentViewContent() {
       ? invitations.find((i: { tournamentId: string }) => i.tournamentId === tournamentId)
       : null;
     setPendingInviteId(mine?.id ?? null);
-  };
+  }, [tournamentId]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [meRes, tRes] = await Promise.all([
+        authenticatedFetch(API_ENDPOINTS.AUTH.ME),
+        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!))
+      ]);
+
+      if (meRes.ok) {
+        const data = await safeJson(meRes);
+        if (data) setUser(data);
+        await loadInvitation(data);
+      }
+      if (tRes.ok) {
+        const data = await safeJson(tRes);
+        if (data) setTournament(data);
+      }
+
+    } catch (error) {
+      console.error("Fetch failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [tournamentId, loadInvitation]);
+
+  useEffect(() => {
+    if (tournamentId) {
+      fetchData();
+    } else {
+      router.push("/tournaments");
+    }
+  }, [tournamentId, fetchData, router]);
+
+  useEffect(() => {
+    if (tournament?.name) {
+      document.title = `Joust | ${tournament.name}`;
+    }
+  }, [tournament?.name]);
 
   const respondToInvitation = async (accept: boolean) => {
     if (!pendingInviteId || respondingToInvite) return;
@@ -152,55 +182,123 @@ function TournamentViewContent() {
         {/* The blocks below are decorative; this announces the load to screen
             readers, which otherwise get silence while the page fills in. */}
         <SkeletonStatus label="Loading tournament" />
-        <div className="w-full px-4 md:px-12 py-12 max-w-[1600px] mx-auto animate-pulse">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-            <div className="lg:col-span-8 space-y-12">
-              <div className="h-[400px] md:h-[600px] bg-white/5 rounded-[3rem]" />
-              <div className="space-y-4">
-                <div className="h-4 w-40 bg-white/10 rounded-md" />
-                <div className="h-12 w-full bg-white/10 rounded-xl" />
-                <div className="h-20 w-full bg-white/5 rounded-xl" />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-32 bg-white/5 rounded-3xl" />
-                ))}
-              </div>
-            </div>
-            <div className="lg:col-span-4 space-y-8">
-              <div className="h-64 bg-white/5 rounded-[2.5rem]" />
-              <div className="h-96 bg-white/5 rounded-[2.5rem]" />
-            </div>
+        <div className="w-full max-w-7xl mx-auto px-5 md:px-8 py-10 md:py-16 flex flex-col gap-8">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-12 w-3/4 max-w-xl" />
+          <div className="flex gap-2">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-7 w-40" />
+          </div>
+          <Skeleton className="h-14 w-full md:w-80" />
+          <Skeleton className="h-12 w-full" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="lg:col-span-7"><Skeleton className="h-64 w-full" /></div>
+            <div className="lg:col-span-5"><Skeleton className="h-64 w-full" /></div>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!tournament) return <div className="min-h-screen bg-background flex items-center justify-center text-white font-black uppercase tracking-widest">TOURNAMENT_NOT_FOUND</div>;
+  if (!tournament) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-6 text-center">
+        <p className="text-white text-lg">This tournament doesn&apos;t exist or has been removed.</p>
+        <Link
+          href="/tournaments"
+          className="px-6 py-3 border-2 border-primary text-primary text-[11px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-colors"
+        >
+          Browse tournaments
+        </Link>
+      </div>
+    );
+  }
 
   const myId = user?.sub || (user as any)?.id;
   const isJoined = tournament.participants.some(p => p.userId === myId);
-  const isFull = tournament.participants.length >= tournament.maxPlayers;
-  const registrationOpen = tournament.status === "OPEN" || tournament.status === "UPCOMING";
-  const canJoin = registrationOpen && !isJoined && !isFull && !!user;
+  const status = describeStatus(tournament, isJoined);
+  const when = formatWhen(tournament.date);
+  const system = typeof tournament.format === "object" ? tournament.format?.system : null;
+  const action = actionFor({ tournament, userId: myId, isJoined });
+  const canManage = tournament.canManage;
+  const started = tournament.status === "ONGOING" || tournament.status === "COMPLETED";
 
-  const formatExplanations: Record<string, string> = {
-    SINGLE_ELIMINATION: "Loss results in immediate disqualification. High-stakes, high-precision competition.",
-    DOUBLE_ELIMINATION: "Features a secondary bracket for losers. Two losses required for elimination.",
-    SWISS: "Fixed number of rounds. Matches players with similar records. No one is eliminated early.",
-    ROUND_ROBIN: "Every participant plays every other participant. Final ranking based on overall record."
-  };
-
-  const tabs = [
-    { id: "DETAILS", label: "Overview" },
-    { id: "PLAYERS", label: `Players (${tournament.participants.length})` },
-    { id: "BUILDS", label: "Builds" },
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "players", label: `Players · ${tournament.participants.length}` },
+    { id: "bracket", label: "Bracket" },
+    { id: "builds", label: "Builds" },
   ];
+
+  const cfg = getTournamentConfig(tournament) as any;
+  const isHybrid = system === "HYBRID";
+  const points = [
+    `1st ${cfg?.placementPointsChampion ?? 10}`,
+    `2nd ${cfg?.placementPoints2nd ?? 7}`,
+    `3rd ${cfg?.placementPoints3rd ?? 5}`,
+    ...(isHybrid ? [`Top cut ${cfg?.placementPointsTopCut ?? 3}`] : []),
+    `Played ${cfg?.placementPointsParticipation ?? 1}`,
+  ].join(" · ");
+
+  const details: { label: string; value: React.ReactNode; note?: string | null }[] = [
+    ...(tournament.game
+      ? [{
+          label: "Game",
+          value: (
+            <span className="inline-flex items-center gap-2">
+              <GameIcon game={tournament.game} size="chip" />
+              {tournament.game.name}
+            </span>
+          ),
+        }]
+      : []),
+    {
+      label: "Format",
+      value: systemLabel(system) ?? "Not set",
+      note: systemExplanation(system),
+    },
+    { label: "Date", value: when ?? "To be announced" },
+    { label: "Venue", value: tournament.venue || "Not specified" },
+    {
+      label: "Seats",
+      value: `${tournament.participants.length} of ${tournament.maxPlayers} taken`,
+    },
+    {
+      label: "Prize",
+      value: tournament.prizePool
+        ? (tournament.prizeImageUrl
+            // The text IS the link to the picture of the prize — "Trophy" means
+            // more when you can see which trophy.
+            ? <a
+                href={resolveImageUrl(tournament.prizeImageUrl, "")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline decoration-primary/40 underline-offset-4 hover:text-primary-light transition-colors"
+              >
+                {tournament.prizePool} <span aria-hidden>↗</span>
+              </a>
+            : tournament.prizePool)
+        : "None",
+    },
+    ...(tournament.createdBy
+      ? [{
+          label: "Organizer",
+          value: (
+            <Link href={profileHref(tournament.createdBy)} className="text-primary hover:text-primary-light transition-colors">
+              {displayNameOf(tournament.createdBy)}
+            </Link>
+          ),
+        }]
+      : []),
+    { label: "Points", value: points },
+  ];
+
+  const activeParticipants = tournament.participants.filter(p => p.status !== "FORFEITED");
+  const withdrawn = tournament.participants.filter(p => p.status === "FORFEITED");
 
   return (
     <div className="min-h-screen w-full bg-background text-white font-poppins selection:bg-primary selection:text-black overflow-x-hidden">
-      <main className="max-w-7xl mx-auto px-6 py-16 md:py-32 flex flex-col gap-16">
+      <main className="max-w-7xl mx-auto px-5 md:px-8 py-8 md:py-14 flex flex-col gap-8">
 
         {pendingInviteId && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between border border-primary/30 bg-primary/5 px-6 py-5">
@@ -226,15 +324,133 @@ function TournamentViewContent() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-4 border-b border-white/5 pb-8">
+        {/* HEADER — what it is, when, and the one thing you can do, all before
+            any tab is chosen. The name used to be the fourth thing on the page,
+            below the fold on a phone. */}
+        <header className="flex flex-col gap-5">
+          <Link
+            href="/tournaments"
+            className="text-xs text-white/50 hover:text-white transition-colors w-fit"
+          >
+            ‹ Tournaments
+          </Link>
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-12">
+            <div className="flex flex-col gap-3 min-w-0">
+              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none break-words">
+                {tournament.name}
+              </h1>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border ${
+                    status.tone === "now"
+                      ? "bg-[#FF4D4D] border-[#FF4D4D] text-white"
+                      : isJoined
+                        ? "bg-primary border-primary text-black"
+                        : status.tone === "open"
+                          ? "border-primary text-primary"
+                          : "border-component-border text-white/70"
+                  }`}
+                >
+                  {status.tone === "now" && (
+                    <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  )}
+                  {status.tone === "open" && !isJoined && <span aria-hidden>● </span>}
+                  {status.label}
+                </span>
+
+                {tournament.game && (
+                  <span className="inline-flex items-center gap-2 px-2.5 py-1 border border-component-border text-[10px] font-black uppercase tracking-widest text-white">
+                    <GameIcon game={tournament.game} size="chip" />
+                    {tournament.game.name}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm text-white/70">
+                {when ?? "Date to be announced"}
+                {tournament.venue && <span className="text-white/50"> · {tournament.venue}</span>}
+              </p>
+            </div>
+
+            {/* The action block: one button, one reason. */}
+            <div className="flex flex-col gap-2 lg:w-80 shrink-0">
+              {action.join ? (
+                <button
+                  onClick={handleJoin}
+                  disabled={joining}
+                  className="h-14 w-full bg-primary text-black font-black text-xs uppercase tracking-[0.2em] hover:bg-primary-light transition-colors disabled:opacity-50"
+                >
+                  {joining ? "Joining…" : action.label}
+                </button>
+              ) : action.disabled ? (
+                <div className="h-14 w-full flex items-center justify-center bg-component-background border-2 border-component-border text-white/40 font-black text-xs uppercase tracking-[0.2em] text-center px-4">
+                  {action.label}
+                </div>
+              ) : (
+                <Link
+                  href={action.href ?? "#"}
+                  className={`h-14 w-full flex items-center justify-center font-black text-xs uppercase tracking-[0.2em] transition-colors ${
+                    action.tone === "primary"
+                      ? "bg-primary text-black hover:bg-primary-light"
+                      : action.tone === "neutral"
+                        ? "bg-white text-black hover:bg-primary"
+                        : "border-2 border-primary text-primary hover:bg-primary hover:text-black"
+                  }`}
+                >
+                  {action.label}
+                </Link>
+              )}
+
+              {action.helper && (
+                <p className="text-xs text-white/60 text-center">{action.helper}</p>
+              )}
+
+              {(canManage || started) && (
+                <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-1">
+                  {/* Gated on canManage, which the server computes — holding the
+                      ORGANIZER role says nothing about THIS tournament. */}
+                  {canManage && (
+                    <Link
+                      href={`/tournaments/${tournamentId}/manage`}
+                      className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
+                    >
+                      Manage
+                    </Link>
+                  )}
+                  {started && (
+                    <>
+                      <Link
+                        href={`/tournaments/${tournamentId}/report`}
+                        className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
+                      >
+                        Report
+                      </Link>
+                      <Link
+                        href={`/tournaments/${tournamentId}/bracket`}
+                        className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
+                      >
+                        Full bracket
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <div className="flex overflow-x-auto border-b border-component-border -mx-5 px-5 md:mx-0 md:px-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-8 py-4 text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
-                activeTab === tab.id 
-                  ? "bg-primary border-primary text-black" 
-                  : "border-component-border text-white/40 hover:border-white/20 hover:text-white"
+              onClick={() => setTab(tab.id)}
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              className={`shrink-0 px-5 py-4 text-[11px] font-black uppercase tracking-widest transition-colors border-b-2 ${
+                activeTab === tab.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-white/50 hover:text-white"
               }`}
             >
               {tab.label}
@@ -243,212 +459,202 @@ function TournamentViewContent() {
         </div>
 
         <AnimatePresence mode="wait">
-          {activeTab === "DETAILS" && (
-            <motion.div 
-              key="details"
-              initial={{ opacity: 0, y: 20 }}
+          {activeTab === "overview" && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20"
+              exit={{ opacity: 0, y: -12 }}
+              className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16"
             >
-              <div className="lg:col-span-7 flex flex-col gap-12">
-                <div className="relative group border-2 border-component-border overflow-hidden">
-                  <div className="aspect-video relative overflow-hidden">
-                    {/* /placeholder.png has "PLACEHOLDER — NO IMAGE SET" drawn
-                        into the artwork, which reads as broken rather than as
-                        empty. A tournament without a banner gets a quiet ground. */}
-                    {tournament.bannerUrl ? (
-                      <Image
-                        src={resolveImageUrl(tournament.bannerUrl, "")}
-                        alt={tournament.name}
-                        fill
-                        unoptimized
-                        className="object-cover transition-transform duration-1000 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div
-                        aria-hidden
-                        className="absolute inset-0 bg-zinc-900"
-                        style={{
-                          backgroundImage:
-                            "repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 14px)",
-                        }}
-                      />
-                    )}
-                  </div>
-                  
-                  <div className="absolute top-6 left-6 flex flex-col items-start gap-4 z-20">
-                    <div className="relative">
-                      <motion.div 
-                        whileHover={{ scale: 1.05 }}
-                        className="px-4 py-2 bg-primary text-black font-black text-[10px] uppercase tracking-[0.4em] italic shadow-2xl cursor-help peer"
-                      >
-                        {(typeof tournament.format === 'object' ? tournament.format?.system : "UNKNOWN")?.replace("_", " ") || "UNKNOWN"}
-                      </motion.div>
-                      
-                      <div className="absolute top-full left-0 mt-4 opacity-0 peer-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-30">
-                        <div className="bg-component-background p-6 border border-primary/40 w-64 shadow-[0_0_40px_rgba(82,185,70,0.2)]">
-                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">FORMAT_DETAILS</p>
-                          <p className="text-[11px] text-white/80 leading-relaxed font-light italic">
-                            {formatExplanations[typeof tournament.format === 'object' ? tournament.format?.system : ""] || "Standard tournament format."}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              <div className="lg:col-span-7 flex flex-col gap-8">
+                <div className="relative aspect-video w-full overflow-hidden border-2 border-component-border">
+                  {/* /placeholder.png has "PLACEHOLDER — NO IMAGE SET" drawn
+                      into the artwork, which reads as broken rather than as
+                      empty. A tournament without a banner gets a quiet ground. */}
+                  {tournament.bannerUrl ? (
+                    <Image
+                      src={resolveImageUrl(tournament.bannerUrl, "")}
+                      alt=""
+                      aria-hidden
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 bg-zinc-900"
+                      style={{
+                        backgroundImage:
+                          "repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 14px)",
+                      }}
+                    />
+                  )}
                 </div>
 
-                <div className="space-y-6">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4">
-                      <div className="h-[2px] w-12 bg-primary" />
-                      <span className="text-[10px] font-black text-primary/40 uppercase tracking-[0.6em]">OVERVIEW</span>
-                    </div>
-                    <h1 className="text-5xl md:text-7xl font-black uppercase italic tracking-tighter leading-none">
-                      {tournament.name}
-                    </h1>
-                  </div>
-                  <p className="text-xl md:text-2xl text-white/60 leading-relaxed font-light italic whitespace-pre-wrap">
-                    {tournament.description || "Join this competitive tournament event. Success requires careful planning and strong strategy."}
+                {tournament.description && (
+                  <p className="text-base md:text-lg text-white/75 leading-relaxed whitespace-pre-wrap">
+                    {tournament.description}
                   </p>
-                </div>
+                )}
               </div>
 
-              <div className="lg:col-span-5 flex flex-col gap-8">
-                <div className="h-48 flex flex-col gap-4">
-                  <div className="flex-1 relative">
-                    {canJoin ? (
-                      <motion.button 
-                        onClick={handleJoin}
-                        disabled={joining}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary font-black text-sm uppercase tracking-[0.6em] transition-all hover:bg-primary hover:text-black hover:shadow-[0_0_50px_rgba(82,185,70,0.3)] flex items-center justify-center group relative overflow-hidden"
-                      >
-                        <span className="relative z-10">{joining ? "JOINING..." : "JOIN TOURNAMENT"}</span>
-                        <div className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                      </motion.button>
-                    ) : !user && registrationOpen ? (
-                      <Link 
-                        href="/auth"
-                        className="w-full h-full border-2 border-white/20 bg-white/5 text-white text-center font-black text-sm uppercase tracking-[0.6em] transition-all hover:bg-white hover:text-black flex items-center justify-center italic"
-                      >
-                        SIGN IN TO REGISTER
-                      </Link>
-                    ) : isJoined ? (
-                      <Link 
-                        href={`/tournaments/${tournamentId}/lobby`}
-                        className="w-full h-full bg-white text-black text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary transition-all shadow-xl flex items-center justify-center italic"
-                      >
-                        ENTER TOURNAMENT
-                      </Link>
-                    ) : tournament.status === "ONGOING" ? (
-                      <Link 
-                        href={`/tournaments/${tournamentId}/bracket`}
-                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary hover:text-black transition-all shadow-[0_0_50px_rgba(82,185,70,0.15)] flex items-center justify-center italic"
-                      >
-                        SPECTATE
-                      </Link>
-                    ) : tournament.status === "COMPLETED" ? (
-                      <Link 
-                        href={`/tournaments/${tournamentId}/bracket`}
-                        className="w-full h-full border-2 border-primary bg-primary/5 text-primary text-center font-black text-sm uppercase tracking-[0.6em] hover:bg-primary hover:text-black transition-all shadow-[0_0_50px_rgba(82,185,70,0.15)] flex items-center justify-center italic"
-                      >
-                        FINAL RESULTS
-                      </Link>
-                    ) : (
-                      <div className="w-full h-full border-2 border-component-border bg-component-background text-white/20 text-center font-black text-xs uppercase tracking-widest flex items-center justify-center">
-                        REGISTRATION_CLOSED
+              {/* Details: a plain list. This replaces three panels that expanded
+                  after a one-second hover, rotated one line every three seconds,
+                  and called themselves "Live" while showing the page's first
+                  fetch — with no keyboard path to any of it. */}
+              <div className="lg:col-span-5 flex flex-col">
+                <h2 className="text-[11px] font-black uppercase tracking-widest text-white/40 pb-2 border-b-2 border-component-border">
+                  Details
+                </h2>
+                <dl className="flex flex-col">
+                  {details.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex flex-col gap-1 py-3 border-b border-component-border"
+                    >
+                      <div className="flex justify-between items-baseline gap-4">
+                        <dt className="text-xs text-white/50 shrink-0">{row.label}</dt>
+                        <dd className="text-sm text-white text-right min-w-0 break-words">{row.value}</dd>
                       </div>
-                    )}
-                  </div>
-                  {(user as any)?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") && (
-                    <Link
-                      href={`/tournaments/${tournamentId}/manage`}
-                      className="h-12 w-full border border-primary/40 bg-primary/5 text-primary flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
-                    >
-                      MANAGE TOURNAMENT
-                    </Link>
-                  )}
-                  {/* The printable summary: winner, placements, every round.
-                      Offered once there is something to report. */}
-                  {(tournament.status === "ONGOING" || tournament.status === "COMPLETED") && (
-                    <Link
-                      href={`/tournaments/${tournamentId}/report`}
-                      className="h-12 w-full border border-white/15 bg-white/[0.03] text-white/70 flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all"
-                    >
-                      TOURNAMENT REPORT
-                    </Link>
-                  )}
-                </div>
-
-                <ExpansionModule 
-                  label="Tournament Status"
-                  data={[
-                    { label: "Status", value: tournament.status },
-                    { label: "Enrolled", value: `${tournament.participants.length} / ${tournament.maxPlayers}` }
-                  ]}
-                />
-
-                <ExpansionModule 
-                  label="Event Logistics"
-                  data={[
-                    { label: "Date", value: tournament.date ? new Date(tournament.date).toLocaleDateString() : "To be announced" },
-                    {
-                      label: "Prize",
-                      value: tournament.prizePool
-                        ? (tournament.prizeImageUrl
-                            // The text IS the link to the picture of the prize —
-                            // "Trophy" means more when you can see which trophy.
-                            ? <a
-                                href={resolveImageUrl(tournament.prizeImageUrl, "")}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="underline decoration-primary/40 underline-offset-4 hover:text-primary transition-colors"
-                              >
-                                {tournament.prizePool} <span aria-hidden className="text-primary">↗</span>
-                              </a>
-                            : tournament.prizePool)
-                        : "None" },
-                    { label: "Venue", value: tournament.venue || "Not specified" }
-                  ]}
-                />
-
-                {/* Placement Points Module */}
-                {(() => {
-                  if (!tournament.config && typeof tournament.format !== 'object') return null;
-                  const cfg = getTournamentConfig(tournament) as any;
-                  const champion = cfg?.placementPointsChampion ?? 10;
-                  const second = cfg?.placementPoints2nd ?? 7;
-                  const third = cfg?.placementPoints3rd ?? 5;
-                  const topCut = cfg?.placementPointsTopCut ?? 3;
-                  const participation = cfg?.placementPointsParticipation ?? 1;
-                  const isHybrid = (typeof tournament.format === 'object' ? tournament.format?.system : null) === 'HYBRID';
-                  const rows = [
-                    { label: "Champion", value: `${champion} pts` },
-                    { label: "1st Runner-Up", value: `${second} pts` },
-                    { label: "2nd Runner-Up", value: `${third} pts` },
-                    ...(isHybrid ? [{ label: "Top Cut", value: `${topCut} pts` }] : []),
-                    { label: "Participation", value: `${participation} pts` },
-                  ];
-                  return (
-                    <ExpansionModule 
-                      label="Placement Points"
-                      data={rows}
-                    />
-                  );
-                })()}
+                      {row.note && <p className="text-xs text-white/50">{row.note}</p>}
+                    </div>
+                  ))}
+                </dl>
               </div>
             </motion.div>
           )}
 
-          {activeTab === "BUILDS" && (
+          {activeTab === "players" && (
+            <motion.div
+              key="players"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="flex flex-col gap-8"
+            >
+              {tournament.participants.length === 0 ? (
+                <div className="py-20 text-center border-2 border-dashed border-white/10">
+                  <p className="text-sm text-white/50">Nobody has registered yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10">
+                  {activeParticipants.map((p: any) => {
+                    const isMe = p.userId === myId;
+                    return (
+                      <div
+                        key={p.userId}
+                        className={`flex items-center gap-3 py-3 border-b border-component-border ${isMe ? "bg-primary/5" : ""}`}
+                      >
+                        <ProfileAvatar
+                          name={displayNameOf(p.user)}
+                          avatarUrl={p.user?.avatarUrl}
+                          accent={isMe}
+                          className="w-8 h-8 text-xs rounded-full"
+                        />
+                        {p.user?.isGuest ? (
+                          <span className="flex-1 text-sm truncate">{displayNameOf(p.user)}</span>
+                        ) : (
+                          <Link
+                            href={profileHref({ slug: p.user?.slug, id: p.userId })}
+                            className="flex-1 text-sm truncate hover:text-primary transition-colors"
+                          >
+                            {displayNameOf(p.user)}
+                          </Link>
+                        )}
+                        {isMe && (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-primary">You</span>
+                        )}
+                        {/* Only when the organizer actually set one — the old
+                            page fell back to the array index, inventing seeds
+                            that the bracket would then contradict. */}
+                        {!isMe && p.seed != null && (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                            Seed {p.seed}
+                          </span>
+                        )}
+                        {!isMe && p.seed == null && p.user?.isGuest && (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                            Guest
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {withdrawn.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-white/40">
+                    Withdrew · {withdrawn.length}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10">
+                    {withdrawn.map((p: any) => (
+                      <div
+                        key={p.userId}
+                        className="flex items-center gap-3 py-3 border-b border-component-border opacity-50"
+                      >
+                        <ProfileAvatar
+                          name={displayNameOf(p.user)}
+                          avatarUrl={p.user?.avatarUrl}
+                          className="w-8 h-8 text-xs rounded-full"
+                        />
+                        <span className="flex-1 text-sm truncate">{displayNameOf(p.user)}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                          Forfeited
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "bracket" && (
+            <motion.div
+              key="bracket"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="flex flex-col gap-4"
+            >
+              {tournament.status === "OPEN" || tournament.status === "UPCOMING" ? (
+                <div className="py-20 text-center border-2 border-dashed border-white/10">
+                  <p className="text-sm text-white/50">
+                    The bracket is drawn when the tournament starts.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <BracketPreview
+                    tournament={tournament}
+                    tournamentId={tournamentId}
+                    isAdmin={false}
+                    currentUserId={myId}
+                    onRefresh={fetchData}
+                    addLog={() => {}}
+                    viewMode="BRACKET"
+                  />
+                  <Link
+                    href={`/tournaments/${tournamentId}/bracket`}
+                    className="self-start text-[11px] font-black uppercase tracking-widest text-primary hover:text-primary-light transition-colors"
+                  >
+                    Open full bracket →
+                  </Link>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "builds" && (
             <motion.div
               key="builds"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
             >
               <TournamentBuildsPanel
                 tournamentId={tournamentId}
@@ -461,204 +667,9 @@ function TournamentViewContent() {
               />
             </motion.div>
           )}
-
-          {activeTab === "PLAYERS" && (
-            <motion.div 
-              key="players"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-12"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-4">
-                  <div className="h-[2px] w-12 bg-primary" />
-                  <span className="text-[10px] font-black text-primary/40 uppercase tracking-[0.6em]">PARTICIPANTS</span>
-                </div>
-                <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter italic">Tournament Roster</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {tournament.participants.map((p: any, idx: number) => (
-                  <div
-                    key={p.userId}
-                    className={`p-8 border border-component-border bg-component-background relative group hover:border-primary/40 transition-all ${p.status === "FORFEITED" ? "opacity-40" : ""}`}
-                  >
-                    <div className="absolute top-4 right-4 text-[8px] font-black text-white/10 group-hover:text-primary transition-colors">
-                      {String(idx + 1).padStart(2, '0')}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">SEED #{p.seed || idx + 1}</span>
-                      <span className="text-xl font-black text-white uppercase tracking-tighter truncate">{displayNameOf(p.user)}</span>
-                      <span className="text-[8px] font-black text-white/20 uppercase tracking-widest mt-2">
-                        {p.user.isGuest ? "GUEST" : "REGISTERED USER"}
-                      </span>
-                      {p.status === "FORFEITED" && (
-                        <span className="text-[8px] font-black text-white/40 uppercase tracking-widest mt-1">
-                          Forfeited
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {tournament.participants.length === 0 && (
-                  <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 bg-background">
-                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">No players registered for this tournament</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-
-
         </AnimatePresence>
       </main>
     </div>
-  );
-}
-
-function ExpansionModule({ label, data }: { label: string, data: { label: string, value: React.ReactNode }[] }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [syncProgress, setSyncProgress] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    let interval: any;
-    if (isHovered && !isExpanded) {
-      interval = setInterval(() => {
-        setSyncProgress(prev => {
-          if (prev >= 100) {
-            setIsExpanded(true);
-            return 100;
-          }
-          return prev + 2; 
-        });
-      }, 20);
-    } else if (!isHovered && !isExpanded) {
-      setSyncProgress(0);
-    }
-    return () => clearInterval(interval);
-  }, [isHovered, isExpanded]);
-
-  useEffect(() => {
-    if (!isHovered && isExpanded) {
-      setIsExpanded(false);
-      setSyncProgress(0);
-    }
-  }, [isHovered, isExpanded]);
-
-  useEffect(() => {
-    let cycleInterval: any;
-    if (!isExpanded) {
-      cycleInterval = setInterval(() => {
-        setActiveIndex(prev => (prev + 1) % data.length);
-      }, 3000);
-    }
-    return () => clearInterval(cycleInterval);
-  }, [isExpanded, data.length]);
-
-  return (
-    <motion.div 
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={() => {
-        setIsExpanded(!isExpanded);
-      }}
-      layout
-      className={`p-8 border-2 transition-all duration-500 cursor-pointer relative overflow-hidden min-h-[160px] flex flex-col justify-center ${
-        isExpanded ? "border-primary bg-primary/10" : "border-component-border bg-component-background hover:border-white/20"
-      }`}
-    >
-      {!isExpanded && isHovered && (
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${syncProgress}%` }}
-          className="absolute top-0 left-0 h-1 bg-primary shadow-[0_0_15px_rgba(82,185,70,0.5)] z-40" 
-        />
-      )}
-
-      {!isExpanded && (
-        <div className="absolute bottom-6 left-8 flex items-center gap-2 z-20">
-          {data.map((_, i) => (
-            <motion.div 
-              key={i}
-              animate={{ 
-                width: i === activeIndex ? 24 : 4,
-                backgroundColor: i === activeIndex ? "rgba(82, 185, 70, 1)" : "rgba(255, 255, 255, 0.1)"
-              }}
-              className="h-1 rounded-full transition-all duration-500"
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="relative z-10 flex flex-col gap-4">
-        <div className="flex justify-between items-baseline mb-2">
-          <span className={`text-[10px] font-black uppercase tracking-[0.3em] transition-colors ${isExpanded ? "text-primary" : "text-white/20"}`}>
-            {label}
-          </span>
-          <AnimatePresence mode="wait">
-            {!isExpanded ? (
-              <motion.span 
-                key="rotation"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-[8px] font-black text-white/10 uppercase tracking-widest italic"
-              >
-                {isHovered ? "Refreshing..." : "Auto-Refresh"}
-              </motion.span>
-            ) : (
-              <motion.span 
-                key="live"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-[8px] font-black text-primary uppercase tracking-widest italic flex items-center gap-2"
-              >
-                <div className="w-1 h-1 bg-primary rounded-full animate-ping" />
-                Live
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="relative">
-          <AnimatePresence mode="wait">
-            {isExpanded ? (
-              <motion.div 
-                key="expanded"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`grid gap-8 ${data.length > 2 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-2"}`}
-              >
-                {data.map((item, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    <span className="text-[8px] font-black text-primary/40 uppercase tracking-widest">{item.label}</span>
-                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-tighter italic">
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div 
-                key={activeIndex}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="flex flex-col gap-1"
-              >
-                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">{data[activeIndex].label}</span>
-                <span className="text-3xl font-black text-white/80 uppercase tracking-tighter italic">
-                  {data[activeIndex].value}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    </motion.div>
   );
 }
 
@@ -666,13 +677,7 @@ export default function TournamentViewPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <motion.div 
-          animate={{ opacity: [0.3, 1, 0.3] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="text-[10px] font-black text-primary uppercase tracking-[1em]"
-        >
-          Loading
-        </motion.div>
+        <SkeletonStatus label="Loading tournament" />
       </div>
     }>
       <TournamentViewContent />

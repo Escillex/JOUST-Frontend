@@ -87,7 +87,7 @@ export default function SettingsPanel() {
     }
   };
 
-  const label = "text-[10px] font-bold text-white/40 uppercase tracking-widest";
+  const label = "text-[10px] font-bold text-white/60 uppercase tracking-widest";
   const input =
     "w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded-sm placeholder:text-white/15";
 
@@ -99,7 +99,7 @@ export default function SettingsPanel() {
         <div className="flex items-baseline justify-between gap-3">
           <label className={label}>{f.label}</label>
           {setting?.secret && (
-            <span className="text-[9px] uppercase tracking-widest text-white/25">
+            <span className="text-[10px] uppercase tracking-widest text-white/25">
               {setting.configured ? "configured ••••" : "not set"}
             </span>
           )}
@@ -145,7 +145,7 @@ export default function SettingsPanel() {
 
       <div className="bg-background border border-white/10 p-6 space-y-6">
         <div>
-          <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Email delivery</h3>
+          <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Email delivery</h3>
           <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
             Stored in the database and applied without a restart. Values fall back to environment
             variables when blank. The password is encrypted at rest and cannot be read back.
@@ -182,14 +182,14 @@ export default function SettingsPanel() {
       </div>
 
       <div className="bg-background border border-white/10 p-6 space-y-6">
-        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Security</h3>
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Security</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
           {SECURITY_FIELDS.map(field)}
         </div>
       </div>
 
       <div className="bg-background border border-white/10 p-6 space-y-6">
-        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Google Sign-In</h3>
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Google Sign-In</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
           {GOOGLE_FIELDS.map(field)}
         </div>
@@ -197,8 +197,8 @@ export default function SettingsPanel() {
         {/* The setup a deployer does once, in their own Google account. The
             origin is read from the page, so it is exactly what Google needs. */}
         <div className="border border-white/5 bg-white/[0.02] p-5 space-y-3">
-          <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Getting a Client ID</p>
-          <ol className="text-[11px] text-white/40 leading-relaxed space-y-1.5 list-decimal list-inside">
+          <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Getting a Client ID</p>
+          <ol className="text-[11px] text-white/60 leading-relaxed space-y-1.5 list-decimal list-inside">
             <li>In Google Cloud Console, create (or pick) a project owned by whoever runs this site.</li>
             <li>APIs &amp; Services → OAuth consent screen: set the app name and support email your users should see.</li>
             <li>Credentials → Create credentials → OAuth client ID → <span className="text-white/70">Web application</span>.</li>

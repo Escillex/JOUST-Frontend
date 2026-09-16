@@ -109,6 +109,7 @@ function ProfileContent() {
                 isGuest: bundle.isGuest,
                 roles: bundle.roles,
                 createdAt: bundle.memberSince,
+                games: bundle.games,
               },
         );
 

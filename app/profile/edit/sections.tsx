@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { AccountSecurity } from "../../tournaments/types";
+import type { AccountSecurity, GamePlayed } from "../../tournaments/types";
 import BioEditor from "../../components/profile/BioEditor";
 import ShowcaseEditor from "../../components/profile/ShowcaseEditor";
 import GalleryEditor from "../../components/profile/GalleryEditor";
@@ -11,6 +11,7 @@ import EmailSection from "../../components/settings/EmailSection";
 import PasswordSection from "../../components/settings/PasswordSection";
 import SecuritySection from "../../components/settings/SecuritySection";
 import DeleteSection from "../../components/settings/DeleteSection";
+import GamesSection from "../../components/settings/GamesSection";
 
 /**
  * The settings, in order, and how each one renders. Both device views read
@@ -18,7 +19,7 @@ import DeleteSection from "../../components/settings/DeleteSection";
  * at a time — so a section added here appears in both, which is exactly what
  * the two separate trees tend to get wrong.
  */
-export type SectionKey = "picture" | "showcase" | "gallery" | "name" | "email" | "password" | "security" | "delete";
+export type SectionKey = "picture" | "games" | "showcase" | "gallery" | "name" | "email" | "password" | "security" | "delete";
 
 export interface SectionItem {
   key: SectionKey;
@@ -33,6 +34,7 @@ export const GROUPS: { label: string | null; items: SectionItem[] }[] = [
     label: "Public profile",
     items: [
       { key: "picture", label: "Picture and bio" },
+      { key: "games", label: "Games I play" },
       { key: "showcase", label: "Showcase" },
       { key: "gallery", label: "Gallery" },
     ],
@@ -64,6 +66,7 @@ export interface SettingsUser {
   bio?: string | null;
   isGuest?: boolean;
   googleLinked?: boolean;
+  games?: GamePlayed[];
 }
 
 export interface SectionContext {
@@ -102,6 +105,8 @@ export function renderSection(key: SectionKey, ctx: SectionContext): React.React
           <BioEditor key={user.id} initial={user.bio} onSaved={ctx.refreshUser} />
         </div>
       );
+    case "games":
+      return <GamesSection key={user.id} games={user.games} onSaved={ctx.refreshUser} />;
     case "showcase":
       return <ShowcaseEditor handle={user.id} />;
     case "gallery":

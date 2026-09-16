@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { displayNameOf, handleOf, profileHref } from "../../../utils/api";
 import ProfileAvatar from "../../../components/profile/ProfileAvatar";
+import PlaysRow from "../../../components/profile/PlaysRow";
 import Showcase from "../../../components/profile/Showcase";
 import ProfileActions from "../../../components/profile/ProfileActions";
 import StatsStrip from "../../../components/profile/StatsStrip";
@@ -56,6 +57,8 @@ export default function MobileView(p: ProfileViewProps) {
       <Showcase awards={p.awards} isOwnProfile={p.isOwnProfile} profileUrl={profileUrl} compact />
 
       {user.bio && <p className="text-sm leading-relaxed text-white/75 whitespace-pre-line break-words">{user.bio}</p>}
+
+      <PlaysRow games={user.games} />
 
       <ProfileActions isOwnProfile={p.isOwnProfile} onAward={p.onAward} />
 

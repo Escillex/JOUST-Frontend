@@ -61,7 +61,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Accounts
             </h2>
-            <p className="text-[10px] text-white/40 font-medium uppercase mt-1 tracking-widest">{filteredUsers.length} shown</p>
+            <p className="text-[10px] text-white/60 font-medium uppercase mt-1 tracking-widest">{filteredUsers.length} shown</p>
           </div>
           <div className="flex gap-3">
             <AnimatePresence>
@@ -90,9 +90,9 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 px-10 py-3 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50 focus:bg-white/[0.07] transition-all rounded-md"
+              className="w-full bg-white/5 border border-white/10 px-10 py-3 text-xs text-white placeholder:text-white/60 focus:outline-none focus:border-primary/50 focus:bg-white/[0.07] transition-all rounded-md"
             />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
@@ -101,7 +101,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
               <button 
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 md:px-4 py-2 text-[9px] font-bold uppercase tracking-widest transition-all rounded ${filter === f ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
+                className={`px-3 md:px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded ${filter === f ? "bg-white/10 text-white" : "text-white/60 hover:text-white/60"}`}
               >
                 {f}
               </button>
@@ -123,9 +123,9 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                   className="w-4 h-4 bg-background border-2 border-white/20 rounded cursor-pointer accent-primary"
                 />
               </th>
-              <th className="px-6 py-4 text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">User Identity</th>
-              <th className="px-6 py-4 w-48 text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Access Level</th>
-              <th className="px-6 py-4 w-48 text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] text-right">Actions</th>
+              <th className="px-6 py-4 text-[10px] font-bold text-white/60 uppercase tracking-[0.2em]">User Identity</th>
+              <th className="px-6 py-4 w-48 text-[10px] font-bold text-white/60 uppercase tracking-[0.2em]">Access Level</th>
+              <th className="px-6 py-4 w-48 text-[10px] font-bold text-white/60 uppercase tracking-[0.2em] text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.03]">
@@ -149,25 +149,25 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 shrink-0 rounded flex items-center justify-center text-xs font-black border transition-all ${u.isGuest ? "bg-white/5 text-white/30 border-white/10" : "bg-primary/10 text-primary border-primary/20"}`}>
+                      <div className={`w-10 h-10 shrink-0 rounded flex items-center justify-center text-xs font-black border transition-all ${u.isGuest ? "bg-white/5 text-white/60 border-white/10" : "bg-primary/10 text-primary border-primary/20"}`}>
                         {u.username ? u.username[0].toUpperCase() : "?"}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-[13px] font-bold text-white flex items-center gap-2 truncate">
                           {u.username || "Unknown User"}
-                          {u.isGuest && <span className="text-[7px] border border-primary/40 px-1 py-0.5 text-primary uppercase tracking-tighter rounded font-black bg-primary/5">GUEST</span>}
+                          {u.isGuest && <span className="text-[10px] border border-primary/40 px-1 py-0.5 text-primary uppercase tracking-tighter rounded font-black bg-primary/5">GUEST</span>}
                         </div>
-                        <div className="text-[10px] text-white/30 truncate font-mono tracking-tight">{u.email || "No Email Provided"}</div>
+                        <div className="text-[10px] text-white/60 truncate font-mono tracking-tight">{u.email || "No Email Provided"}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1.5">
                       {u.roles?.map(r => (
-                        <span key={r} className={`text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-sm border ${
+                        <span key={r} className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-sm border ${
                           r === 'ADMIN' ? 'text-red-500 border-red-500/20 bg-red-500/10' :
                           r === 'ORGANIZER' ? 'text-amber-400 border-amber-400/20 bg-amber-400/10' :
-                          'text-white/40 border-white/10 bg-white/5'
+                          'text-white/60 border-white/10 bg-white/5'
                         }`}>
                           {r}
                         </span>
@@ -194,7 +194,7 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                       )}
                       <button 
                         onClick={() => onEdit(u)} 
-                        className="text-[10px] font-bold text-white/40 hover:text-white uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                        className="text-[10px] font-bold text-white/60 hover:text-white uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
                       >
                         Edit
                       </button>

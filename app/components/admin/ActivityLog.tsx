@@ -46,7 +46,7 @@ const CATEGORY_TONE: Record<string, string> = {
   STAFF: "text-violet-400 border-violet-400/30",
   USER: "text-amber-400 border-amber-400/30",
   AWARD: "text-yellow-300 border-yellow-300/30",
-  CATALOG: "text-white/50 border-white/15",
+  CATALOG: "text-white/60 border-white/15",
   SYSTEM: "text-[#FF4D4D] border-[#FF4D4D]/30",
 };
 
@@ -125,8 +125,8 @@ export default function ActivityLog() {
     <div className="bg-background border border-white/10 p-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Activity Log</h3>
-          <p className="text-xs text-white/30 mt-1">
+          <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Activity Log</h3>
+          <p className="text-xs text-white/60 mt-1">
             Every organizer and admin action, newest first. Recorded only after the action succeeded.
           </p>
         </div>
@@ -135,12 +135,12 @@ export default function ActivityLog() {
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Search people, tournaments, actions"
-            className="flex-1 sm:w-72 h-9 bg-black border border-white/10 px-3 text-xs text-white focus:outline-none focus:border-primary placeholder:text-white/20"
+            className="flex-1 sm:w-72 h-9 bg-black border border-white/10 px-3 text-xs text-white focus:outline-none focus:border-primary placeholder:text-white/60"
           />
           <button
             onClick={() => void load()}
             disabled={loading}
-            className="h-9 px-4 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white hover:border-white/30 disabled:opacity-40"
+            className="h-9 px-4 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white hover:border-white/30 disabled:opacity-40"
           >
             Refresh
           </button>
@@ -152,8 +152,8 @@ export default function ActivityLog() {
           <button
             key={value || "all"}
             onClick={() => setCategory(value)}
-            className={`px-3 py-1 text-[9px] font-bold uppercase tracking-widest border transition-all ${
-              category === value ? "bg-primary text-black border-primary" : "border-white/10 text-white/40 hover:text-white hover:border-white/30"
+            className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border transition-all ${
+              category === value ? "bg-primary text-black border-primary" : "border-white/10 text-white/60 hover:text-white hover:border-white/30"
             }`}
           >
             {label}
@@ -164,16 +164,16 @@ export default function ActivityLog() {
       {failed ? (
         <p className="text-xs text-[#FF4D4D]">Could not load the activity log. Check the connection and refresh.</p>
       ) : loading ? (
-        <p className="text-xs text-white/30 py-8 text-center">Loading activity…</p>
+        <p className="text-xs text-white/60 py-8 text-center">Loading activity…</p>
       ) : entries.length === 0 ? (
-        <p className="text-xs text-white/30 py-8 text-center">
+        <p className="text-xs text-white/60 py-8 text-center">
           {query || category ? "Nothing matches these filters." : "No actions recorded yet."}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[720px]">
             <thead>
-              <tr className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/30 border-b border-white/10">
+              <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 border-b border-white/10">
                 <th className="py-2 pr-4 w-28">When</th>
                 <th className="py-2 pr-4 w-44">Who</th>
                 <th className="py-2 pr-4">What</th>
@@ -183,26 +183,26 @@ export default function ActivityLog() {
             <tbody className="divide-y divide-white/5">
               {entries.map((e) => (
                 <tr key={e.id} className="align-top hover:bg-white/[0.02]">
-                  <td className="py-2.5 pr-4 text-[11px] text-white/40 whitespace-nowrap" title={new Date(e.createdAt).toLocaleString()}>
+                  <td className="py-2.5 pr-4 text-[11px] text-white/60 whitespace-nowrap" title={new Date(e.createdAt).toLocaleString()}>
                     {ago(e.createdAt)}
                   </td>
                   <td className="py-2.5 pr-4">
                     <p className="text-xs text-white font-semibold truncate">{e.actorName}</p>
-                    <p className="text-[9px] uppercase tracking-widest text-white/30">{roleOf(e.actorRoles)}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/60">{roleOf(e.actorRoles)}</p>
                   </td>
                   <td className="py-2.5 pr-4 text-xs text-white/80 leading-relaxed">
                     {e.summary}
                     {e.tournamentId && (
                       <Link
                         href={`/tournaments/${e.tournamentId}/report`}
-                        className="ml-2 text-[9px] font-bold uppercase tracking-widest text-white/30 hover:text-primary"
+                        className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-primary"
                       >
                         Report →
                       </Link>
                     )}
                   </td>
                   <td className="py-2.5 text-right">
-                    <span className={`text-[8px] font-bold uppercase tracking-widest border px-1.5 py-0.5 ${CATEGORY_TONE[e.category] ?? "text-white/40 border-white/10"}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 ${CATEGORY_TONE[e.category] ?? "text-white/60 border-white/10"}`}>
                       {e.category.toLowerCase()}
                     </span>
                   </td>
@@ -217,7 +217,7 @@ export default function ActivityLog() {
         <button
           onClick={more}
           disabled={loadingMore}
-          className="w-full py-2.5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white hover:border-white/30 disabled:opacity-40"
+          className="w-full py-2.5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white hover:border-white/30 disabled:opacity-40"
         >
           {loadingMore ? "Loading…" : "Load older entries"}
         </button>

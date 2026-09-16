@@ -40,7 +40,7 @@ export interface AnalyticsOverview {
 const ACCENT = "#52B946";
 const WINDOWS = [6, 12, 24] as const;
 
-const SECTION = "text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]";
+const SECTION = "text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]";
 const PANEL = "bg-background border border-white/10 p-6 space-y-6";
 
 /** Durations read as minutes until they stop being useful as minutes. */
@@ -79,14 +79,14 @@ function MonthlyColumns({ title, points, valueOf }: {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <h4 className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">{title}</h4>
-        <span className="text-[10px] text-white/30 tabular-nums">{total.toLocaleString()} total</span>
+        <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">{title}</h4>
+        <span className="text-[10px] text-white/60 tabular-nums">{total.toLocaleString()} total</span>
       </div>
 
       {/* Hairline baseline, one step off the surface, solid — never dashed. */}
       <div className="relative h-24 border-b border-white/10">
         {total === 0 ? (
-          <p className="absolute inset-0 flex items-center justify-center text-[10px] text-white/20 uppercase tracking-widest">
+          <p className="absolute inset-0 flex items-center justify-center text-[10px] text-white/60 uppercase tracking-widest">
             No activity in this window
           </p>
         ) : (
@@ -115,7 +115,7 @@ function MonthlyColumns({ title, points, valueOf }: {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-[9px] text-white/25 tracking-widest tabular-nums">
+      <div className="flex items-center justify-between text-[10px] text-white/25 tracking-widest tabular-nums">
         <span>{points.length ? monthLabel(points[0].month) : ""}</span>
         {/* Direct label only where it earns its place: the month under the cursor,
             falling back to the peak rather than labelling all twelve columns. */}
@@ -137,7 +137,7 @@ function BarRows({ rows, emptyLabel }: {
   emptyLabel: string;
 }) {
   const max = Math.max(...rows.map((r) => r.value), 1);
-  if (rows.length === 0) return <p className="text-xs text-white/30">{emptyLabel}</p>;
+  if (rows.length === 0) return <p className="text-xs text-white/60">{emptyLabel}</p>;
   return (
     <div className="space-y-3">
       {rows.map((r) => (
@@ -189,7 +189,7 @@ export default function AnalyticsPanel() {
   if (!data) {
     return (
       <div className={PANEL}>
-        <p className="text-xs text-white/40">{loading ? "Loading analytics…" : error ?? "No data."}</p>
+        <p className="text-xs text-white/60">{loading ? "Loading analytics…" : error ?? "No data."}</p>
       </div>
     );
   }
@@ -207,16 +207,16 @@ export default function AnalyticsPanel() {
           all-time. A control that looks like it filters the page but only moves
           one chart is worse than no control, so it says what it does. */}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <p className="text-xs text-white/30">
+        <p className="text-xs text-white/60">
           Aggregated server-side · generated {new Date(data.generatedAt).toLocaleString()}
         </p>
         <div className="flex items-center gap-2" role="group" aria-label="Timeline window">
-          <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em]">Timeline</span>
+          <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Timeline</span>
           {WINDOWS.map((w) => (
             <button key={w} onClick={() => setMonths(w)}
                     aria-pressed={months === w}
                     className={`px-3 h-8 text-[10px] font-black uppercase tracking-widest border transition-colors ${
-                      months === w ? "bg-primary text-black border-primary" : "border-white/10 text-white/50 hover:border-white/30"
+                      months === w ? "bg-primary text-black border-primary" : "border-white/10 text-white/60 hover:border-white/30"
                     }`}>
               {w}M
             </button>
@@ -231,7 +231,7 @@ export default function AnalyticsPanel() {
         <div className="bg-background border border-white/10 p-6 lg:col-span-1">
           <p className={SECTION}>Tournaments run</p>
           <p className="text-6xl font-black text-primary leading-none mt-4 font-poppins">{summary.tournaments.total.toLocaleString()}</p>
-          <p className="text-[11px] text-white/30 mt-3">
+          <p className="text-[11px] text-white/60 mt-3">
             {(summary.tournaments.byStatus.COMPLETED ?? 0).toLocaleString()} completed ·{" "}
             {(summary.tournaments.byStatus.ONGOING ?? 0).toLocaleString()} ongoing
           </p>
@@ -245,7 +245,7 @@ export default function AnalyticsPanel() {
             <div key={t.label} className="bg-background border border-white/10 p-6">
               <p className={SECTION}>{t.label}</p>
               <p className="text-4xl font-black text-white leading-none mt-4 font-poppins">{t.value.toLocaleString()}</p>
-              <p className="text-[11px] text-white/30 mt-3">{t.note}</p>
+              <p className="text-[11px] text-white/60 mt-3">{t.note}</p>
             </div>
           ))}
         </div>
@@ -256,7 +256,7 @@ export default function AnalyticsPanel() {
         <div className="flex items-center justify-between gap-3">
           <h3 className={SECTION}>Activity over time · last {data.months} months</h3>
           <button onClick={() => setShowTable((v) => !v)}
-                  className="text-[9px] font-black text-primary uppercase tracking-widest hover:brightness-125">
+                  className="text-[10px] font-black text-primary uppercase tracking-widest hover:brightness-125">
             {showTable ? "Show charts" : "Show data table"}
           </button>
         </div>
@@ -265,7 +265,7 @@ export default function AnalyticsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-white/40 text-left">
+                <tr className="text-white/60 text-left">
                   <th className="py-2 pr-4 font-semibold">Month</th>
                   <th className="py-2 pr-4 font-semibold text-right">Signups</th>
                   <th className="py-2 pr-4 font-semibold text-right">Created</th>
@@ -359,40 +359,40 @@ export default function AnalyticsPanel() {
         <h3 className={SECTION}>Operational health · all time</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div>
-            <p className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Median match length</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Median match length</p>
             <p className="text-3xl font-black text-white leading-none mt-3 font-poppins">
               {formatMinutes(operations.duration.medianMinutes)}
             </p>
-            <p className="text-[11px] text-white/30 mt-2">
+            <p className="text-[11px] text-white/60 mt-2">
               {operations.duration.samples > 0
                 ? `p90 ${formatMinutes(operations.duration.p90Minutes)} · ${operations.duration.samples.toLocaleString()} timed`
                 : "No timed matches yet"}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Matches in progress</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Matches in progress</p>
             <p className="text-3xl font-black text-white leading-none mt-3 font-poppins">
               {operations.matches.ongoing.toLocaleString()}
             </p>
-            <p className="text-[11px] text-white/30 mt-2">
+            <p className="text-[11px] text-white/60 mt-2">
               {operations.matches.pending.toLocaleString()} not started yet
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Matches played</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Matches played</p>
             <p className="text-3xl font-black text-white leading-none mt-3 font-poppins">
               {operations.matches.completed.toLocaleString()}
             </p>
-            <p className="text-[11px] text-white/30 mt-2">
+            <p className="text-[11px] text-white/60 mt-2">
               {operations.matches.byes.toLocaleString()} resolved as byes
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Forfeit rate</p>
+            <p className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Forfeit rate</p>
             <p className="text-3xl font-black text-white leading-none mt-3 font-poppins">
               {operations.forfeits.rate}%
             </p>
-            <p className="text-[11px] text-white/30 mt-2">
+            <p className="text-[11px] text-white/60 mt-2">
               {operations.forfeits.participants.toLocaleString()} of {summary.participation.entries.toLocaleString()} entries
             </p>
           </div>
@@ -406,8 +406,8 @@ export default function AnalyticsPanel() {
             { label: "Tournaments running for more than 30 days", value: operations.stalled.tournamentsOngoingOver30d },
           ].map((row) => (
             <div key={row.label} className="flex items-baseline justify-between gap-4">
-              <span className="text-[11px] text-white/40">{row.label}</span>
-              <span className={`text-sm tabular-nums ${row.value > 0 ? "text-[#FFCC00]" : "text-white/40"}`}>
+              <span className="text-[11px] text-white/60">{row.label}</span>
+              <span className={`text-sm tabular-nums ${row.value > 0 ? "text-[#FFCC00]" : "text-white/60"}`}>
                 {row.value > 0 ? `⚠ ${row.value.toLocaleString()}` : "0"}
               </span>
             </div>
@@ -429,7 +429,7 @@ export default function AnalyticsPanel() {
         <h3 className={SECTION}>Player engagement · all time</h3>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="space-y-4">
-            <h4 className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Tournaments entered per player</h4>
+            <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Tournaments entered per player</h4>
             <BarRows
               emptyLabel="No entries yet."
               rows={engagement.participationDistribution.map((d) => ({
@@ -441,16 +441,16 @@ export default function AnalyticsPanel() {
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Players who came back</h4>
+            <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Players who came back</h4>
             <p className="text-4xl font-black text-white leading-none font-poppins">{engagement.returning.returnRate}%</p>
-            <p className="text-[11px] text-white/30 leading-relaxed">
+            <p className="text-[11px] text-white/60 leading-relaxed">
               {engagement.returning.repeat.toLocaleString()} of {engagement.returning.players.toLocaleString()} registered
               players have entered more than one tournament.
             </p>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-bold text-white/50 uppercase tracking-[0.15em]">Recent activity</h4>
+            <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-[0.15em]">Recent activity</h4>
             {/* Part-to-whole with three known parts, so a labelled stacked bar
                 reads faster than three separate tiles. 2px surface gaps, not borders. */}
             <div className="flex h-1.5 w-full gap-[2px]">
@@ -469,7 +469,7 @@ export default function AnalyticsPanel() {
                 { label: "Dormant (90+ days)", value: act.dormant },
               ].map((r) => (
                 <div key={r.label} className="flex justify-between gap-3">
-                  <dt className="text-white/40">{r.label}</dt>
+                  <dt className="text-white/60">{r.label}</dt>
                   <dd className="text-white tabular-nums">{r.value.toLocaleString()}</dd>
                 </div>
               ))}

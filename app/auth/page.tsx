@@ -5,12 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { API_ENDPOINTS, API_URL, safeJson } from "../utils/api";
+import { API_ENDPOINTS, API_URL, authenticatedFetch, safeJson } from "../utils/api";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";
 import Footer from "../components/Footer";
 
 import { useUser } from "../components/UserProvider";
 import GoogleButton from "../components/auth/GoogleButton";
+import GamesPicker from "../components/profile/GamesPicker";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -34,6 +35,13 @@ export default function AuthPage() {
   const [usingRecovery, setUsingRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
+  // The one screen a brand-new account sees before the app: which games do you
+  // play. Skippable, and only ever on the first session — an ordinary sign-in
+  // never reaches it. What it picks orders the tournament list.
+  const [pickingGames, setPickingGames] = useState(false);
+  const [pickedGames, setPickedGames] = useState<string[]>([]);
+  const [savingGames, setSavingGames] = useState(false);
 
   // A password an admin (or the seed) chose buys one sign-in, spent replacing
   // it. The server hands back a single-purpose token instead of a session, so
@@ -84,7 +92,11 @@ export default function AuthPage() {
       }
       if (data?.token) localStorage.setItem("token", data.token);
       await refreshUser();
-      setMessage(data?.created ? "Success: Account created with Google" : "Success: Signed in with Google");
+      if (data?.created) {
+        setPickingGames(true);
+        return;
+      }
+      setMessage("Success: Signed in with Google");
       setTimeout(() => router.push("/home"), 600);
     } catch {
       setMessage("Error: Failed to connect to server");
@@ -449,7 +461,65 @@ export default function AuthPage() {
 
           <FadeIn>
             <div className="bg-component-background border-4 border-white p-8 md:p-10 relative shadow-[16px_16px_0px_0px_rgba(82,185,70,0.1)] overflow-hidden min-h-[500px] flex flex-col justify-center">
-              {showSignupSuccess ? (
+              {pickingGames ? (
+                /* First session only. Skippable on purpose: nothing downstream
+                   requires an answer, it only orders the tournament list. */
+                <div className="flex flex-col gap-6">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                      Account created
+                    </span>
+                    <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight leading-none">
+                      Which games do you play?
+                    </h2>
+                    <p className="text-xs text-white/50 leading-relaxed">
+                      Tournaments for these show up first. You can change this any time in Settings.
+                    </p>
+                  </div>
+
+                  <GamesPicker value={pickedGames} onChange={setPickedGames} disabled={savingGames} />
+
+                  <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      disabled={savingGames}
+                      onClick={async () => {
+                        if (pickedGames.length === 0) {
+                          router.push("/home");
+                          return;
+                        }
+                        setSavingGames(true);
+                        const res = await authenticatedFetch(API_ENDPOINTS.AUTH.ME, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ gameIds: pickedGames }),
+                        });
+                        setSavingGames(false);
+                        // A failed save must not trap somebody on a screen they
+                        // can skip anyway — the setting is in Settings too.
+                        if (!res.ok) setMessage("Error: Could not save your games. You can set them in Settings.");
+                        await refreshUser();
+                        router.push("/home");
+                      }}
+                      className="h-12 bg-primary text-black font-black text-xs uppercase tracking-widest hover:brightness-90 transition-all disabled:opacity-50"
+                    >
+                      {savingGames
+                        ? "Saving…"
+                        : pickedGames.length > 0
+                          ? `Continue · ${pickedGames.length} picked`
+                          : "Continue"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingGames}
+                      onClick={() => router.push("/home")}
+                      className="h-11 text-[11px] font-black uppercase tracking-widest text-white/50 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
+                </div>
+              ) : showSignupSuccess ? (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -544,7 +614,7 @@ export default function AuthPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => router.push("/home")}
+                      onClick={() => { setRecoveryCodes(null); setPickingGames(true); }}
                       className="flex-1 h-12 bg-primary text-black font-black text-xs uppercase tracking-widest hover:brightness-90 transition-all"
                     >
                       I have saved them

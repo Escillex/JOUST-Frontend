@@ -130,6 +130,9 @@ export interface Tournament {
     /** ACTIVE by default; FORFEITED when the organizer removed the player from a
      *  live tournament. Forfeited players are shown tagged and non-actionable. */
     status?: "ACTIVE" | "FORFEITED";
+    /** Final rank, written for every participant when the tournament completes
+     *  (1 = champion). Null on tournaments that predate placement persistence. */
+    placement?: number | null;
     user: {
       id: string;
       /** The `@handle`. Render people via `displayNameOf()`, not this. */
@@ -137,6 +140,10 @@ export interface Tournament {
       displayName?: string | null;
       email: string;
       isGuest?: boolean;
+      /** Served by GET /tournaments/:id so the roster can show faces and link
+       *  to profiles. Both are public on the profile already. */
+      avatarUrl?: string | null;
+      slug?: string | null;
     };
   }[];
   rounds?: {
@@ -170,6 +177,16 @@ export interface Tournament {
       loserNextMatchId?: string | null;
     }[];
   }[];
+  /** When the last match actually finished (2026-09-10). Distinct from `date`,
+   *  which is when it was scheduled to start. */
+  completedAt?: string | null;
+  /** The champion, once there is one. Served by every tournament listing. */
+  winner?: {
+    id?: string;
+    username: string;
+    displayName?: string | null;
+    isGuest?: boolean;
+  } | null;
   formatConfig?: FormatConfig;
   // Fields for UI
   bannerUrl?: string | null;
@@ -281,6 +298,11 @@ export interface LeaderboardStats {
 
 /** The subset of a user record the profile screens render. `email` is only
  *  present when the viewer is entitled to see it. */
+/** A game somebody says they play — the flattened `UserGame` join the server
+ *  serves on `/auth/me` and the public profile. Self-declared interest, not
+ *  earned history (that is `stats`). */
+export type GamePlayed = Pick<Game, "id" | "name" | "iconUrl">;
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -293,6 +315,8 @@ export interface UserProfile {
   isGuest?: boolean;
   avatarUrl?: string | null;
   createdAt?: string;
+  /** The games this person says they play. Ordered oldest-declared first. */
+  games?: GamePlayed[];
 }
 
 /** Mirrors AwardKind (server/prisma/schema.prisma). A MEDAL is a square a user

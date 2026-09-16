@@ -189,8 +189,8 @@ export default function PresetManager() {
       .catch(() => undefined);
   }, []);
 
-  const labelCls = "text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block";
-  const deeperLabelCls = "text-[10px] font-black text-white/20 uppercase tracking-widest mb-1 block";
+  const labelCls = "text-[10px] font-black text-white/60 uppercase tracking-widest mb-1 block";
+  const deeperLabelCls = "text-[10px] font-black text-white/60 uppercase tracking-widest mb-1 block";
   const inputCls = "w-full bg-background border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary transition-all cursor-pointer hover:bg-white/[0.02]";
 
   return (
@@ -202,7 +202,7 @@ export default function PresetManager() {
             if (isCreating) resetForm();
             setIsCreating(!isCreating);
           }}
-          className="px-4 py-1.5 bg-primary/10 border border-primary/20 text-[9px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
+          className="px-4 py-1.5 bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
         >
           {isCreating ? "CANCEL" : "+ CREATE PRESET"}
         </button>
@@ -240,7 +240,7 @@ export default function PresetManager() {
               {games.length === 0 && (
                 // Creating a game from inside the preset form is how half-made
                 // catalog entries happen; Catalog > Games is one tab away.
-                <p className="text-[9px] text-white/30 mt-1.5 leading-relaxed">
+                <p className="text-[10px] text-white/60 mt-1.5 leading-relaxed">
                   No games in the catalog yet. Add one under Catalog &rsaquo; Games.
                 </p>
               )}
@@ -255,7 +255,7 @@ export default function PresetManager() {
           <div className={`space-y-8 transition-all duration-700 ${system === "HYBRID" ? "opacity-20 grayscale blur-sm pointer-events-none" : "opacity-100"}`}>
             <div className="grid grid-cols-2 gap-12 pt-4 border-t border-white/5">
               <div className="space-y-4">
-                <div className="text-[9px] font-black text-white/[0.08] uppercase tracking-widest border-b border-white/5 pb-2">Structure</div>
+                <div className="text-[10px] font-black text-white/[0.08] uppercase tracking-widest border-b border-white/5 pb-2">Structure</div>
                 <div>
                   <label className={deeperLabelCls}>Best Of</label>
                   <input 
@@ -283,10 +283,10 @@ export default function PresetManager() {
                     <button
                       type="button"
                       onClick={() => setSeedingMode("RANDOM")}
-                      className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                      className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                         seedingMode === "RANDOM"
                           ? "bg-primary/10 border-primary text-primary"
-                          : "bg-background border-white/10 text-white/40 hover:text-white"
+                          : "bg-background border-white/10 text-white/60 hover:text-white"
                       }`}
                     >
                       Random Draw
@@ -294,16 +294,16 @@ export default function PresetManager() {
                     <button
                       type="button"
                       onClick={() => setSeedingMode("MANUAL")}
-                      className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                      className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                         seedingMode === "MANUAL"
                           ? "bg-primary/10 border-primary text-primary"
-                          : "bg-background border-white/10 text-white/40 hover:text-white"
+                          : "bg-background border-white/10 text-white/60 hover:text-white"
                       }`}
                     >
                       Manual Seeding
                     </button>
                   </div>
-                  <p className="text-[9px] text-white/30 leading-relaxed">
+                  <p className="text-[10px] text-white/60 leading-relaxed">
                     {seedingMode === "RANDOM"
                       ? "The field is drawn at random when the tournament starts. Any seed order set on the roster is ignored."
                       : "The bracket follows the seed order arranged on the roster. Unseeded entrants are placed last."}
@@ -312,7 +312,7 @@ export default function PresetManager() {
               </div>
 
               <div className="space-y-4">
-                <div className="text-[9px] font-black text-white/10 uppercase tracking-widest border-b border-white/5 pb-2">Advanced</div>
+                <div className="text-[10px] font-black text-white/60 uppercase tracking-widest border-b border-white/5 pb-2">Advanced</div>
                 <div className="flex items-center space-x-2 pt-2">
                   <input 
                     type="checkbox" 
@@ -381,10 +381,10 @@ export default function PresetManager() {
                       <button
                         type="button"
                         onClick={() => setAllowDraw(false)}
-                        className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                        className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                           !allowDraw
                             ? "bg-primary/10 border-primary text-primary"
-                            : "bg-background border-white/10 text-white/40 hover:text-white"
+                            : "bg-background border-white/10 text-white/60 hover:text-white"
                         }`}
                       >
                         Force Win
@@ -392,10 +392,10 @@ export default function PresetManager() {
                       <button
                         type="button"
                         onClick={() => setAllowDraw(true)}
-                        className={`flex-1 h-9 text-[9px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                        className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
                           allowDraw
                             ? "bg-primary/10 border-primary text-primary"
-                            : "bg-background border-white/10 text-white/40 hover:text-white"
+                            : "bg-background border-white/10 text-white/60 hover:text-white"
                         }`}
                       >
                         Permit Draws
@@ -405,7 +405,7 @@ export default function PresetManager() {
                       /* Inert combination: the backend rejects a winnerless
                          submit for a series or a threshold-scored match, so the
                          Draw control would never appear during scoring. */
-                      <p className="text-[9px] text-[#FFB020] leading-relaxed">
+                      <p className="text-[10px] text-[#FFB020] leading-relaxed">
                         Inert with {bestOf > 1 ? "a best-of series" : "point-threshold scoring"} — set Best Of to 1
                         {pointsThreshold > 0 ? " and clear the threshold" : ""} for draws to be offered.
                       </p>
@@ -486,19 +486,19 @@ export default function PresetManager() {
                <div className="flex items-start justify-between mb-4">
                  <div>
                    <h4 className="text-xs font-black text-white uppercase tracking-widest">{tpl.name}</h4>
-                   <span className="text-[8px] font-black text-primary/60 uppercase tracking-[0.2em]">{tpl.system.replace(/_/g, " ")}</span>
+                   <span className="text-[10px] font-black text-primary/60 uppercase tracking-[0.2em]">{tpl.system.replace(/_/g, " ")}</span>
                  </div>
-                  <button onClick={() => handleDelete(tpl.id)} disabled={deletingId === tpl.id} className="text-[10px] text-white/40 hover:text-red-500 transition-colors relative z-20 p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none">{deletingId === tpl.id ? "…" : "✕"}</button>
+                  <button onClick={() => handleDelete(tpl.id)} disabled={deletingId === tpl.id} className="text-[10px] text-white/60 hover:text-red-500 transition-colors relative z-20 p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none">{deletingId === tpl.id ? "…" : "✕"}</button>
                </div>
                
-               <p className="text-[9px] text-white/40 leading-relaxed italic mb-4 line-clamp-2">
+               <p className="text-[10px] text-white/60 leading-relaxed italic mb-4 line-clamp-2">
                  {tpl.description || "No technical specification provided."}
                </p>
              </div>
 
              <div className="flex items-center justify-between border-t border-white/5 pt-4">
                   <div className="flex flex-col relative z-20">
-                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Game</span>
+                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Game</span>
                     {editingGameId === tpl.id ? (
                       <div className="flex items-center gap-1 mt-0.5">
                         <select
@@ -506,7 +506,7 @@ export default function PresetManager() {
                           value={editGameValue}
                           onChange={e => setEditGameValue(e.target.value)}
                           onKeyDown={e => { if (e.key === "Escape") setEditingGameId(null); }}
-                          className="w-32 bg-background border border-white/10 px-1.5 py-0.5 text-[8px] font-bold text-primary focus:outline-none focus:border-primary"
+                          className="w-32 bg-background border border-white/10 px-1.5 py-0.5 text-[10px] font-bold text-primary focus:outline-none focus:border-primary"
                         >
                           <option value="" className="bg-background">No game</option>
                           {games.map(g => (
@@ -514,23 +514,23 @@ export default function PresetManager() {
                           ))}
                         </select>
                         <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] text-primary hover:text-white px-1">✓</button>
-                        <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/40 hover:text-white px-1">✕</button>
+                        <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/60 hover:text-white px-1">✕</button>
                       </div>
                     ) : (
                       <button
                         onClick={() => { setEditingGameId(tpl.id); setEditGameValue(tpl.game?.id || ""); }}
                         title="Change the game"
-                        className="text-[8px] font-bold text-primary text-left hover:underline decoration-primary/40 underline-offset-2"
+                        className="text-[10px] font-bold text-primary text-left hover:underline decoration-primary/40 underline-offset-2"
                       >
                         {tpl.game?.name
                           ?? (tpl.gameName ? `${tpl.gameName} (legacy)` : "No game")}{" "}
-                        <span className="text-white/30">✎</span>
+                        <span className="text-white/60">✎</span>
                       </button>
                     )}
                   </div>
                  <div className="flex flex-col text-right">
-                   <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Best Of</span>
-                   <span className="text-[8px] font-bold text-white/60">{tpl.config?.bestOf || 1} wins</span>
+                   <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Best Of</span>
+                   <span className="text-[10px] font-bold text-white/60">{tpl.config?.bestOf || 1} wins</span>
                  </div>
                </div>
           </div>

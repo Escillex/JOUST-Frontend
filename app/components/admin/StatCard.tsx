@@ -22,7 +22,7 @@ export default function StatCard({ title, value, subtitle, color = "text-white",
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
       <div className="flex items-center justify-between relative z-10">
-        <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none">
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em] leading-none">
           {title}
         </h3>
         <div className={`w-1.5 h-1.5 rounded-full ${color.replace('text-', 'bg-')} opacity-50 group-hover:opacity-100 transition-opacity shadow-[0_0_8px_rgba(82,185,70,0.5)]`}></div>
@@ -33,7 +33,7 @@ export default function StatCard({ title, value, subtitle, color = "text-white",
           {value}
         </div>
         {subtitle && (
-          <p className="text-[10px] text-white/30 uppercase tracking-[0.1em] font-bold border-t border-white/5 pt-2 inline-block">
+          <p className="text-[10px] text-white/60 uppercase tracking-[0.1em] font-bold border-t border-white/5 pt-2 inline-block">
             {subtitle}
           </p>
         )}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { displayNameOf, handleOf, profileHref } from "../../../utils/api";
 import ProfileAvatar from "../../../components/profile/ProfileAvatar";
+import PlaysRow from "../../../components/profile/PlaysRow";
 import Showcase from "../../../components/profile/Showcase";
 import ProfileActions from "../../../components/profile/ProfileActions";
 import ProfileSection, { Icons } from "../../../components/profile/ProfileSection";
@@ -62,6 +63,8 @@ export default function DesktopView(p: ProfileViewProps) {
         {user.bio && (
           <p className="text-[15px] leading-relaxed text-white/75 whitespace-pre-line break-words">{user.bio}</p>
         )}
+
+        <PlaysRow games={user.games} />
 
       </aside>
 
