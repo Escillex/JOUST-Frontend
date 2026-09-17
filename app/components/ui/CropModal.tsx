@@ -135,7 +135,7 @@ export default function CropModal({
             onClick={onCancel}
             className="text-white/20 hover:text-white transition-colors p-2"
           >
-            ✕
+            ×
           </button>
         </div>
 

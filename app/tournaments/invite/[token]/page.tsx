@@ -78,7 +78,7 @@ export default function InvitePage() {
         // Send registered joiners to the lobby, the same place the normal
         // join flow lands them (tournaments/[id]/page.tsx), rather than the
         // read-only overview page.
-        router.push(`/tournaments/${tournament.id}/lobby`);
+        router.push(`/tournaments/${tournament.id}`);
       } else {
         toast(data?.message || "Could not join the tournament", "error");
       }

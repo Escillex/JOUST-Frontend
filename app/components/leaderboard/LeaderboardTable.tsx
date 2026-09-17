@@ -56,6 +56,21 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
             the list is taller than the fixed bento, and a hidden scrollbar gives
             no hint that there is anything below the fold. */}
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+          {displayEntries.length === 0 ? (
+            /* A game is listed as soon as it exists in the catalog, so a board
+               with no ranked players yet is normal — it used to render a header
+               over an empty void. */
+            <div className="h-full flex flex-col items-center justify-center gap-2 p-8 text-center">
+              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-white/45 font-poppins">
+                No ranked players yet
+              </p>
+              <p className="text-[11px] text-white/35">
+                {gameLabel
+                  ? `Nobody has finished a ${gameLabel} match.`
+                  : "Nobody has finished a match."}
+              </p>
+            </div>
+          ) : (
           <div className="divide-y-2 divide-white/5">
             {displayEntries.map((entry, idx) => (
               <motion.div 
@@ -103,6 +118,7 @@ export default function LeaderboardTable({ entries, loading, variant = "default"
               </motion.div>
             ))}
           </div>
+          )}
         </div>
       </div>
     );

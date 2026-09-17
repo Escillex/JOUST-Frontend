@@ -356,7 +356,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             </div>
             {twoFactorMode === "off" ? (
               <p className="text-[10px] font-black text-[#FF4D4D] uppercase tracking-widest">
-                ⚠ Sign-in requires only a password right now. Resets to the configured mode on server restart.
+                Sign-in requires only a password right now. Resets to the configured mode on server restart.
               </p>
             ) : (
               <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
@@ -494,7 +494,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             </button>
             <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
               {allowRestore
-                ? "⚠ A restore can overwrite this database right now. Turn it off when you are done."
+                ? "A restore can overwrite this database right now. Turn it off when you are done."
                 : "Off by default. A restore replaces every row in the database, so it must be allowed explicitly."}
             </p>
           </div>

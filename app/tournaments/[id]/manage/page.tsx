@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
@@ -19,10 +19,16 @@ import FormatRulesPanel from "../../../components/tournaments/manage/FormatRules
 import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
 import DeleteTournamentPanel from "../../../components/tournaments/manage/DeleteTournamentPanel";
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
+import ManageSection from "../../../components/tournaments/manage/ManageSection";
+import PairingsView from "../../../components/tournaments/PairingsView";
 import { uniqueGuestNames } from "../../../utils/guestName";
+
+type ManageTab = "rounds" | "players" | "settings" | "builds";
+const MANAGE_TABS: ManageTab[] = ["rounds", "players", "settings", "builds"];
 
 function ControlRoomContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams();
   const tournamentId = params.id as string;
 
@@ -64,6 +70,13 @@ function ControlRoomContent() {
   // userId currently being forfeited or replaced, so that row can show a busy
   // state and no two roster actions can overlap.
   const [actingOn, setActingOn]               = useState<string | null>(null);
+  /** The same per-viewer flag Admin → Dev Tools writes (`joust_debug_mode`).
+   *  Round Control offers coin tosses and force-resolve, which are testing
+   *  affordances rather than organiser workflow, so it hides behind this. */
+  const [debugMode, setDebugMode] = useState(false);
+  useEffect(() => {
+    try { setDebugMode(localStorage.getItem("joust_debug_mode") === "1"); } catch { /* storage unavailable */ }
+  }, []);
 
   useEffect(() => {
     if (!tournamentId) { router.push("/tournaments/manage"); return; }
@@ -489,6 +502,30 @@ function ControlRoomContent() {
     ? tournament.format
     : tournament.format?.system;
 
+  // Three tabs, not eight stacked panels (docs/tournament-views-plan.md §4).
+  // Rounds is the default once a tournament is running, because entering a
+  // result is the only reason to open this page mid-event — it used to be
+  // fifth down a single scroll, under the roster and two placeholder images.
+  const tabParam = searchParams.get("tab") as ManageTab | null;
+  const running = tournament.status === "ONGOING";
+  // Rounds exist from the moment a tournament starts and outlive it. Keying
+  // this tab off ONGOING alone meant a COMPLETED tournament showed the
+  // *pre-start seeding roster* — offering to shuffle seeds, remove entrants and
+  // forfeit players on an event that had already finished — and gave no way to
+  // see the results at all. Same mistake the Bracket tab made with
+  // `BracketPreview`; same fix: branch on whether rounds exist.
+  const hasRounds = ((tournament as unknown as { rounds?: unknown[] }).rounds ?? []).length > 0;
+  const manageTab: ManageTab = MANAGE_TABS.includes(tabParam as ManageTab)
+    ? (tabParam as ManageTab)
+    : hasRounds
+      ? "rounds"
+      : "players";
+  const setManageTab = (tab: ManageTab) => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", tab);
+    router.replace(`?${next.toString()}`, { scroll: false });
+  };
+
   return (
     <div className="min-h-screen w-full bg-background font-sans overflow-x-hidden text-[#E0E0E0]">
       {oddWarning && (
@@ -505,7 +542,7 @@ function ControlRoomContent() {
           tournament={tournament}
           tournamentId={tournamentId!}
           onBack={() => router.push("/tournaments/manage")}
-          onViewBracket={() => router.push(`/tournaments/${tournamentId}/bracket`)}
+          onViewBracket={() => router.push(`/tournaments/${tournamentId}?tab=bracket`)}
           onOpenTournament={handleOpenRegistration}
           onStartTournament={handleStartTournament}
           onRefresh={fetchData}
@@ -513,7 +550,153 @@ function ControlRoomContent() {
           lastUpdated={lastUpdated}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Builds only appears when the tournament actually asks for builds —
+            an empty review panel is not a destination. */}
+        <div className="flex flex-wrap gap-1 border-b border-white/10 mt-6 mb-6">
+          {(
+            [
+              ["rounds", hasRounds ? "Rounds" : "Seeding"],
+              ["players", `Players · ${tournament.participants.length}`],
+              ["settings", "Settings"],
+              ...(tournament.buildsRequired
+                ? ([["builds", "Builds"]] as [ManageTab, string][])
+                : []),
+            ] as [ManageTab, string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setManageTab(id)}
+              aria-current={manageTab === id ? "page" : undefined}
+              className={`px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] border-b-2 transition-colors ${
+                manageTab === id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-white/45 hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {manageTab === "rounds" && (
+          <div className="flex flex-col gap-6">
+            {hasRounds ? (
+              <>
+                {/* The normal path: a card per match, each opening the scoring
+                    drawer. Recording a result is a per-match job. */}
+                {/* Read-only once the tournament is over: the placements and
+                    leaderboard points are already awarded, so re-scoring a
+                    settled match would silently disagree with them. Seeing what
+                    happened is the job here. */}
+                <PairingsView
+                  tournament={tournament}
+                  currentUserId={currentUser?.sub || currentUser?.id}
+                  canManage={running}
+                  debugMode={debugMode}
+                  onRefresh={() => fetchData(true)}
+                />
+
+                {/* Round Control is bulk machinery — coin tosses and
+                    force-resolve — so it sits behind the same debug flag the
+                    bracket page used for its shortcuts, not in front of the
+                    organiser who just wants to record a score. */}
+                {debugMode && running && (
+                  <div>
+                    <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-[#e8c53d] mb-3">
+                      Round control · debug mode
+                    </h2>
+                    <RoundControlPanel
+                      tournament={tournament}
+                      fetchData={fetchData}
+                      setMessage={toast}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <RosterPanel
+                tournament={tournament}
+                allUsers={allUsers}
+                onReorder={handleReorder}
+                onShuffle={handleShuffleSeeds}
+                onRemove={handleRemoveParticipant}
+                onForfeit={handleForfeit}
+                onReplace={handleReplace}
+                actingOn={actingOn}
+              />
+            )}
+          </div>
+        )}
+
+        {manageTab === "settings" && (
+          <div className="flex flex-col gap-3 max-w-4xl">
+            <ManageSection
+              title="Format and rules"
+              summary={system ?? undefined}
+              defaultOpen
+            >
+              <FormatRulesPanel
+                tournament={tournament}
+                formatDefinitions={formatDefinitions}
+                isEditing={isEditingRules}
+                formatConfig={ruleView(formatConfig)}
+                onToggleEdit={() => setIsEditingRules(true)}
+                onDiscard={() => { setIsEditingRules(false); setFormatConfig(getRawTournamentConfig(tournament)); }}
+                onRuleChange={(k, v) => setFormatConfig(p => writeRuleValue(p, k, v))}
+                onSave={handleSaveRules}
+              />
+            </ManageSection>
+
+            <ManageSection title="Details" summary="Name, date, venue, prize, artwork">
+              <SpecsPanel
+                tournament={tournament}
+                tournamentId={tournamentId!}
+                isEditing={isEditing}
+                editState={editState}
+                formatOptions={formats}
+                onToggleEdit={() => setIsEditing(v => !v)}
+                onEditChange={(field, value) => setEditState(prev => ({ ...prev, [field]: value }))}
+                onSubmit={handleUpdateTournament}
+                onOpenRegistration={handleOpenRegistration}
+                onStartTournament={handleStartTournament}
+                fetchData={fetchData}
+                setMessage={toast}
+              />
+            </ManageSection>
+
+            <ManageSection title="Co-organisers" summary="Who else can run this">
+              <StaffPanel
+                tournamentId={tournamentId!}
+                isCreator={
+                  !!tournament.createdById &&
+                  tournament.createdById === (currentUser?.sub || currentUser?.id)
+                }
+              />
+            </ManageSection>
+
+            <ManageSection title="Delete this tournament" tone="danger">
+              <DeleteTournamentPanel
+                tournamentId={tournamentId!}
+                name={tournament.name}
+                status={tournament.status}
+                participants={tournament.participants?.length ?? 0}
+                onMessage={toast}
+              />
+            </ManageSection>
+          </div>
+        )}
+
+        {manageTab === "builds" && (
+          <BuildsReviewPanel
+            tournamentId={tournamentId!}
+            status={tournament.status}
+            refreshKey={`${tournament.status}:${tournament.participants.map(p => `${p.userId}/${p.status}`).join(",")}`}
+            setMessage={toast}
+          />
+        )}
+
+        <div className={manageTab === "players" ? "flex flex-col gap-6" : "hidden"}>
           <RosterPanel
             tournament={tournament}
             allUsers={allUsers}
@@ -525,79 +708,23 @@ function ControlRoomContent() {
             actingOn={actingOn}
           />
 
-          <div className="lg:col-span-4 space-y-6">
-            <SpecsPanel
-              tournament={tournament}
-              tournamentId={tournamentId!}
-              isEditing={isEditing}
-              editState={editState}
-              formatOptions={formats}
-              onToggleEdit={() => setIsEditing(v => !v)}
-              onEditChange={(field, value) => setEditState(prev => ({ ...prev, [field]: value }))}
-              onSubmit={handleUpdateTournament}
-              onOpenRegistration={handleOpenRegistration}
-              onStartTournament={handleStartTournament}
-              fetchData={fetchData}
-              setMessage={toast}
-            />
-            <FormatRulesPanel
-              tournament={tournament}
-              formatDefinitions={formatDefinitions}
-              isEditing={isEditingRules}
-              /* The flat view of what the engine will ACTUALLY apply. On a
-                 HYBRID tournament resolveConfig reads through `phase1`, so the
-                 raw top level is ignored — passing it here showed defaults
-                 instead of the real rules (plan 9.6). */
-              formatConfig={ruleView(formatConfig)}
-              onToggleEdit={() => setIsEditingRules(true)}
-              onDiscard={() => { setIsEditingRules(false); setFormatConfig(getRawTournamentConfig(tournament)); }}
-              /* Writes into the phase the engine reads the key from, rather than
-                 setting a top-level key a hybrid config would never consult. */
-              onRuleChange={(k, v) => setFormatConfig(p => writeRuleValue(p, k, v))}
-              onSave={handleSaveRules}
-            />
-            {tournament.status === "ONGOING" && (system === "SWISS" || system === "ROUND_ROBIN") && (
-              <RoundControlPanel
-                tournament={tournament}
-                fetchData={fetchData}
-                setMessage={toast}
-              />
-            )}
-            <StaffPanel
-              tournamentId={tournamentId!}
-              isCreator={
-                !!tournament.createdById &&
-                tournament.createdById === (currentUser?.sub || currentUser?.id)
-              }
-            />
-            <BuildsReviewPanel
-              tournamentId={tournamentId!}
-              status={tournament.status}
-              refreshKey={`${tournament.status}:${tournament.participants.map(p => `${p.userId}/${p.status}`).join(",")}`}
-              setMessage={toast}
-            />
-            <AddParticipantsPanel
-              tournament={tournament}
-              allUsers={allUsers}
-              guestUsername={guestUsername}
-              setGuestUsername={setGuestUsername}
-              batchGuestCount={batchGuestCount}
-              setBatchGuestCount={setBatchGuestCount}
-              selectedUserId={selectedUserId}
-              setSelectedUserId={setSelectedUserId}
-              onAddGuest={handleAddGuest}
-              onBatchAddGuests={handleBatchAddGuests}
-              onInvitePlayer={() => selectedUserId && handleJoin(selectedUserId)}
-              batchLoading={batchLoading}
-            />
-            <DeleteTournamentPanel
-              tournamentId={tournamentId!}
-              name={tournament.name}
-              status={tournament.status}
-              participants={tournament.participants?.length ?? 0}
-              onMessage={toast}
-            />
-          </div>
+          {/* Adding people belongs with the roster, not in a panel seven
+              deep. Everything else that used to live in this column is now a
+              collapsed group under Settings. */}
+          <AddParticipantsPanel
+            tournament={tournament}
+            allUsers={allUsers}
+            guestUsername={guestUsername}
+            setGuestUsername={setGuestUsername}
+            batchGuestCount={batchGuestCount}
+            setBatchGuestCount={setBatchGuestCount}
+            selectedUserId={selectedUserId}
+            setSelectedUserId={setSelectedUserId}
+            onAddGuest={handleAddGuest}
+            onBatchAddGuests={handleBatchAddGuests}
+            onInvitePlayer={() => selectedUserId && handleJoin(selectedUserId)}
+            batchLoading={batchLoading}
+          />
         </div>
       </div>
     </div>

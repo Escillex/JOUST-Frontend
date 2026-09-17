@@ -14,7 +14,6 @@ import {
   Handle,
   Position,
   NodeProps,
-  EdgeTypes,
   ConnectionMode,
   ReactFlowProvider,
   useReactFlow,
@@ -23,9 +22,33 @@ import {
 import "@xyflow/react/dist/style.css";
 
 // Layout Constants
-const COLUMN_WIDTH = 360;
+/** Card 212 + 68 for the connector to turn in (agreed 2026-09-17, option 2A).
+ *  It was 360 against a 288px card, which made a bracket-reset tree 2,460px
+ *  wide — too wide for the canvas at a legible zoom. */
+const COLUMN_WIDTH = 280;
+const CARD_WIDTH = 212;
+/** A two-row card with no status header. Used to place the halves apart
+ *  instead of the magic gap the losers bracket used to sit behind. */
+const CARD_HEIGHT = 74;
 const BASE_MATCH_GAP = 150;
-const HEADER_HEIGHT = 100;
+/** Air between the bottom of the winners bracket and the losers captions,
+ *  with the divider set into the middle of it (option 1B). */
+const HALF_GAP = 190;
+
+/** How far a connector runs out of a node before it turns, and how tightly it
+ *  turns. The defaults (20 / 5) give near-square corners, which read as sharp
+ *  kinks on the long spans a double-elimination bracket needs. */
+const EDGE_PATH = { borderRadius: 18, offset: 28 } as const;
+
+/** The floor `fitView` may zoom to. The cards carry 12px text, so a free fit
+ *  (which will happily go to 0.2 on a large bracket) renders them unreadable;
+ *  below this the canvas pans instead of shrinking further. */
+const MIN_FIT_ZOOM = 0.55;
+
+/** `pathOptions` lives on the `SmoothStepEdge` member of the `Edge` union, not
+ *  on `Edge` itself, so an array typed `Edge[]` cannot carry it — even though
+ *  React Flow reads it off the edge object at render time. */
+type BracketEdge = Edge & { pathOptions?: { borderRadius?: number; offset?: number } };
 
 // Custom Match Node Component
 const MatchNode = ({ data }: NodeProps<FlowNode<{ 
@@ -36,6 +59,8 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
     trackedUserId: string | null;
     currentUserId?: string | null;
     focusedMatchId: string | null;
+    seeds?: Record<string, number>;
+    isChampion?: boolean;
     onOpenScoring: (match: Match, pos?: {x: number, y: number}) => void;
 }>>) => {
     return (
@@ -66,6 +91,8 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
                     trackedUserId={data.trackedUserId}
                     currentUserId={data.currentUserId}
                     isFocused={data.focusedMatchId === data.match.id}
+                    seeds={data.seeds}
+                    isChampion={data.isChampion}
                 />
             </div>
 
@@ -77,46 +104,39 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
     );
 };
 
-// Custom Champion Node
-const ChampionNode = ({ data }: NodeProps<FlowNode<{ label: string; hasChampion?: boolean }>>) => (
-    <div className="flex flex-col items-center">
-        <Handle id="cl" type="target" position={Position.Left} className="!opacity-0" />
-        <Handle id="ct" type="target" position={Position.Top} className="!opacity-0" />
-        <div className={`w-72 p-12 flex flex-col items-center justify-center gap-6 rounded-sm border transition-all duration-500 bg-black ${
-            data.hasChampion 
-                ? 'border-primary shadow-[0_0_30px_rgba(82,185,70,0.25)]' 
-                : 'border-white/10 border-dashed bg-white/5'
-        }`}>
-            <div className={`w-16 h-16 rounded-full border flex items-center justify-center transition-all duration-500 ${
-                data.hasChampion 
-                    ? 'border-primary/30 bg-primary/10 text-primary shadow-[0_0_15px_rgba(82,185,70,0.35)]' 
-                    : 'border-white/10 text-white/20'
-            }`}>
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5M19 19C19 19.6 18.6 20 18 20H6C5.4 20 5 19.6 5 19V18H19V19Z"/></svg>
-            </div>
-            <span className={`text-[12px] font-black uppercase tracking-widest transition-all duration-500 ${
-                data.hasChampion 
-                    ? 'text-primary drop-shadow-[0_0_8px_rgba(82,185,70,0.5)]' 
-                    : 'text-white/40'
-            }`}>
-                {data.label}
-            </span>
+/** The rule between the two halves, with the name of the half below it set
+ *  into the line (option 1B). A node rather than a Background variant because
+ *  it has to span the bracket's own width, which only the layout knows. */
+const DividerNode = ({ data }: NodeProps<FlowNode<{ label: string; width: number }>>) => (
+    <div className="relative pointer-events-none select-none" style={{ width: data.width }}>
+        <div className="border-t border-dashed border-white/12" />
+        <span className="absolute left-0 -top-[9px] bg-[#0a0a0a] pr-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#FF8A8A]">
+            {data.label}
+        </span>
+    </div>
+);
+
+/** A round caption. The sublabel names which half of the bracket the column
+ *  belongs to — "WINNERS BRACKET", "LOSERS", "CHAMPIONSHIP" — and at 9px on
+ *  30% white it was the first thing to disappear when the viewport zoomed out,
+ *  which is why the losers half looked unlabelled. It is now the same weight as
+ *  the round name and tinted by half, so the two are distinguishable at a
+ *  glance rather than by reading. */
+const HeaderNode = ({ data }: NodeProps<FlowNode<{ label: string; sublabel: string }>>) => {
+    const half = (data.sublabel || "").toUpperCase();
+    const tone = half.includes("LOSER")
+        ? "text-[#FF8A8A] border-[#FF4D4D]/25 bg-[#FF4D4D]/[0.06]"
+        : half.includes("CHAMPION")
+          ? "text-[#e8c53d] border-[#e8c53d]/25 bg-[#e8c53d]/[0.06]"
+          : "text-primary border-primary/25 bg-primary/[0.06]";
+    return (
+        <div className={`w-[248px] flex flex-col gap-0.5 border-b px-3.5 py-2 ${tone}`}>
+            <span className="text-[12px] font-black text-white tracking-wider uppercase">{data.label}</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em]">{data.sublabel}</span>
         </div>
-    </div>
-);
+    );
+};
 
-const HeaderNode = ({ data }: NodeProps<FlowNode<{ label: string; sublabel: string }>>) => (
-    <div className="w-80 flex flex-col justify-center border-b border-white/5 bg-zinc-900/30 px-4 py-2 opacity-80">
-        <span className="text-[11px] font-bold text-white tracking-widest uppercase">{data.label}</span>
-        <span className="text-[9px] text-white/30 uppercase tracking-tighter">{data.sublabel}</span>
-    </div>
-);
-
-const ChampionHeaderNode = ({ data }: NodeProps<FlowNode<{ label: string }>>) => (
-    <div className="w-80 flex flex-col justify-center border-b border-primary/20 bg-primary/5 px-4 py-2">
-        <span className="text-[11px] font-bold text-primary tracking-widest uppercase">{data.label}</span>
-    </div>
-);
 
 
 interface EliminationLayoutProps {
@@ -129,15 +149,26 @@ interface EliminationLayoutProps {
     currentUserId?: string | null;
 }
  
-function FlowControls({ focusedMatchId, nodes }: { focusedMatchId: string | null; nodes: FlowNode[] }) {
-    const { setCenter, fitView } = useReactFlow();
+/** Viewport behaviour only — it renders nothing. The controls it used to carry
+ *  moved into `CanvasBar`. */
+function ViewportFit({ focusedMatchId, nodes }: { focusedMatchId: string | null; nodes: FlowNode[] }) {
+    const { setCenter, fitView, getViewport, setViewport } = useReactFlow();
 
     useEffect(() => {
         // Delay viewport manipulation slightly to allow React Flow to measure DOM nodes.
         // Without this, completed tournaments (which don't poll/re-render) will fitView on 0x0 nodes and turn blank.
+        let anchor: ReturnType<typeof setTimeout> | undefined;
         const timer = setTimeout(() => {
             if (!focusedMatchId) {
-                fitView({ padding: 0.1, duration: 800 });
+                fitView({ padding: 0.15, duration: 800, minZoom: MIN_FIT_ZOOM });
+                // A double-elimination bracket is wider than the canvas once the
+                // zoom floor stops `fitView` shrinking it any further, and a
+                // centred fit then clips BOTH ends — hiding round 1, which is
+                // where the eye starts. Anchor it to the left instead.
+                anchor = setTimeout(() => {
+                    const vp = getViewport();
+                    if (vp.x < -8) setViewport({ ...vp, x: 24 }, { duration: 300 });
+                }, 850);
                 return;
             }
             
@@ -149,34 +180,88 @@ function FlowControls({ focusedMatchId, nodes }: { focusedMatchId: string | null
             }
         }, 50);
 
-        return () => clearTimeout(timer);
-    }, [focusedMatchId, nodes, fitView, setCenter]);
+        return () => {
+            clearTimeout(timer);
+            if (anchor) clearTimeout(anchor);
+        };
+    }, [focusedMatchId, nodes, fitView, setCenter, getViewport, setViewport]);
 
-    return (
-        <Panel position="bottom-left" className="z-50 m-6">
-            <div className="bg-[#0a0a0a] border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-sm p-1 flex items-center">
-                <button onClick={() => fitView({ duration: 800 })} className="px-6 py-3 text-white/60 text-[10px] font-bold hover:text-white hover:bg-white/5 transition-all uppercase tracking-widest">
-                    Reset View
-                </button>
-                <div className="w-px h-6 bg-white/10 mx-1" />
-                <button onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} className="px-6 py-3 text-white/60 text-[10px] font-bold hover:text-white hover:bg-white/5 transition-all uppercase tracking-widest">
-                    Scroll Page ▼
-                </button>
-            </div>
-        </Panel>
-    );
+    return null;
 }
 
-function FlowLegend() {
+/** The one control surface on the canvas (agreed 2026-09-17, option 3A).
+ *
+ * It replaces three things that each did part of the job: a header strip that
+ * restated the tab's own name, a floating Reset View / Scroll Page bar, and a
+ * hover-only legend that was also `hidden md:block` — so the key explaining
+ * green, red and amber was unreachable on a touch screen entirely.
+ *
+ * The colour key doubles as navigation: a half's swatch flies the viewport to
+ * that half, which is the only practical way to reach the losers bracket on a
+ * phone (option 4B).
+ */
+function CanvasBar({
+    halves,
+    trackedUserId,
+    setTrackedUserId,
+    leaderboard,
+}: {
+    halves: { key: string; label: string; short: string; colour: string; nodeIds: string[] }[];
+    trackedUserId: string | null;
+    setTrackedUserId: (id: string | null) => void;
+    leaderboard: LeaderboardEntry[];
+}) {
+    const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+    const flyTo = (nodeIds: string[]) =>
+        fitView({ nodes: nodeIds.map((id) => ({ id })), padding: 0.2, duration: 600, minZoom: MIN_FIT_ZOOM, maxZoom: 1 });
+
+    // Compact enough to stay on one row at 390px, where it sits over the
+    // bracket rather than beside it.
+    const btn = "px-2 sm:px-3 py-1.5 sm:py-2 text-white/60 text-[10px] font-black hover:text-white hover:bg-white/5 transition-colors uppercase tracking-widest disabled:opacity-30";
+
     return (
-        <Panel position="top-right" className="hidden md:block p-4 pointer-events-none z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div className="flex flex-col gap-1 text-[10px] font-bold tracking-widest text-white/40 uppercase bg-black/80 p-4 border border-white/10 backdrop-blur-sm shadow-xl rounded-sm">
-                <span><strong className="text-white">SCROLL</strong>: ZOOM</span>
-                <span><strong className="text-white">SHIFT + SCROLL</strong>: PAN HORIZONTAL</span>
-                <span><strong className="text-white">CTRL + SCROLL</strong>: PAN VERTICAL</span>
-                <span><strong className="text-white">CLICK & DRAG</strong>: PAN CANVAS</span>
-            </div>
-        </Panel>
+        <div className="bg-[#0a0a0a]/95 backdrop-blur-sm border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex items-center">
+            <button type="button" onClick={() => zoomOut({ duration: 200 })} aria-label="Zoom out" className={btn}>−</button>
+            <button type="button" onClick={() => zoomIn({ duration: 200 })} aria-label="Zoom in" className={btn}>+</button>
+            <button type="button" onClick={() => fitView({ duration: 600, padding: 0.15, minZoom: MIN_FIT_ZOOM })} className={btn}>Fit</button>
+
+            {halves.length > 1 && <span className="w-px self-stretch bg-white/10" />}
+            {halves.length > 1 && halves.map((h) => (
+                <button
+                    key={h.key}
+                    type="button"
+                    onClick={() => flyTo(h.nodeIds)}
+                    title={`Go to ${h.label.toLowerCase()}`}
+                    aria-label={`Go to ${h.label.toLowerCase()}`}
+                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 hover:bg-white/5 transition-colors group/key"
+                >
+                    <span aria-hidden className="w-2.5 sm:w-3.5 h-[2px]" style={{ background: h.colour }} />
+                    <span className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45 group-hover/key:text-white transition-colors">
+                        <span className="sm:hidden">{h.short}</span>
+                        <span className="hidden sm:inline">{h.label}</span>
+                    </span>
+                </button>
+            ))}
+
+            {leaderboard.length > 0 && <span className="w-px self-stretch bg-white/10" />}
+            {leaderboard.length > 0 && (
+                <div className="relative">
+                    <select
+                        value={trackedUserId || ""}
+                        onChange={(e) => setTrackedUserId(e.target.value || null)}
+                        aria-label="Follow a player through the bracket"
+                        className={`bg-transparent border-0 pl-2 sm:pl-3 pr-6 sm:pr-7 py-1.5 sm:py-2 max-w-[104px] sm:max-w-none text-[9px] font-black uppercase tracking-[0.16em] outline-none appearance-none cursor-pointer transition-colors ${trackedUserId ? 'text-primary' : 'text-white/45 hover:text-white'}`}
+                    >
+                        <option value="">{trackedUserId ? "Stop following" : "Follow"}</option>
+                        {leaderboard.map((u) => (
+                            <option key={u.userId} value={u.userId}>{displayNameOf(u, u.username)}</option>
+                        ))}
+                    </select>
+                    <span aria-hidden className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-white/35 text-[8px]">▼</span>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -275,9 +360,8 @@ export default function EliminationLayout({
 
     const nodeTypes = useMemo(() => ({
         match: MatchNode,
-        champion: ChampionNode,
         header: HeaderNode,
-        championHeader: ChampionHeaderNode
+        divider: DividerNode
     }), []);
 
 
@@ -306,9 +390,20 @@ export default function EliminationLayout({
         }
     }, [losersRounds]);
 
+    /** Entrant seeds by user id. Random seeding is the default, so this is
+     *  usually empty and the card renders no seed slot at all rather than a
+     *  column of blanks. */
+    const seeds = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const p of tournament?.participants ?? []) {
+            if (typeof p?.seed === 'number' && p?.userId) map[p.userId] = p.seed;
+        }
+        return map;
+    }, [tournament?.participants]);
+
     const { nodes, edges } = useMemo(() => {
         const nodes: FlowNode[] = [];
-        const edges: Edge[] = [];
+        const edges: BracketEdge[] = [];
 
         // Build a map of all matches by ID for path lookup
         const matchMap = new Map<string, Match>();
@@ -318,6 +413,13 @@ export default function EliminationLayout({
                 matchMap.set(m.id, m);
             });
         });
+
+        // The match that decided the tournament: the last one played, and only
+        // once there is a champion to name. It wears the crown in place of the
+        // pedestal node that used to occupy a column of its own.
+        const decidingRound = [...winnersRounds, ...grandFinals].pop();
+        const decidingMatchId = tournament?.winner ? decidingRound?.matches?.[0]?.id : undefined;
+        const isDecider = (match: Match) => !!decidingMatchId && match.id === decidingMatchId;
 
         const isEdgeTracked = (match: Match, targetMatch: Match | undefined): boolean =>
             !!(trackedUserId &&
@@ -408,9 +510,9 @@ export default function EliminationLayout({
                 if (isFinalRound) {
                     nodes.push({
                         id: `header-round-${round.roundNumber}`,
-                        type: 'championHeader',
+                        type: 'header',
                         position: { x: centerX, y: 50 },
-                        data: { label: 'FINAL' },
+                        data: { label: 'FINAL', sublabel: 'CHAMPIONSHIP' },
                         draggable: false, selectable: false
                     });
                 } else {
@@ -433,7 +535,7 @@ export default function EliminationLayout({
                         id: match.id,
                         type: 'match',
                         position: { x: columnX(rIdx, s), y: matchYMap.get(match.id) ?? BASE_MATCH_GAP },
-                        data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, onOpenScoring },
+                        data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, isChampion: isDecider(match), onOpenScoring },
                         draggable: false
                     });
 
@@ -445,43 +547,20 @@ export default function EliminationLayout({
                             target: match.nextMatchId,
                             sourceHandle: s === 'R' ? 'sl' : 'sr',
                             targetHandle: s === 'R' ? 'tr' : 'tl',
-                            type: 'step',
+                            // smoothstep, not step: hard 90-degree corners on the long
+                        // cross-bracket runs were most of why this looked scrappy.
+                        type: 'smoothstep',
+                        pathOptions: EDGE_PATH,
                             style: tracked
                                 ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 }
-                                : { stroke: 'rgba(82, 185, 70, 0.35)', strokeWidth: 1.5 }
+                                : { stroke: 'rgba(82, 185, 70, 0.55)', strokeWidth: 1.75 }
                         });
                     }
                 });
             });
 
-            // Champion pedestal sits centered beneath the final
-            const finalY = matchYMap.get(finalMatch.id) ?? BASE_MATCH_GAP;
-            nodes.push({
-                id: 'champion-pedestal',
-                type: 'champion',
-                position: { x: centerX, y: finalY + 220 },
-                data: {
-                    label: displayNameOf(tournament?.winner, 'TBD'),
-                    hasChampion: !!tournament?.winner
-                },
-                draggable: false
-            });
-
-            const isFinalEdgeTracked = trackedUserId &&
-                (finalMatch.player1?.id === trackedUserId || finalMatch.player2?.id === trackedUserId) &&
-                tournament?.winner?.id === trackedUserId;
-
-            edges.push({
-                id: `edge-final-champion`,
-                source: finalMatch.id,
-                sourceHandle: 'sb',
-                target: 'champion-pedestal',
-                targetHandle: 'ct',
-                type: 'step',
-                style: isFinalEdgeTracked
-                    ? { stroke: '#52B946', strokeWidth: 2.5, strokeDasharray: '6 4', filter: 'drop-shadow(0px 0px 5px rgba(82, 185, 70, 0.8))', zIndex: 10 }
-                    : { stroke: 'rgba(82, 185, 70, 0.45)', strokeWidth: 2, strokeDasharray: '6 4' }
-            });
+            // No pedestal: the deciding match wears the win instead (option 5B),
+            // which is one fewer column and cannot scroll out of view.
 
             const sortedEdges = [...edges].sort((a, b) => {
                 const aIsTracked = a.style?.filter ? 1 : 0;
@@ -510,7 +589,7 @@ export default function EliminationLayout({
                     id: match.id,
                     type: 'match',
                     position: { x: rIdx * COLUMN_WIDTH, y: y },
-                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, onOpenScoring },
+                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, isChampion: isDecider(match), onOpenScoring },
                     draggable: false
                 });
 
@@ -523,17 +602,22 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         sourceHandle: 'sr',
                         targetHandle: 'tl',
-                        type: 'step',
+                        type: 'smoothstep',
+                        pathOptions: EDGE_PATH,
                         style: tracked
                             ? { stroke: '#52B946', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(82, 185, 70, 0.6))', zIndex: 10 }
-                            : { stroke: 'rgba(82, 185, 70, 0.35)', strokeWidth: 1.5 }
+                            : { stroke: 'rgba(82, 185, 70, 0.55)', strokeWidth: 1.75 }
                     });
                 }
             });
         });
 
         // 2. Losers Bracket (Rendered below Winners)
-        const losersVerticalOffset = (winnersRounds[0]?.matches?.length || 4) * BASE_MATCH_GAP + 400;
+        // Derived from where the winners bracket actually ends rather than a
+        // magic 400, so the halves sit the same distance apart at every field
+        // size and the divider has a known place to go (option 1B).
+        const winnersBottom = (winnersRounds[0]?.matches?.length || 4) * BASE_MATCH_GAP + CARD_HEIGHT;
+        const losersVerticalOffset = winnersBottom + HALF_GAP;
         losersRounds.forEach((round: Round, rIdx: number) => {
             const losersRoundNum = isLosersRound(round.roundNumber) ? losersRoundIndex(round.roundNumber) : rIdx + 1;
             const losersRoundLabel = `ROUND ${losersRoundNum}`;
@@ -553,7 +637,7 @@ export default function EliminationLayout({
                     id: match.id,
                     type: 'match',
                     position: { x: rIdx * COLUMN_WIDTH, y: y },
-                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, onOpenScoring },
+                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, isChampion: isDecider(match), onOpenScoring },
                     draggable: false
                 });
 
@@ -566,25 +650,49 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         sourceHandle: 'sr',
                         targetHandle: 'tl',
-                        type: 'step',
+                        type: 'smoothstep',
+                        pathOptions: EDGE_PATH,
                         style: tracked
-                            ? { stroke: '#f59e0b', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(245, 158, 11, 0.6))', zIndex: 10 }
-                            : { stroke: 'rgba(245, 158, 11, 0.4)', strokeWidth: 1.5 }
+                            ? { stroke: '#FF4D4D', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(255, 77, 77, 0.6))', zIndex: 10 }
+                            : { stroke: 'rgba(255, 77, 77, 0.45)', strokeWidth: 1.75 }
                     });
                 }
             });
         });
 
+        // 2b. The rule between the halves. Spans the whole bracket, so its width
+        // is computed from the last column rather than guessed.
+        if (losersRounds.length > 0) {
+            const columns = Math.max(winnersRounds.length, losersRounds.length) + grandFinals.length;
+            nodes.push({
+                id: 'half-divider',
+                type: 'divider',
+                position: { x: -24, y: winnersBottom + HALF_GAP / 2 - 40 },
+                data: { label: 'LOSERS BRACKET', width: (columns - 1) * COLUMN_WIDTH + CARD_WIDTH + 48 },
+                draggable: false, selectable: false,
+                zIndex: 0
+            });
+        }
+
         // 3. Grand Finals
+        // The championship columns start after BOTH halves, not after the
+        // winners bracket: the losers bracket runs one round longer, so
+        // `winnersRounds.length` put the grand final in the same column as the
+        // losers final and its connector had to double back on itself.
+        const bracketColumns = Math.max(winnersRounds.length, losersRounds.length);
         grandFinals.forEach((round: Round, rIdx: number) => {
-            const gfX = (winnersRounds.length + rIdx) * COLUMN_WIDTH;
+            const gfX = (bracketColumns + rIdx) * COLUMN_WIDTH;
             const gfY = getMatchY(winnersRounds.length - 1, 0);
+            const isReset = round.roundNumber >= 201;
 
             nodes.push({
                 id: `header-round-${round.roundNumber}`,
                 type: 'header',
                 position: { x: gfX, y: 50 },
-                data: { label: 'GRAND FINALS', sublabel: 'CHAMPIONSHIP' },
+                data: {
+                    label: isReset ? 'BRACKET RESET' : 'GRAND FINAL',
+                    sublabel: isReset ? 'DECIDING MATCH' : 'CHAMPIONSHIP',
+                },
                 draggable: false, selectable: false
             });
 
@@ -593,7 +701,7 @@ export default function EliminationLayout({
                     id: match.id,
                     type: 'match',
                     position: { x: gfX, y: gfY + (mIdx * 200) },
-                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, onOpenScoring },
+                    data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, isChampion: isDecider(match), onOpenScoring },
                     draggable: false
                 });
 
@@ -606,60 +714,41 @@ export default function EliminationLayout({
                         target: match.nextMatchId,
                         sourceHandle: 'sr',
                         targetHandle: 'tl',
-                        type: 'step',
+                        type: 'smoothstep',
+                        pathOptions: EDGE_PATH,
                         style: tracked
-                            ? { stroke: '#ffffff', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.6))', zIndex: 10 }
-                            : { stroke: 'rgba(255, 255, 255, 0.3)', strokeWidth: 1.5 }
+                            ? { stroke: '#e8c53d', strokeWidth: 2, filter: 'drop-shadow(0px 0px 3px rgba(232, 197, 61, 0.6))', zIndex: 10 }
+                            : { stroke: 'rgba(232, 197, 61, 0.5)', strokeWidth: 1.75 }
                     });
                 }
             });
-        });
 
-        // 4. Champion Pedestal
-        const allRounds = [...winnersRounds, ...grandFinals];
-        if (allRounds.length > 0) {
-            const lastRound = allRounds[allRounds.length - 1];
-            const finalMatch = lastRound.matches[0];
-            if (finalMatch) {
-                const championX = allRounds.length * COLUMN_WIDTH;
-                const championY = getMatchY(winnersRounds.length - 1, 0);
-
-                nodes.push({
-                    id: 'champion-header',
-                    type: 'championHeader',
-                    position: { x: championX, y: 50 },
-                    data: { label: 'CHAMPION' },
-                    draggable: false, selectable: false
-                });
-
-                nodes.push({
-                    id: 'champion-pedestal',
-                    type: 'champion',
-                    position: { x: championX, y: championY - 35 },
-                    data: { 
-                        label: displayNameOf(tournament?.winner, 'TBD'),
-                        hasChampion: !!tournament?.winner
-                    },
-                    draggable: false
-                });
-
-                const isFinalEdgeTracked = trackedUserId && 
-                    (finalMatch.player1?.id === trackedUserId || finalMatch.player2?.id === trackedUserId) &&
-                    tournament?.winner?.id === trackedUserId;
-
-                edges.push({
-                    id: `edge-final-champion`,
-                    source: finalMatch.id,
-                    sourceHandle: 'sr',
-                    target: 'champion-pedestal',
-                    targetHandle: 'cl',
-                    type: 'step',
-                    style: isFinalEdgeTracked
-                        ? { stroke: '#52B946', strokeWidth: 2.5, strokeDasharray: '6 4', filter: 'drop-shadow(0px 0px 5px rgba(82, 185, 70, 0.8))', zIndex: 10 }
-                        : { stroke: 'rgba(82, 185, 70, 0.45)', strokeWidth: 2, strokeDasharray: '6 4' }
+            // Grand final -> bracket reset. The server spawns the reset round
+            // only once the losers-bracket finalist has won, and never sets
+            // `nextMatchId` on the grand final (advancement into a reset is not
+            // a winner feed — both players carry over), so without this the
+            // bracket visibly broke between its two most important matches.
+            const next = grandFinals[rIdx + 1];
+            const resetMatch = next?.matches?.[0];
+            if (resetMatch && !round.matches.some((m: Match) => m.nextMatchId === resetMatch.id)) {
+                round.matches.forEach((match: Match) => {
+                    if (match.nextMatchId) return;
+                    edges.push({
+                        id: `edge-gf-reset-${match.id}-${resetMatch.id}`,
+                        source: match.id,
+                        target: resetMatch.id,
+                        sourceHandle: 'sr',
+                        targetHandle: 'tl',
+                        type: 'smoothstep',
+                        pathOptions: EDGE_PATH,
+                        style: { stroke: 'rgba(232, 197, 61, 0.5)', strokeWidth: 1.75 }
+                    });
                 });
             }
-        }
+        });
+
+        // 4. No champion pedestal (option 5B) — the deciding match is crowned
+        // in place, which drops a whole column from the widest bracket we draw.
 
         // Sort edges so that tracked edges are rendered last (drawn on top)
         const sortedEdges = [...edges].sort((a, b) => {
@@ -669,33 +758,22 @@ export default function EliminationLayout({
         });
 
         return { nodes, edges: sortedEdges };
-    }, [winnersRounds, losersRounds, grandFinals, isAdmin, updating, leaderboard, trackedUserId, focusedMatchId, onOpenScoring, getMatchY, getLosersMatchY, tournament?.winner]);
+    }, [winnersRounds, losersRounds, grandFinals, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, onOpenScoring, getMatchY, getLosersMatchY, tournament?.winner]);
+
+    /** What the colour key lists, and where each swatch flies the viewport.
+     *  Derived from the rounds that exist, so a single-elimination bracket
+     *  never offers a Losers key it cannot honour. */
+    const halves = useMemo(() => {
+        const ids = (rounds: Round[]) => rounds.flatMap((r) => r.matches.map((m) => m.id));
+        const out: { key: string; label: string; short: string; colour: string; nodeIds: string[] }[] = [];
+        if (winnersRounds.length) out.push({ key: 'w', label: 'Winners', short: 'W', colour: '#52B946', nodeIds: ids(winnersRounds) });
+        if (losersRounds.length) out.push({ key: 'l', label: 'Losers', short: 'L', colour: '#FF4D4D', nodeIds: ids(losersRounds) });
+        if (grandFinals.length) out.push({ key: 'g', label: 'Final', short: 'GF', colour: '#e8c53d', nodeIds: ids(grandFinals) });
+        return out.filter((h) => h.nodeIds.length > 0);
+    }, [winnersRounds, losersRounds, grandFinals]);
 
     return (
         <div className="flex flex-col h-full bg-[#0a0a0a]">
-            {/* Toolbar Panel */}
-            <div className="flex items-center justify-between px-6 py-4 bg-black border-b border-white/10 shrink-0 z-20">
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3">
-                         <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#52b946]" />
-                         <span className="text-[11px] font-bold text-white uppercase tracking-wider">Tournament Bracket — {nodes.filter(n => n.type === 'match').length} Matches</span>
-                    </div>
-                    <div className="relative">
-                        <select 
-                            value={trackedUserId || ""} 
-                            onChange={(e) => setTrackedUserId(e.target.value || null)} 
-                            className={`bg-white/5 border border-white/10 px-4 py-2 pr-8 text-[10px] font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer transition-all rounded-sm ${trackedUserId ? 'text-primary' : 'text-white/60 hover:border-primary hover:text-white'}`}
-                        >
-                            <option value="">{trackedUserId ? "Stop Tracking" : "Track Participant"}</option>
-                            {leaderboard.map(u => (
-                                <option key={u.userId} value={u.userId}>{u.username}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/40">▼</div>
-                    </div>
-                </div>
-            </div>
-
             {/* Bracket Canvas */}
             <div className="relative w-full h-full group">
                 <ReactFlowProvider>
@@ -705,7 +783,14 @@ export default function EliminationLayout({
                         nodeTypes={nodeTypes}
                         connectionMode={ConnectionMode.Loose}
                         fitView
-                        minZoom={0.2}
+                        /* The bracket's text is 12px, but `fitView` was free to
+                           zoom to 0.2 to make a large bracket fit — rendering
+                           names at ~2px and erasing the round sublabels
+                           entirely. That, not the CSS, is why the tree looked
+                           like a debug view. Fit now stops at 55% and the
+                           viewer pans instead, which is what panning is for. */
+                        fitViewOptions={{ padding: 0.15, minZoom: MIN_FIT_ZOOM }}
+                        minZoom={0.35}
                         maxZoom={1.5}
                         colorMode="dark"
                         proOptions={{ hideAttribution: true }}
@@ -721,8 +806,17 @@ export default function EliminationLayout({
                         zoomActivationKeyCode={null}
                     >
                         <Background color="#111" gap={20} />
-                        <FlowControls focusedMatchId={focusedMatchId} nodes={nodes} />
-                        <FlowLegend />
+                        <ViewportFit focusedMatchId={focusedMatchId} nodes={nodes} />
+
+                        {/* Same bar, two anchors: the phone's fixed bottom
+                            navigation overlaps the foot of a full-bleed canvas,
+                            so there it rides at the top instead. */}
+                        <Panel position="top-left" className="z-50 m-3 md:hidden">
+                            <CanvasBar halves={halves} trackedUserId={trackedUserId} setTrackedUserId={setTrackedUserId} leaderboard={leaderboard} />
+                        </Panel>
+                        <Panel position="bottom-left" className="z-50 m-6 hidden md:block">
+                            <CanvasBar halves={halves} trackedUserId={trackedUserId} setTrackedUserId={setTrackedUserId} leaderboard={leaderboard} />
+                        </Panel>
 
                         {/* Floating Player Tracker Widget as a React Flow Panel */}
                         {trackedUserId && sortedPlayerMatches.length > 0 && (

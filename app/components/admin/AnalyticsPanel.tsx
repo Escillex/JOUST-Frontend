@@ -408,7 +408,7 @@ export default function AnalyticsPanel() {
             <div key={row.label} className="flex items-baseline justify-between gap-4">
               <span className="text-[11px] text-white/60">{row.label}</span>
               <span className={`text-sm tabular-nums ${row.value > 0 ? "text-[#FFCC00]" : "text-white/60"}`}>
-                {row.value > 0 ? `⚠ ${row.value.toLocaleString()}` : "0"}
+                {row.value > 0 ? row.value.toLocaleString() : "0"}
               </span>
             </div>
           ))}

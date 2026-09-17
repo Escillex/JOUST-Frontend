@@ -116,13 +116,23 @@ export default function ImageUpload({
             {placeholder}
           </div>
         ) : (
-          <Image
-            src="/placeholder.png"
-            alt="Uploaded content"
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
-            className="object-cover opacity-95 group-hover:opacity-100 brightness-100 group-hover:brightness-110 transition-all duration-500"
-          />
+          /* A quiet hatched ground, not the "PLACEHOLDER — NO IMAGE SET"
+             artwork. That image reads as a broken upload rather than an empty
+             slot — it was retired from tournament cards for the same reason,
+             and this is the component every other empty slot inherits it
+             from. */
+          <div
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center bg-zinc-900"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 14px)",
+            }}
+          >
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">
+              No image
+            </span>
+          </div>
         )}
 
         {/* Scanline overlay */}

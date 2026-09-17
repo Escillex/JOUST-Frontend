@@ -14,7 +14,7 @@ const TrackerPanel = dynamic(() => import('./tracker/TrackerPanel'), {
 });
 import GameSeriesScore from './tracker/GameSeriesScore';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../utils/api';
-import { canOfferDraw } from '../../../utils/formatConfig';
+import { canOfferDraw, getMatchStartWho } from '../../../utils/formatConfig';
 
 interface Props {
   match: Match | null;
@@ -101,6 +101,15 @@ export default function ScoringDrawer({
   // A draw is COMPLETED with no winner. Checked before any winner lookup below,
   // because the final `winnerId === player1` comparison is false for a draw and
   // would otherwise announce player 2 as the winner of a match nobody won.
+  // Staff always; a player of this match when the tournament permits it.
+  const isParticipant =
+    !!currentUserId &&
+    (currentUserId === (match.player1?.id ?? match.player1Id) ||
+      currentUserId === (match.player2?.id ?? match.player2Id));
+  const canStartMatch =
+    isAdmin ||
+    (isParticipant && getMatchStartWho(formatConfig) === 'STAFF_AND_PARTICIPANTS');
+
   const isDraw = match.status === 'COMPLETED' && !match.winnerId && !match.isBye;
   const seriesWinnerName = seriesComplete && !isDraw
     ? (p1Score >= winsNeeded ? p1Name : p2Score >= winsNeeded ? p2Name : (match.winnerId === match.player1?.id ? p1Name : p2Name))
@@ -136,7 +145,7 @@ export default function ScoringDrawer({
 
         {/* Header */}
         <div className="px-8 pt-8 pb-0 flex-shrink-0">
-          <button onClick={onClose} className="absolute top-6 right-6 text-white/20 hover:text-white transition-all font-black text-xl">✕</button>
+          <button onClick={onClose} className="absolute top-6 right-6 text-white/20 hover:text-white transition-all font-black text-xl">×</button>
           <span className="text-[9px] font-black text-primary uppercase tracking-[0.5em] block mb-1">Score This Match</span>
           <h2 className="text-xl font-black text-white uppercase tracking-tight">Match Result</h2>
           <p className="text-[10px] text-white/30 uppercase tracking-widest mt-1">
@@ -162,12 +171,21 @@ export default function ScoringDrawer({
         <div className="flex-1 overflow-y-auto px-8 py-6">
 
           {/* ── START GATE ─────────────────────────────────────────────────── */}
-          {isAdmin && match.status === 'PENDING' && !match.isBye &&
+          {/* Staff always; the two players when the tournament's `matchStartWho`
+              allows it (the default). Organizer-only start is the strict,
+              supervised setting rather than the built-in behaviour it used to
+              be — the server makes the same decision in MatchService.startMatch,
+              so this is which button to draw, not who is allowed. */}
+          {canStartMatch && match.status === 'PENDING' && !match.isBye &&
             (match.player1Id || match.player1?.id) && (match.player2Id || match.player2?.id) && (
             <div className="mb-6 p-4 bg-primary/5 border border-primary/30 rounded-sm flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
               <div>
                 <p className="text-[10px] font-black text-primary uppercase tracking-widest">Match not started</p>
-                <p className="text-[11px] text-white/40 mt-1">Start the match to make it live and notify both players before scoring.</p>
+                <p className="text-[11px] text-white/40 mt-1">
+                  {isAdmin
+                    ? 'Start the match to make it live and notify both players before scoring.'
+                    : 'Start it when you and your opponent sit down. Your organizer records the result.'}
+                </p>
               </div>
               <button
                 onClick={handleStartMatch}

@@ -61,6 +61,29 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  /**
+   * The tournament lobby and the standalone bracket page merged into the
+   * tournament page itself (docs/tournament-views-plan.md, phase 3). These keep
+   * every old link working — the invite flow sent joiners to /lobby, and both
+   * routes have been shared and bookmarked.
+   *
+   * `permanent: false` on purpose: a 308 is cached by browsers indefinitely,
+   * which is a bad trade for a route layout that has changed once already.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/tournaments/:id/lobby",
+        destination: "/tournaments/:id",
+        permanent: false,
+      },
+      {
+        source: "/tournaments/:id/bracket",
+        destination: "/tournaments/:id?tab=bracket",
+        permanent: false,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

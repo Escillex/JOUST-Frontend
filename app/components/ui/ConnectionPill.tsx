@@ -1,8 +1,12 @@
 "use client";
 
-/** Tells the viewer whether the page is being pushed live updates or has fallen
- *  back to polling. Without this the two are indistinguishable, which makes a
- *  dropped socket invisible until the data visibly goes stale. */
+/** Tells the viewer whether the page is being pushed updates or has fallen back
+ *  to polling. Without this the two are indistinguishable, which makes a
+ *  dropped socket invisible until the data visibly goes stale.
+ *
+ *  Reads "Connected", not "Live": once the tournament status badge stopped
+ *  saying LIVE (2026-09-16), a pill saying LIVE next to it looked like a claim
+ *  about the tournament rather than about the socket. */
 export default function ConnectionPill({ connected }: { connected: boolean }) {
   return (
     <span
@@ -13,12 +17,12 @@ export default function ConnectionPill({ connected }: { connected: boolean }) {
       }`}
       title={
         connected
-          ? "Receiving live updates"
+          ? "Receiving updates as they happen"
           : "Reconnecting - updates are still arriving, just less often"
       }
     >
       <span className={`w-1.5 h-1.5 ${connected ? "bg-primary" : "bg-white/30"}`} />
-      {connected ? "Live" : "Reconnecting"}
+      {connected ? "Connected" : "Reconnecting"}
     </span>
   );
 }

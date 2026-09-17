@@ -7,8 +7,6 @@ import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string>("");
-  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
@@ -24,8 +22,6 @@ export default function CreateTournamentPage() {
           return;
         }
         setIsAuthorized(true);
-        setUserId(data?.sub || data?.id || "");
-        setUserRoles(roles);
       } else {
         setIsAuthorized(false);
         router.push("/auth");
@@ -34,37 +30,36 @@ export default function CreateTournamentPage() {
     fetchMe();
   }, []);
 
-  const handleSuccess = (msg: string) => {
-    if (msg.includes("Error")) {
-      setMessage(msg);
-      return;
-    }
-    router.push("/tournaments/manage");
-  };
+  // Straight to the new tournament's own manage page (agreed 2026-09-17), which
+  // opens on Players for anything not yet started — getting people in is the
+  // next job either way. It used to land on the list of every tournament, where
+  // the first thing to do was find the one just created.
+  const handleSuccess = (tournamentId: string) =>
+    router.push(tournamentId ? `/tournaments/${tournamentId}/manage` : "/tournaments/manage");
 
   if (isAuthorized === false) return null;
-  if (isAuthorized === null) return <div className="min-h-screen bg-background flex items-center justify-center text-primary font-black uppercase tracking-widest animate-pulse">Verifying Creator Status...</div>;
+  if (isAuthorized === null) return <div className="min-h-screen bg-background flex items-center justify-center text-primary font-black uppercase tracking-widest animate-pulse">Checking your access…</div>;
 
   return (
     <ManagerLayout breadcrumbs={[{ label: "TOURNAMENTS", href: "/tournaments/manage" }, { label: "CREATE NEW" }]}>
       <div className="max-w-4xl mx-auto">
         <div className="mb-10">
           <h1 className="text-3xl font-bold text-white tracking-tight uppercase leading-none">Create Tournament</h1>
-          <p className="text-sm text-white/30 mt-4">
-            Initialize a new competitive event with custom format configurations and access controls.
+          <p className="text-sm text-white/40 mt-4">
+            Three steps: what it is, how matches are won, and when it runs. You can change any of
+            it from the tournament&apos;s settings until it starts.
           </p>
         </div>
 
         {message && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-[4px] text-red-500 text-[10px] font-black uppercase tracking-[0.2em]">
+          <div className="mb-8 p-4 bg-[#FF4D4D]/10 border border-[#FF4D4D]/25 rounded-[4px] text-[#FF4D4D] text-sm">
             {message}
           </div>
         )}
 
         <CreateTournamentForm 
-          userId={userId}
-          userRoles={userRoles}
           onSuccess={handleSuccess} 
+          onError={setMessage}
           onDiscard={() => router.push("/tournaments/manage")} 
         />
       </div>

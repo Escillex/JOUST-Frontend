@@ -556,7 +556,7 @@ export default function AdminDashboard() {
                       href={href}
                       className={`${base} border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20`}
                     >
-                      {label} <span aria-hidden className="ml-1.5 text-[#E0E0E0]/30">↗</span>
+                      {label} <span aria-hidden className="ml-1.5 text-[#E0E0E0]/30">→</span>
                     </a>
                   );
                 }

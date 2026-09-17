@@ -71,7 +71,7 @@ export default function ProductCard({ product, index }: ProductCardProps) {
         />
 
         <div className="absolute top-8 right-8 bg-primary text-black px-8 py-4 text-xs font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 font-poppins shadow-[4px_4px_0px_0px_white]">
-          VIEW STORE ↗
+          VIEW STORE →
         </div>
 
         <div className="absolute bottom-8 left-8 z-20">

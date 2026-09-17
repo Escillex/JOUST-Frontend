@@ -144,7 +144,7 @@ export default function MobileBottomNav() {
             onClick={() => setIsMenuOpen(false)}
             className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center text-foreground/40 hover:text-white transition-all text-xs font-black"
           >
-            ✕
+            ×
           </button>
         </div>
 

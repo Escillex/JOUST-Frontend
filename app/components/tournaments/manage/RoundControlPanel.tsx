@@ -118,7 +118,7 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
           <div className="space-y-4">
             <div className="p-4 bg-[#FFB800]/10 border border-[#FFB800]/30 rounded text-center">
               <h4 className="text-sm font-black text-[#FFB800] tracking-widest uppercase mb-1">
-                ⚠️ TIE DETECTED FOR 1ST PLACE
+                TIE DETECTED FOR 1ST PLACE
               </h4>
               <p className="text-xs text-[#FFB800]/80">
                 Multiple players are tied at {leaderboard[0]?.points} points. The tournament has paused completion to allow manual resolution.

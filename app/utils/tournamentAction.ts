@@ -60,8 +60,11 @@ function ordinal(n: number): string {
 }
 
 export function actionFor({ tournament: t, userId, isJoined }: Args): TournamentAction {
-  const lobby = `/tournaments/${t.id}/lobby`;
-  const bracket = `/tournaments/${t.id}/bracket`;
+  // Both surfaces are tabs on the tournament page now (phase 3): the lobby
+  // merged into Overview/Players, and the bracket is a tab. next.config still
+  // redirects the old routes for links already in the wild.
+  const lobby = `/tournaments/${t.id}`;
+  const bracket = `/tournaments/${t.id}?tab=bracket`;
   const full = seatsLeft(t) === 0;
 
   if (t.status === "COMPLETED") {

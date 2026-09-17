@@ -47,11 +47,81 @@ export function formatDay(date: string | null | undefined): string | null {
 }
 
 /** The round a tournament has reached, from the last round the listing carries. */
+/** "Round 2", "Losers round 1", "Grand final" — the vocabulary the server uses
+ *  in `roundText()`, so a round is named the same everywhere. */
+export function roundLabel(n: number): string {
+  if (n === 201) return "Grand final reset";
+  if (n >= 200) return "Grand final";
+  if (n > 100) return `Losers round ${n - 100}`;
+  return `Round ${n}`;
+}
+
 export function currentRound(t: Tournament): { round: number; total?: number } | null {
-  const round = t.rounds?.[0]?.roundNumber;
-  if (!round) return null;
+  // The lowest-numbered round that still has something to play — NOT the
+  // highest that exists, and not `rounds[0]`.
+  //
+  //  - `rounds[0]` was wrong because the two endpoints order rounds differently:
+  //    the browse listing takes the latest first, `GET /tournaments/:id` ascends.
+  //  - the highest was wrong because an elimination bracket creates every round
+  //    up front, so a tournament that had not played a single match announced
+  //    itself as being in the final.
+  const rounds = (t.rounds ?? []).filter((r) => typeof r.roundNumber === "number");
+  if (rounds.length === 0) return null;
+  const unfinished = rounds.filter((r) =>
+    (r.matches ?? []).some((m) => m.status !== "COMPLETED"),
+  );
+  const pool = unfinished.length > 0 ? unfinished : rounds;
+  const round = Math.min(...pool.map((r) => r.roundNumber));
   const cfg = (t.config ?? {}) as { swissRounds?: number };
   return { round, total: cfg.swissRounds };
+}
+
+/**
+ * The derived state line that replaced the LIVE badge (agreed 2026-09-16).
+ *
+ * A badge was a flag, and flags go stale: a completed tournament still read
+ * LIVE on the bracket page. Every part of this is computed from the rounds and
+ * the results, so it cannot disagree with them.
+ */
+export function stateLine(t: Tournament): string {
+  const players = t.participants?.length ?? 0;
+  const field = `${players} ${players === 1 ? "player" : "players"}`;
+
+  if (t.status === "COMPLETED") {
+    const who = t.winner ? displayNameOf(t.winner) : null;
+    return [who ? `Won by ${who}` : "Finished", field].join(" · ");
+  }
+
+  if (t.status === "ONGOING") {
+    const at = currentRound(t);
+    const rounds = t.rounds ?? [];
+    const here = at ? rounds.find((r) => r.roundNumber === at.round) : undefined;
+    const matches = here?.matches ?? [];
+    const reported = matches.filter((m) => m.status === "COMPLETED").length;
+
+    const parts: string[] = [];
+    if (at) {
+      parts.push(
+        at.total && at.round <= 100
+          ? `Round ${at.round} of ${at.total}`
+          : roundLabel(at.round),
+      );
+    }
+    if (matches.length > 0) parts.push(`${reported} of ${matches.length} results in`);
+    parts.push(field);
+    return parts.join(" · ");
+  }
+
+  if (t.status === "OPEN") {
+    const left = seatsLeft(t);
+    return [
+      left === 0 ? "Full" : `${left} ${left === 1 ? "seat" : "seats"} left`,
+      `${players} of ${t.maxPlayers} entered`,
+    ].join(" · ");
+  }
+
+  const day = formatDay(t.date);
+  return [day ? `Opens ${day}` : "Opening soon", `${players} of ${t.maxPlayers} entered`].join(" · ");
 }
 
 /**

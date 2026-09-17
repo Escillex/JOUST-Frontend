@@ -57,7 +57,7 @@ export default function LivePage() {
           <div className="sticky top-0 z-10 bg-black/95 border-b border-white/5 px-6 py-4 flex items-center justify-between backdrop-blur-sm">
             <div className="flex items-center gap-4">
               <Link
-                href={`/tournaments/${tournamentId}/bracket`}
+                href={`/tournaments/${tournamentId}?tab=bracket`}
                 className="text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all"
               >
                 ← Bracket
@@ -320,7 +320,7 @@ export default function LivePage() {
         <div className="sticky top-0 z-10 bg-black/95 border-b border-white/5 px-6 py-4 flex items-center justify-between backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <Link
-              href={`/tournaments/${tournamentId}/bracket`}
+              href={`/tournaments/${tournamentId}?tab=bracket`}
               className="text-[9px] font-black uppercase tracking-widest text-white/20 hover:text-white transition-all"
             >
               ← Bracket

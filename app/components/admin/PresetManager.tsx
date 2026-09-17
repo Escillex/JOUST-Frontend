@@ -488,7 +488,7 @@ export default function PresetManager() {
                    <h4 className="text-xs font-black text-white uppercase tracking-widest">{tpl.name}</h4>
                    <span className="text-[10px] font-black text-primary/60 uppercase tracking-[0.2em]">{tpl.system.replace(/_/g, " ")}</span>
                  </div>
-                  <button onClick={() => handleDelete(tpl.id)} disabled={deletingId === tpl.id} className="text-[10px] text-white/60 hover:text-red-500 transition-colors relative z-20 p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none">{deletingId === tpl.id ? "…" : "✕"}</button>
+                  <button onClick={() => handleDelete(tpl.id)} disabled={deletingId === tpl.id} className="text-[10px] text-white/60 hover:text-red-500 transition-colors relative z-20 p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none">{deletingId === tpl.id ? "…" : "×"}</button>
                </div>
                
                <p className="text-[10px] text-white/60 leading-relaxed italic mb-4 line-clamp-2">
@@ -513,8 +513,8 @@ export default function PresetManager() {
                             <option key={g.id} value={g.id} className="bg-background">{g.name}</option>
                           ))}
                         </select>
-                        <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] text-primary hover:text-white px-1">✓</button>
-                        <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/60 hover:text-white px-1">✕</button>
+                        <button onClick={() => handleUpdateGame(tpl.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-white px-1">Save</button>
+                        <button onClick={() => setEditingGameId(null)} className="text-[10px] text-white/60 hover:text-white px-1">×</button>
                       </div>
                     ) : (
                       <button
@@ -524,7 +524,7 @@ export default function PresetManager() {
                       >
                         {tpl.game?.name
                           ?? (tpl.gameName ? `${tpl.gameName} (legacy)` : "No game")}{" "}
-                        <span className="text-white/60">✎</span>
+                        <span className="text-white/60">Edit</span>
                       </button>
                     )}
                   </div>

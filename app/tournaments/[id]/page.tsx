@@ -14,6 +14,7 @@ import {
 } from "../../utils/api";
 import { Tournament } from "../types";
 import {
+  getTieBreakerOrder,
   getTournamentConfig,
   systemExplanation,
   systemLabel,
@@ -37,15 +38,44 @@ const BracketPreview = dynamic(
     ),
   },
 );
+
+/**
+ * The REAL bracket, drawn from the rounds that are being played —
+ * `BracketPreview` above is only the pre-start seeding preview, which is why
+ * this tab used to insist the bracket had not been drawn yet on tournaments
+ * that were finished. Same lazy treatment: it is the same ReactFlow dependency.
+ */
+const EliminationLayout = dynamic(
+  () => import("./bracket/Formats/EliminationLayout"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[400px] flex items-center justify-center">
+        <SkeletonStatus label="Loading bracket" />
+        <Skeleton className="w-full h-full" />
+      </div>
+    ),
+  },
+);
 import { useToast } from "../../components/ui/Toast";
 import TournamentBuildsPanel from "../../components/tournaments/TournamentBuildsPanel";
+import PairingsView from "../../components/tournaments/PairingsView";
+import StandingsTable from "../../components/tournaments/StandingsTable";
+import type { LeaderboardEntry } from "./bracket/types";
 import GameIcon from "../../components/ui/GameIcon";
 import ProfileAvatar from "../../components/profile/ProfileAvatar";
-import { describeStatus, formatWhen } from "../../utils/tournamentStatus";
+import { formatWhen, stateLine } from "../../utils/tournamentStatus";
 import { actionFor } from "../../utils/tournamentAction";
 
-type TabId = "overview" | "players" | "bracket" | "builds";
-const TAB_IDS: TabId[] = ["overview", "players", "bracket", "builds"];
+type TabId = "overview" | "players" | "pairings" | "standings" | "bracket" | "builds";
+const TAB_IDS: TabId[] = [
+  "overview",
+  "players",
+  "pairings",
+  "standings",
+  "bracket",
+  "builds",
+];
 
 function TournamentViewContent() {
   const { toast } = useToast();
@@ -60,11 +90,15 @@ function TournamentViewContent() {
   const [joining, setJoining] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
   const [respondingToInvite, setRespondingToInvite] = useState(false);
+  /** The ranking table's rows. Fetched separately from the tournament because
+   *  the standings are computed, not stored on it. */
+  const [standings, setStandings] = useState<LeaderboardEntry[]>([]);
+  const [standingsLoading, setStandingsLoading] = useState(true);
 
   // The open tab lives in the URL, so a player can be sent straight to the
   // roster or the bracket and Back returns where it should.
   const tabParam = searchParams.get("tab");
-  const activeTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : "overview";
+  const requestedTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : "overview";
   const setTab = (tab: TabId) => {
     const next = new URLSearchParams(Array.from(searchParams.entries()));
     if (tab === "overview") next.delete("tab");
@@ -111,6 +145,37 @@ function TournamentViewContent() {
       setLoading(false);
     }
   }, [tournamentId, loadInvitation]);
+
+  // Standings are only meaningful once something has been played, so this does
+  // not run for an OPEN tournament — and a failure leaves the table empty
+  // rather than taking the page down (Core Rule 8).
+  //
+  // Keyed on the ROUND COUNT rather than the tournament object: `fetchData`
+  // hands back a fresh object on every poll, which would otherwise refetch the
+  // standings on a timer for no reason. A new round is the thing that changes
+  // them.
+  const tournamentStatus = tournament?.status;
+  const roundCount = ((tournament as unknown as { rounds?: unknown[] })?.rounds ?? []).length;
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    if (!tournamentStatus || tournamentStatus === "OPEN" || tournamentStatus === "UPCOMING") return;
+    let alive = true;
+    authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEADERBOARD(tournamentId))
+      .then(safeJson)
+      .then((rows) => {
+        if (alive && Array.isArray(rows)) setStandings(rows);
+      })
+      .catch(() => {})
+      // Only ever set false: a refetch keeps the table that is already on
+      // screen instead of flashing a skeleton over good data.
+      .finally(() => {
+        if (alive) setStandingsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tournamentId, tournamentStatus, roundCount]);
 
   useEffect(() => {
     if (tournamentId) {
@@ -162,7 +227,7 @@ function TournamentViewContent() {
         body: JSON.stringify({ userId: (user as any).id || (user as any).sub }),
       });
       if (res.ok) {
-        router.push(`/tournaments/${tournamentId}/lobby`);
+        router.push(`/tournaments/${tournamentId}`);
       } else {
         // Toast instead of alert(): alert() blocks the whole page and
         // is not allowed in this project.
@@ -216,19 +281,33 @@ function TournamentViewContent() {
 
   const myId = user?.sub || (user as any)?.id;
   const isJoined = tournament.participants.some(p => p.userId === myId);
-  const status = describeStatus(tournament, isJoined);
   const when = formatWhen(tournament.date);
   const system = typeof tournament.format === "object" ? tournament.format?.system : null;
   const action = actionFor({ tournament, userId: myId, isJoined });
   const canManage = tournament.canManage;
   const started = tournament.status === "ONGOING" || tournament.status === "COMPLETED";
 
+  // Rounds exist from the moment a tournament starts, which is also when
+  // pairings and standings start to mean anything.
+  const hasRounds = ((tournament as unknown as { rounds?: unknown[] }).rounds ?? []).length > 0;
+  // Swiss and round robin are not trees; their structure is the standings
+  // table, so they get no Bracket tab at all.
+  const isTree = system === "SINGLE_ELIMINATION" || system === "DOUBLE_ELIMINATION" || system === "HYBRID";
+
   const tabs: { id: TabId; label: string }[] = [
     { id: "overview", label: "Overview" },
     { id: "players", label: `Players · ${tournament.participants.length}` },
-    { id: "bracket", label: "Bracket" },
+    ...(hasRounds ? [{ id: "pairings" as TabId, label: "Pairings" }] : []),
+    ...(hasRounds ? [{ id: "standings" as TabId, label: "Standings" }] : []),
+    ...(isTree ? [{ id: "bracket" as TabId, label: "Bracket" }] : []),
     { id: "builds", label: "Builds" },
   ];
+
+  // Validated against the tabs this tournament actually has, not merely against
+  // every id that exists. `/tournaments/:id/bracket` redirects to `?tab=bracket`,
+  // so a Swiss event's old bracket link was drawing its rounds as an
+  // elimination tree — columns of matches with nothing linking them.
+  const activeTab: TabId = tabs.some((t) => t.id === requestedTab) ? requestedTab : "overview";
 
   const cfg = getTournamentConfig(tournament) as any;
   const isHybrid = system === "HYBRID";
@@ -275,7 +354,7 @@ function TournamentViewContent() {
                 rel="noopener noreferrer"
                 className="text-primary underline decoration-primary/40 underline-offset-4 hover:text-primary-light transition-colors"
               >
-                {tournament.prizePool} <span aria-hidden>↗</span>
+                {tournament.prizePool} <span aria-hidden>→</span>
               </a>
             : tournament.prizePool)
         : "None",
@@ -341,24 +420,17 @@ function TournamentViewContent() {
                 {tournament.name}
               </h1>
 
+              {/* No LIVE badge (agreed 2026-09-16). The badge was a flag, and a
+                  flag goes stale — a finished tournament still read LIVE on the
+                  bracket page. This line is computed from the rounds and the
+                  results, so it cannot disagree with them. "You're in" stays a
+                  chip because it is about the viewer, not the tournament. */}
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border ${
-                    status.tone === "now"
-                      ? "bg-[#FF4D4D] border-[#FF4D4D] text-white"
-                      : isJoined
-                        ? "bg-primary border-primary text-black"
-                        : status.tone === "open"
-                          ? "border-primary text-primary"
-                          : "border-component-border text-white/70"
-                  }`}
-                >
-                  {status.tone === "now" && (
-                    <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                  )}
-                  {status.tone === "open" && !isJoined && <span aria-hidden>● </span>}
-                  {status.label}
-                </span>
+                {isJoined && tournament.status !== "COMPLETED" && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest border bg-primary border-primary text-black">
+                    You&rsquo;re in
+                  </span>
+                )}
 
                 {tournament.game && (
                   <span className="inline-flex items-center gap-2 px-2.5 py-1 border border-component-border text-[10px] font-black uppercase tracking-widest text-white">
@@ -367,6 +439,8 @@ function TournamentViewContent() {
                   </span>
                 )}
               </div>
+
+              <p className="text-sm text-white/80 font-medium">{stateLine(tournament)}</p>
 
               <p className="text-sm text-white/70">
                 {when ?? "Date to be announced"}
@@ -428,7 +502,7 @@ function TournamentViewContent() {
                         Report
                       </Link>
                       <Link
-                        href={`/tournaments/${tournamentId}/bracket`}
+                        href={`/tournaments/${tournamentId}?tab=bracket`}
                         className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
                       >
                         Full bracket
@@ -613,6 +687,38 @@ function TournamentViewContent() {
             </motion.div>
           )}
 
+          {activeTab === "pairings" && (
+            <motion.div
+              key="pairings"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+            >
+              <PairingsView
+                tournament={tournament}
+                currentUserId={myId}
+                canManage={!!tournament.canManage}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === "standings" && (
+            <motion.div
+              key="standings"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+            >
+              <StandingsTable
+                entries={standings}
+                tieBreakerOrder={getTieBreakerOrder(tournament)}
+                fieldSize={tournament.participants.length}
+                currentUserId={myId}
+                loading={standingsLoading}
+              />
+            </motion.div>
+          )}
+
           {activeTab === "bracket" && (
             <motion.div
               key="bracket"
@@ -621,14 +727,19 @@ function TournamentViewContent() {
               exit={{ opacity: 0, y: -12 }}
               className="flex flex-col gap-4"
             >
-              {tournament.status === "OPEN" || tournament.status === "UPCOMING" ? (
-                <div className="py-20 text-center border-2 border-dashed border-white/10">
-                  <p className="text-sm text-white/50">
-                    The bracket is drawn when the tournament starts.
-                  </p>
-                </div>
-              ) : (
-                <>
+              {/* Branch on whether rounds EXIST, not on the seeding mode.
+                  `BracketPreview` is a pre-start seeding preview and returns a
+                  "drawn when the tournament starts" note whenever seeding is
+                  random — which is the default. Rendering it for ONGOING and
+                  COMPLETED tournaments meant every started tournament, in every
+                  system, told its players the bracket had not been drawn yet,
+                  forever, including finished ones with a champion. */}
+              {!hasRounds ? (
+                /* Before the start there are no rounds to draw, so this is the
+                   one place `BracketPreview` belongs: with manual seeding it
+                   previews the intended first round, and with a random draw it
+                   says so itself. */
+                <div className="h-[420px] border border-white/10 bg-component-background">
                   <BracketPreview
                     tournament={tournament}
                     tournamentId={tournamentId}
@@ -638,13 +749,28 @@ function TournamentViewContent() {
                     addLog={() => {}}
                     viewMode="BRACKET"
                   />
-                  <Link
-                    href={`/tournaments/${tournamentId}/bracket`}
-                    className="self-start text-[11px] font-black uppercase tracking-widest text-primary hover:text-primary-light transition-colors"
-                  >
-                    Open full bracket →
-                  </Link>
-                </>
+                </div>
+              ) : (
+                /* Full-bleed on a phone (agreed 2026-09-17, option 4B): the
+                   canvas was 348px wide inside the page gutter and showed three
+                   of fifteen matches. It now runs edge to edge at 70vh — the
+                   same escape the tab strip above uses — and clears the fixed
+                   bottom navigation. Tall on desktop because at a legible zoom
+                   a double-elimination bracket is taller than 600px and the
+                   round captions were the part getting clipped. */
+                <div className="-mx-5 md:mx-0 mb-20 md:mb-0 h-[70vh] md:h-[min(78vh,880px)] md:min-h-[520px] border-y md:border border-white/10 bg-component-background">
+                  <EliminationLayout
+                    tournament={tournament}
+                    leaderboard={standings}
+                    // Read-only here: scoring lives on the manage page, and
+                    // the tree has never offered it even to admins.
+                    isAdmin={false}
+                    updating={null}
+                    onOpenScoring={() => {}}
+                    addLog={() => {}}
+                    currentUserId={myId}
+                  />
+                </div>
               )}
             </motion.div>
           )}

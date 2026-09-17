@@ -108,7 +108,9 @@ export default function MobileView({ user, awards, data }: Props) {
           )}
         </HubDoor>
 
-        <HubDoor href="/leaderboards" title="Your record" accent="record">
+        {/* Was a second door to /leaderboards — two of six went to the same
+            page. Your record belongs with your matches. */}
+        <HubDoor href={`${profileHref(user)}/matches`} title="Your record" accent="record">
           {record ? (
             <>
               <span className="text-white font-semibold">#{record.rank}</span> · {record.points} pts
@@ -122,7 +124,7 @@ export default function MobileView({ user, awards, data }: Props) {
         </HubDoor>
 
         <HubDoor
-          href="/leaderboards"
+          href={topBoard ? "/leaderboards" : "/profile/edit#games"}
           title="Boards"
           accent="board"
           foot={
@@ -150,7 +152,7 @@ export default function MobileView({ user, awards, data }: Props) {
           )}
         </HubDoor>
 
-        <HubDoor href={profileHref(user)} title="Collection" accent="collection">
+        <HubDoor href={`${profileHref(user)}#gallery`} title="Collection" accent="collection">
           {data.collection.medals + data.collection.plaques > 0 ||
           data.collection.photos + data.collection.builds > 0 ? (
             <>
@@ -200,12 +202,6 @@ export default function MobileView({ user, awards, data }: Props) {
         </HubDoor>
       </div>
 
-      <Link
-        href="/profile/edit"
-        className="text-center text-[10px] font-black uppercase tracking-[0.2em] text-white/35 hover:text-primary transition-colors font-poppins py-2"
-      >
-        Settings
-      </Link>
     </div>
   );
 }

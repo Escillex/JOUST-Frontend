@@ -63,7 +63,7 @@ interface ReportTournament {
 interface Standing {
   rank: number; userId: string; username: string; displayName?: string | null; isGuest?: boolean;
   points: number; wins: number; losses: number; draws: number;
-  matchWinPct: number; omw: number; oomw: number;
+  matchWinPct: number; omw: number; oomw: number; gw: number; ogw: number;
 }
 
 const SYSTEM_LABEL: Record<string, string> = {

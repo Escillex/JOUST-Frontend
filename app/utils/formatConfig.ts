@@ -117,13 +117,18 @@ export function getTrackerSettings(config: FormatConfig | null | undefined): {
  *
  *  Mirrors the backend in two steps, because the default lives in two places:
  *  `resolveConfig` returns `tieBreakerOrder ?? []` (format-config.helper.ts),
- *  and the sorter substitutes `['omw','oomw','matchWinPct']` when that array is
- *  empty (leaderboard.service.ts `sortEntries` / `tiebreakCriterion`). An empty
- *  configured array therefore means "use the default", not "no tiebreakers".
+ *  and the sorter substitutes `LeaderboardService.DEFAULT_TIEBREAK_ORDER` when
+ *  that array is empty. An empty configured array therefore means "use the
+ *  default", not "no tiebreakers".
+ *
+ *  Changed 2026-09-16 with GW%: the backend default is now `omw, gw, oomw`,
+ *  the conventional order for best-of-three formats. This constant must track
+ *  it — the UI names the tiebreaker that decided a tie, so a stale copy here
+ *  would explain a rule the server did not apply.
  *
  *  Read this rather than hardcoding OMW anywhere: the order is configurable,
  *  and three places in the UI previously asserted OMW regardless of it. */
-export const DEFAULT_TIE_BREAKER_ORDER = ['omw', 'oomw', 'matchWinPct'];
+export const DEFAULT_TIE_BREAKER_ORDER = ['omw', 'gw', 'oomw'];
 
 export function getTieBreakerOrder(t: TournamentLike): string[] {
   const configured = getTournamentConfig(t)?.tieBreakerOrder;
@@ -137,6 +142,8 @@ export function tieBreakerLabel(key: string): string {
   const labels: Record<string, string> = {
     omw: 'OMW%',
     oomw: 'OOMW%',
+    gw: 'GW%',
+    ogw: 'OGW%',
     matchWinPct: 'Match Win%',
     wins: 'Wins',
     losses: 'Losses',
@@ -287,4 +294,19 @@ const SYSTEM_EXPLANATIONS: Record<string, string> = {
 export function systemExplanation(system: string | null | undefined): string | null {
   if (!system) return null;
   return SYSTEM_EXPLANATIONS[system] ?? null;
+}
+
+/** Who may move a match from PENDING to ONGOING.
+ *
+ *  Mirrors `resolveMatchStart` in the backend's `format-config.helper.ts`,
+ *  including its default: the two players plus staff. Organizer-only start is
+ *  the strict setting a supervised venue opts into — it is not the norm, because
+ *  at a casual event the players are at the table and the organizer is not.
+ *  The server enforces this in `MatchService.startMatch`; this only decides
+ *  whether to draw the button. */
+export function getMatchStartWho(
+  config: FormatConfig | null | undefined,
+): "STAFF" | "STAFF_AND_PARTICIPANTS" {
+  const raw = (config as Record<string, unknown> | null | undefined)?.matchStartWho;
+  return raw === "STAFF" ? "STAFF" : "STAFF_AND_PARTICIPANTS";
 }

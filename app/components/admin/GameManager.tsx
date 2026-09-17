@@ -382,7 +382,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
                       title="Delete game"
                       className="text-[10px] text-white/60 hover:text-red-500 transition-colors p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none"
                     >
-                      {deletingId === g.id ? "…" : "✕"}
+                      {deletingId === g.id ? "…" : "×"}
                     </button>
                   </div>
                 )}

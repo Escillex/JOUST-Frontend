@@ -53,7 +53,15 @@ export default function AddParticipantsPanel({ tournament, allUsers, guestUserna
         <label className="text-xs font-semibold text-[#888888] block">Add Guest Participant</label>
         <div className="flex gap-2">
           <input placeholder="Guest Username" value={guestUsername} onChange={e => setGuestUsername(e.target.value)} className={inputCls} />
-          <button onClick={onAddGuest} className="w-10 h-10 bg-primary text-black font-semibold hover:brightness-90 transition-colors rounded flex items-center justify-center">
+          {/* Stays compact next to the field, so it gets its name from the
+              attributes rather than from visible text — it was the other
+              icon-only button in the app with no accessible name at all. */}
+          <button
+            onClick={onAddGuest}
+            aria-label="Add guest participant"
+            title="Add guest participant"
+            className="w-10 h-10 shrink-0 bg-primary text-black font-semibold hover:brightness-90 transition-colors rounded flex items-center justify-center"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
           </button>
         </div>

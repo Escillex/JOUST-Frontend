@@ -125,7 +125,7 @@ export default function ManagerTournamentTable({ tournaments, onComplete, comple
                 <td className="p-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Link 
-                      href={`/tournaments/${t.id}/lobby`}
+                      href={`/tournaments/${t.id}`}
                       className="px-3 py-1.5 bg-background hover:bg-white/10 border border-white/20 text-white text-xs font-semibold rounded transition-colors"
                     >
                       Lobby
@@ -202,7 +202,7 @@ export default function ManagerTournamentTable({ tournaments, onComplete, comple
              </div>
 
              <div className="flex items-center gap-2 pt-1">
-                <Link href={`/tournaments/${t.id}/lobby`} className="flex-1 text-center px-2 py-2 bg-background border border-white/20 text-white text-xs font-semibold rounded transition-colors">
+                <Link href={`/tournaments/${t.id}`} className="flex-1 text-center px-2 py-2 bg-background border border-white/20 text-white text-xs font-semibold rounded transition-colors">
                   Lobby
                 </Link>
                 <Link href={`/tournaments/${t.id}/manage`} className="flex-1 text-center px-2 py-2 bg-primary/10 text-primary border border-primary/20 text-xs font-semibold rounded transition-colors">

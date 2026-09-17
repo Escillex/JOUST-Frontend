@@ -113,11 +113,21 @@ export default function FormatRulesPanel({
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-4">
           <h3 className="text-sm font-semibold text-white">Match & Scoring Rules</h3>
+          {/* Labelled, because this is the only way into edit mode and it was a
+              bare pencil glyph: no text, no title, no accessible name. The panel
+              below shows the rules as plain paragraphs, so at rest it reads as a
+              finished summary rather than something you can change — while the
+              two controls it toggles between, Discard and Save, are both words. */}
           {!isEditing && (
-            <button onClick={onToggleEdit} className="text-primary hover:text-white transition-colors p-1.5 bg-primary/10 rounded">
+            <button
+              onClick={onToggleEdit}
+              title="Edit the match and scoring rules"
+              className="group/edit flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded hover:bg-primary hover:text-black transition-colors"
+            >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
+              Edit rules
             </button>
           )}
         </div>

@@ -258,19 +258,40 @@ function CoinFlipper({
     setTimeout(() => setFlipping(false), 700);
   };
 
+  // The newest coin result, whoever threw it — the coin shows what it landed on
+  // rather than a currency symbol, which is what a `$` on the face made it look
+  // like: a money button, not a coin, and it never changed when the coin did.
+  const latest = Object.values(flips ?? {})
+    .filter((f) => f.kind === 'COIN')
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const face = flipping ? '' : latest?.result?.toUpperCase() === 'HEADS' ? 'H' : latest?.result?.toUpperCase() === 'TAILS' ? 'T' : '';
+
   return (
     <div className="flex flex-col items-center gap-4 w-full max-w-[220px]">
       <button
         onClick={doFlip}
         disabled={!canFlip}
+        aria-label={latest ? `Coin — last flip ${latest.result}. Flip again` : 'Flip the coin'}
         className={`relative w-20 h-20 rounded-full border-[4px] border-primary bg-black flex items-center justify-center shadow-[0_0_20px_rgba(82,185,70,0.3)] transition-transform ${
           canFlip ? 'hover:scale-105 cursor-pointer' : 'opacity-40 cursor-not-allowed'
         } ${flipping ? 'animate-[spin-y_0.2s_linear_infinite]' : ''}`}
       >
-        <span className="text-2xl font-black text-primary">$</span>
+        {face ? (
+          <span className="text-3xl font-black text-primary leading-none">{face}</span>
+        ) : (
+          /* Nothing thrown yet: a struck ring reads as a coin edge-on, where a
+             letter would read as a result nobody has produced. */
+          <span aria-hidden className="w-7 h-7 rounded-full border-2 border-primary/50" />
+        )}
       </button>
-      <span className="text-[9px] font-black uppercase tracking-widest text-white/30 h-3">
-        {canFlip ? (flipping ? 'FLIPPING…' : 'TAP TO FLIP') : 'VIEW ONLY'}
+      <span className="text-[10px] font-black uppercase tracking-widest text-white/40 h-3">
+        {flipping
+          ? 'FLIPPING…'
+          : latest
+            ? latest.result?.toUpperCase()
+            : canFlip
+              ? 'TAP TO FLIP'
+              : 'VIEW ONLY'}
       </span>
       <FlipList flips={flips} kind="COIN" nameFor={nameFor} />
       <style>{`@keyframes spin-y { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }`}</style>

@@ -46,12 +46,15 @@ export default function GameSeriesScore({
 }: GameSeriesScoreProps) {
   return (
     <div className="flex flex-col items-center gap-3 py-4 border-y border-white/5">
-      {/* Player labels */}
-      <div className="w-full flex justify-between px-2">
-        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30 truncate max-w-[100px]">
+      {/* Player labels. Capped at a share of the row rather than a flat 100px:
+          at 9px with 0.3em tracking that fitted about eleven characters, so
+          "Cy Nakamura P902" read as "CY NAKAMU…" in the middle of a 700px
+          drawer with the space to spell it out twice over. */}
+      <div className="w-full flex justify-between gap-4 px-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30 truncate min-w-0 flex-1">
           {player1Name}
         </span>
-        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30 truncate max-w-[100px] text-right">
+        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30 truncate min-w-0 flex-1 text-right">
           {player2Name}
         </span>
       </div>

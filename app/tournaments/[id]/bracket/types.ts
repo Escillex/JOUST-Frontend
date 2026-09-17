@@ -45,6 +45,14 @@ export interface LeaderboardEntry {
   matchWinPct: number;
   omw: number;
   oomw: number;
+  /** Games won / games played in this tournament, from the match scores. */
+  gw: number;
+  /** The mean of this player's opponents' GW%, floored like OMW. */
+  ogw: number;
+  /** Served by the per-tournament board; the global one carries a slug too.
+   *  Without a slug `profileHref` falls back to the id, which the backend
+   *  resolves either way. */
+  avatarUrl?: string | null;
 }
 
 /** One line in the bracket page's Activity Log panel. Defined once here; it was

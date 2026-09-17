@@ -82,6 +82,12 @@ export interface Tournament {
   name: string;
   description?: string | null;
   maxPlayers: number;
+  /** Builds settings, served on every tournament read. `buildsRequired` gates
+   *  the manage page's Builds tab: an empty review panel is not a destination. */
+  buildsRequired?: boolean;
+  /** Mirrors BuildVisibility in schema.prisma. */
+  buildVisibility?: "PUBLIC" | "AFTER_COMPLETION" | "STAFF_ONLY";
+  buildsLockAtStart?: boolean;
   /** Free text since 2026-09-15 — "Trophy", "₱2,000", "Booster box". */
   prizePool: string | null;
   /** Optional photo of the prize; the prize text links to it when set. */

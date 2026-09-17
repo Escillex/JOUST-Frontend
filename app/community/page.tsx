@@ -259,7 +259,9 @@ export default function CommunityPage() {
                         key={c.tournamentId}
                         className="flex items-center gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl"
                       >
-                        <span className="text-2xl shrink-0" title="Champion">🥇</span>
+                        <span className="shrink-0 px-2 py-1 border border-primary/40 text-primary text-[9px] font-black uppercase tracking-[0.18em]">
+                          Champion
+                        </span>
                         {c.winner ? (
                           // Two sibling links (avatar+name -> profile, "won X" ->
                           // tournament). They must NOT nest: an <a> inside an <a>

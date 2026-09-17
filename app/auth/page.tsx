@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,12 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [showSignupSuccess, setShowSignupSuccess] = useState(false);
+  /** Set when this page instance created the account, so the sign-in that
+   *  follows knows it is the account's first. `setPickingGames(true)` used to be
+   *  reachable only from the Google path and from the recovery-codes panel, so a
+   *  plain email sign-up never saw the games screen at all — and on a deployment
+   *  with no mail configured, which never issues recovery codes, nobody did. */
+  const justRegistered = useRef(false);
   const [busy, setBusy] = useState(false);
 
   // Sign-in is two steps now. `challenge` is the short-lived token the server
@@ -402,14 +408,25 @@ export default function AuthPage() {
           return;
         }
         if (mode === "login") {
-          setMessage("Success: Signed in");
           if (data?.token) {
             localStorage.setItem("token", data.token);
             await refreshUser();
           }
+          // Straight into the games screen on the account's first sign-in; it
+          // sends them on to /home itself.
+          if (justRegistered.current) {
+            justRegistered.current = false;
+            setMessage("");
+            setPickingGames(true);
+            return;
+          }
+          setMessage("Success: Signed in");
           setTimeout(() => router.push("/home"), 800);
         } else {
+          justRegistered.current = true;
           setShowSignupSuccess(true);
+          // The handle is kept so the sign-in that follows is one field, not two.
+          setPassword("");
           setTimeout(() => {
             setShowSignupSuccess(false);
             setMode("login");

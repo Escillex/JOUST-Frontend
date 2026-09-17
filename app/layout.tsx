@@ -2,10 +2,16 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Questrial } from "next/font/google";
 import "./globals.css";
 
+// 900 is the weight this design actually uses: `font-black` appears 672 times
+// across the app against 224 `font-semibold` and 172 `font-bold`. Loading only
+// 400–700 meant every one of those 672 headings, labels and buttons was
+// SYNTHESISED — the browser smearing the 700 face to fake 900 — which is what
+// made the type look thickened and badly hinted, especially on the bracket,
+// where cards are read at a fit zoom well under 1.
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "900"],
 });
 const questrial = Questrial({
   variable: "--font-questrial",

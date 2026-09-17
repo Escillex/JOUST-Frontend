@@ -448,7 +448,7 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
       await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.UPDATE_SEED(tournamentId, toId), {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seed: fromSeed }),
       });
-      addLog("SEED SWAP", `${displayNameOf(fromP.user).toUpperCase()} ↔ ${displayNameOf(toP.user).toUpperCase()}`);
+      addLog("SEED SWAP", `${displayNameOf(fromP.user).toUpperCase()} / ${displayNameOf(toP.user).toUpperCase()}`);
       onRefresh();
     } catch { addLog("ERROR", "SEED SWAP FAILED"); }
     finally { setSwapping(false); }
@@ -558,7 +558,7 @@ export default function BracketPreview({ tournament, isAdmin, currentUserId, tou
       <div className="h-full flex items-center justify-center bg-[#0a0a0a] p-10">
         <div className="max-w-md w-full text-center border border-white/10 bg-black/40 rounded-2xl px-8 py-12 space-y-4">
           <div className="mx-auto w-10 h-10 rounded-full border border-primary/30 bg-primary/5 flex items-center justify-center text-primary text-lg">
-            ⚄
+            <span aria-hidden className="w-3.5 h-3.5 rounded-full border-2 border-primary/50" />
           </div>
           <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">
             Random Draw

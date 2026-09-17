@@ -394,6 +394,8 @@ export const API_ENDPOINTS = {
     BACKUP_RESTORE: (name: string) =>
       `/admin/backups/${encodeURIComponent(name)}/restore`,
     BACKUP_IMPORT: '/admin/backups/import',
+    /** Empty the database for debugging (typed confirmation + safety copy). */
+    BACKUP_RESET: '/admin/backups/reset',
   },
   /** Awards (todo.md obj. 4.1). Catalog and grants are ADMIN-only; the
    *  showcase is the signed-in user arranging their own. */
