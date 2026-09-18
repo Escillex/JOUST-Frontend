@@ -69,6 +69,10 @@ export default function FormatRulesPanel({
   const hasFormat = !!tournament.formatId;
   const tracker = getTrackerSettings(formatConfig);
 
+  const advancedKeys = ["tieBreakerOrder", "scoreSubmissionRule", "utilitiesEnabled", "utilityCoinWho", "utilityDiceWho", "utilityTimerWho"];
+  const coreFields = fields.filter(f => !advancedKeys.includes(f.key));
+  const advancedFields = fields.filter(f => advancedKeys.includes(f.key));
+
   const handleChange = (field: ConfigField, rawValue: string | boolean) => {
     if (isBooleanField(field)) {
       onRuleChange(field.key, Boolean(rawValue));
@@ -108,6 +112,131 @@ export default function FormatRulesPanel({
     onRuleChange(field.key, value === "" ? null : Number(value));
   };
 
+  const renderEditField = (field: ConfigField) => {
+    const rawValue = (formatConfig as any)[field.key];
+    const value = isArrayField(field)
+      ? Array.isArray(rawValue)
+        ? rawValue.join(", ")
+        : ""
+      : rawValue ?? "";
+
+    return (
+      <div key={field.key} className="space-y-1">
+        <label className="text-xs font-semibold text-[#888888] block">{field.label}</label>
+        {field.key === "tieBreakerOrder" ? (
+          <div className="flex flex-wrap gap-2 mt-2 bg-background border border-white/20 p-2 rounded">
+            {[
+              { value: "omw", label: "OMW %" },
+              { value: "gw", label: "GW %" },
+              { value: "oomw", label: "OOMW %" },
+              { value: "ogw", label: "OGW %" },
+              { value: "matchWinPct", label: "Match Win %" },
+              { value: "wins", label: "Total Wins" },
+              { value: "losses", label: "Total Losses" }
+            ].map(opt => {
+              const currentTiebreakers = Array.isArray(rawValue) ? rawValue : (rawValue ? String(rawValue).split(',').map(s=>s.trim()) : []);
+              const isSelected = currentTiebreakers.includes(opt.value);
+              const orderIndex = currentTiebreakers.indexOf(opt.value);
+              return (
+                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer group bg-[#111] px-2 py-1 rounded border border-white/5 hover:border-primary/50 transition-colors">
+                  <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary/50"}`}>
+                    {isSelected && <span className="text-[8px] font-bold text-black">{orderIndex + 1}</span>}
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                      let newTiebreakers = [...currentTiebreakers];
+                      if (isSelected) {
+                        newTiebreakers = newTiebreakers.filter(t => t !== opt.value);
+                      } else {
+                        newTiebreakers.push(opt.value);
+                      }
+                      onRuleChange(field.key, newTiebreakers.length > 0 ? newTiebreakers : null);
+                    }}
+                    className="hidden"
+                  />
+                  <span className="text-[11px] text-[#E0E0E0]">{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : field.key === "allowDraw" ? (
+          <div className="flex gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => handleChange(field, false)}
+              className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
+                !rawValue
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "bg-background border-white/20 text-[#888888] hover:text-white"
+              }`}
+            >
+              Force Win
+            </button>
+            <button
+              type="button"
+              onClick={() => handleChange(field, true)}
+              className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
+                rawValue
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "bg-background border-white/20 text-[#888888] hover:text-white"
+              }`}
+            >
+              Permit Draws
+            </button>
+          </div>
+        ) : isBooleanField(field) ? (
+          // Fall back to the field's default when the config key is absent,
+          // so a default-true boolean (e.g. grandFinalReset) shows checked
+          // rather than reading undefined as "off".
+          (() => {
+            const boolVal = Boolean(rawValue ?? field.defaultValue);
+            return (
+          <label className="flex items-center gap-3 cursor-pointer group py-2">
+            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${boolVal ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary"}`}>
+              {boolVal && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+            </div>
+            <input
+              type="checkbox"
+              checked={boolVal}
+              onChange={(e) => handleChange(field, e.target.checked)}
+              className="hidden"
+            />
+            <span className="text-sm text-[#E0E0E0]">{boolVal ? "Enabled" : "Disabled"}</span>
+          </label>
+            );
+          })()
+        ) : isSelectField(field) ? (
+          <select
+            value={String(rawValue ?? field.defaultValue ?? "")}
+            onChange={(e) => handleChange(field, e.target.value)}
+            className={inputCls}
+          >
+            {field.options!.map((opt) => (
+              <option key={opt} value={opt} className="bg-background">
+                {opt}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type={isStringField(field) ? "text" : "number"}
+            value={value}
+            onChange={(e) => handleChange(field, e.target.value)}
+            placeholder={field.defaultValue !== null && field.defaultValue !== undefined ? String(field.defaultValue) : field.placeholder}
+            min={field.min}
+            max={field.max}
+            className={inputCls}
+          />
+        )}
+        {field.help && (
+          <p className="text-[11px] text-[#888888] leading-relaxed">{field.help}</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-[#000000] border border-white/20 p-4 md:p-6 rounded">
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
@@ -118,7 +247,25 @@ export default function FormatRulesPanel({
               below shows the rules as plain paragraphs, so at rest it reads as a
               finished summary rather than something you can change — while the
               two controls it toggles between, Discard and Save, are both words. */}
-          {!isEditing && (
+          {!isEditing && tournament.status === "ONGOING" ? (
+            <details className="group/danger">
+              <summary className="text-[10px] font-black text-[#FF4D4D]/60 uppercase tracking-widest cursor-pointer select-none hover:text-[#FF4D4D] transition-colors flex items-center gap-2">
+                <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                Danger Zone (Edit Live Rules)
+              </summary>
+              <div className="pt-2 pl-5">
+                <button
+                  onClick={onToggleEdit}
+                  className="group/edit flex items-center gap-1.5 px-2.5 py-1.5 bg-[#FF4D4D]/10 text-[#FF4D4D] text-[10px] font-black uppercase tracking-widest rounded hover:bg-[#FF4D4D] hover:text-black transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Edit live rules
+                </button>
+              </div>
+            </details>
+          ) : !isEditing && tournament.status !== "COMPLETED" && (
             <button
               onClick={onToggleEdit}
               title="Edit the match and scoring rules"
@@ -145,93 +292,19 @@ export default function FormatRulesPanel({
       ) : isEditing ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {fields.map((field) => {
-              const rawValue = (formatConfig as any)[field.key];
-              const value = isArrayField(field)
-                ? Array.isArray(rawValue)
-                  ? rawValue.join(", ")
-                  : ""
-                : rawValue ?? "";
-
-              return (
-                <div key={field.key} className="space-y-1">
-                  <label className="text-xs font-semibold text-[#888888] block">{field.label}</label>
-                  {field.key === "allowDraw" ? (
-                    <div className="flex gap-2 w-full">
-                      <button
-                        type="button"
-                        onClick={() => handleChange(field, false)}
-                        className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
-                          !rawValue
-                            ? "bg-primary/10 border-primary text-primary"
-                            : "bg-background border-white/20 text-[#888888] hover:text-white"
-                        }`}
-                      >
-                        Force Win
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleChange(field, true)}
-                        className={`flex-1 h-10 text-xs font-semibold border transition-colors rounded ${
-                          rawValue
-                            ? "bg-primary/10 border-primary text-primary"
-                            : "bg-background border-white/20 text-[#888888] hover:text-white"
-                        }`}
-                      >
-                        Permit Draws
-                      </button>
-                    </div>
-                  ) : isBooleanField(field) ? (
-                    // Fall back to the field's default when the config key is absent,
-                    // so a default-true boolean (e.g. grandFinalReset) shows checked
-                    // rather than reading undefined as "off".
-                    (() => {
-                      const boolVal = Boolean(rawValue ?? field.defaultValue);
-                      return (
-                    <label className="flex items-center gap-3 cursor-pointer group py-2">
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${boolVal ? "bg-primary border-primary" : "border-white/20 group-hover:border-primary"}`}>
-                        {boolVal && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={boolVal}
-                        onChange={(e) => handleChange(field, e.target.checked)}
-                        className="hidden"
-                      />
-                      <span className="text-sm text-[#E0E0E0]">{boolVal ? "Enabled" : "Disabled"}</span>
-                    </label>
-                      );
-                    })()
-                  ) : isSelectField(field) ? (
-                    <select
-                      value={String(rawValue ?? field.defaultValue ?? "")}
-                      onChange={(e) => handleChange(field, e.target.value)}
-                      className={inputCls}
-                    >
-                      {field.options!.map((opt) => (
-                        <option key={opt} value={opt} className="bg-background">
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type={isStringField(field) ? "text" : "number"}
-                      value={value}
-                      onChange={(e) => handleChange(field, e.target.value)}
-                      placeholder={field.defaultValue !== null && field.defaultValue !== undefined ? String(field.defaultValue) : field.placeholder}
-                      min={field.min}
-                      max={field.max}
-                      className={inputCls}
-                    />
-                  )}
-                  {field.help && (
-                    <p className="text-[11px] text-[#888888] leading-relaxed">{field.help}</p>
-                  )}
-                </div>
-              );
-            })}
+            {coreFields.map(renderEditField)}
           </div>
+          {advancedFields.length > 0 && (
+            <details className="group pt-4 border-t border-white/10">
+              <summary className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none hover:text-white transition-colors flex items-center gap-2">
+                <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                Advanced Rules
+              </summary>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-5 border-l border-white/10 mt-6">
+                {advancedFields.map(renderEditField)}
+              </div>
+            </details>
+          )}
 
           <div className="space-y-4 pt-4 border-t border-white/10">
             <div className="flex items-center space-x-3">
@@ -269,7 +342,7 @@ export default function FormatRulesPanel({
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-4">
-          {fields.map((field: any) => (
+          {coreFields.map((field: any) => (
             <div key={field.key} className="space-y-1">
               <p className="text-xs font-semibold text-[#888888]">{field.label}</p>
               <p className="text-sm text-white">
@@ -277,6 +350,26 @@ export default function FormatRulesPanel({
               </p>
             </div>
           ))}
+          {advancedFields.length > 0 && (
+            <div className="col-span-full mt-2 pt-4 border-t border-white/10">
+              <details className="group">
+                <summary className="text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none mb-4 hover:text-white transition-colors flex items-center gap-2">
+                  <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  Advanced Rules
+                </summary>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-4 pl-5 border-l border-white/10">
+                  {advancedFields.map((field: any) => (
+                    <div key={field.key} className="space-y-1">
+                      <p className="text-xs font-semibold text-[#888888]">{field.label}</p>
+                      <p className="text-sm text-white break-all">
+                        {getDisplayValue(field, formatConfig)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
           {fields.length === 0 && (
             <p className="col-span-full text-sm text-[#888888] italic">No specific config for this format</p>
           )}

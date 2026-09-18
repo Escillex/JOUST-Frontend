@@ -18,6 +18,7 @@ import SpecsPanel from "../../../components/tournaments/manage/SpecsPanel";
 import FormatRulesPanel from "../../../components/tournaments/manage/FormatRulesPanel";
 import AddParticipantsPanel from "../../../components/tournaments/manage/AddParticipantsPanel";
 import DeleteTournamentPanel from "../../../components/tournaments/manage/DeleteTournamentPanel";
+import InvitePlayerModal from "../../../components/tournaments/manage/InvitePlayerModal";
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
 import ManageSection from "../../../components/tournaments/manage/ManageSection";
 import PairingsView from "../../../components/tournaments/PairingsView";
@@ -58,15 +59,15 @@ function ControlRoomContent() {
   const [editState, setEditState] = useState({ name: "", description: "", formatId: "", maxPlayers: 0, prizePool: "", isPrivate: false, slug: "" });
 
   const [guestUsername, setGuestUsername]     = useState("");
+  const [isAddingGuest, setIsAddingGuest]     = useState(false);
+  const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [batchGuestCount, setBatchGuestCount] = useState<number | "">("");
-  const [selectedUserId, setSelectedUserId]   = useState("");
   const [batchLoading, setBatchLoading]       = useState(false);
   const [isStarting, setIsStarting]           = useState(false);
   // Set when Start is pressed on an odd Swiss/round-robin field: holds the data
   // for the bye warning so the organizer confirms before starting.
   const [oddWarning, setOddWarning]           = useState<{ warning: ByeWarning; byeResult: string } | null>(null);
-  const [isAddingGuest, setIsAddingGuest]     = useState(false);
-  const [isInviting, setIsInviting]           = useState(false);
   // userId currently being forfeited or replaced, so that row can show a busy
   // state and no two roster actions can overlap.
   const [actingOn, setActingOn]               = useState<string | null>(null);
@@ -246,7 +247,12 @@ function ControlRoomContent() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }),
       });
       const data = await safeJson(res);
-      if (res.ok) { toast("Guest registered", "success"); setGuestUsername(""); fetchData(); }
+      if (res.ok) { 
+        toast("Guest registered", "success"); 
+        setGuestUsername(""); 
+        setIsGuestModalOpen(false); 
+        fetchData(); 
+      }
       else { toast(data?.message || "Guest registration failed", "error"); }
     } finally {
       setIsAddingGuest(false);
@@ -274,21 +280,6 @@ function ControlRoomContent() {
     setBatchGuestCount("");
     toast(`${added} guest(s) added`, added > 0 ? "success" : "error");
     await fetchData();
-  };
-
-  const handleJoin = async (userId: string) => {
-    if (isInviting) return;
-    setIsInviting(true);
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId!), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
-      });
-      const data = await safeJson(res);
-      if (res.ok) { toast("Participant registered", "success"); fetchData(); }
-      else { toast(data?.message || "Registration failed", "error"); }
-    } finally {
-      setIsInviting(false);
-    }
   };
 
   const handleReorder = async (activeUserId: string, newIndex: number) => {
@@ -537,6 +528,45 @@ function ControlRoomContent() {
           onConfirm={() => void doStartTournament()}
         />
       )}
+      {isGuestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+          <div className="bg-[#1B1B1B] border border-white/20 rounded max-w-md w-full p-6 space-y-4 shadow-[0_0_40px_rgba(0,0,0,1)]">
+            <h3 className="text-sm font-semibold text-white mb-4">Add Guest Participant</h3>
+            <input
+              autoFocus
+              placeholder="Guest Username"
+              value={guestUsername}
+              onChange={e => setGuestUsername(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddGuest()}
+              className="h-10 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded w-full"
+            />
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setIsGuestModalOpen(false)}
+                disabled={isAddingGuest}
+                className="flex-1 h-10 text-xs font-semibold border border-white/20 text-[#B0B0B0] hover:text-white transition-colors rounded disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddGuest}
+                disabled={isAddingGuest || !guestUsername.trim()}
+                className="flex-1 h-10 text-xs font-semibold bg-primary text-black rounded hover:brightness-90 transition-colors disabled:opacity-50"
+              >
+                {isAddingGuest ? "Adding…" : "Add Guest"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isInviteModalOpen && tournament && (
+        <InvitePlayerModal
+          tournament={tournament}
+          tournamentId={tournamentId!}
+          onClose={() => setIsInviteModalOpen(false)}
+          onInvited={fetchData}
+        />
+      )}
       <div className="w-full px-4 md:px-8 py-8 max-w-[1600px] mx-auto">
         <ControlRoomHeader
           tournament={tournament}
@@ -545,6 +575,8 @@ function ControlRoomContent() {
           onViewBracket={() => router.push(`/tournaments/${tournamentId}?tab=bracket`)}
           onOpenTournament={handleOpenRegistration}
           onStartTournament={handleStartTournament}
+          onAddGuest={() => setIsGuestModalOpen(true)}
+          onInvitePlayer={() => setIsInviteModalOpen(true)}
           onRefresh={fetchData}
           connected={connected}
           lastUpdated={lastUpdated}
@@ -708,21 +740,15 @@ function ControlRoomContent() {
             actingOn={actingOn}
           />
 
-          {/* Adding people belongs with the roster, not in a panel seven
-              deep. Everything else that used to live in this column is now a
-              collapsed group under Settings. */}
+          {/* Bulk guest creation is the one add-control that has no header
+              entry point. A single guest is the header's Add Guest modal and a
+              registered player is the header's Invite Player button, so they
+              are deliberately not duplicated here. */}
           <AddParticipantsPanel
             tournament={tournament}
-            allUsers={allUsers}
-            guestUsername={guestUsername}
-            setGuestUsername={setGuestUsername}
             batchGuestCount={batchGuestCount}
             setBatchGuestCount={setBatchGuestCount}
-            selectedUserId={selectedUserId}
-            setSelectedUserId={setSelectedUserId}
-            onAddGuest={handleAddGuest}
             onBatchAddGuests={handleBatchAddGuests}
-            onInvitePlayer={() => selectedUserId && handleJoin(selectedUserId)}
             batchLoading={batchLoading}
           />
         </div>

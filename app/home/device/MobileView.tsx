@@ -31,177 +31,265 @@ interface Props {
 
 export default function MobileView({ user, awards, data }: Props) {
   const urgent = mostUrgent(data.entries);
-  const live = urgent ? entryAction(urgent).tone === "live" : false;
+  const live = urgent ? urgent.status === "ONGOING" || entryAction(urgent).tone === "live" : false;
   const record = data.record;
   const topBoard = data.boards.find((b) => b.myRank != null) ?? data.boards[0] ?? null;
   const openCount = data.openToJoin.length;
 
-  return (
-    <div className="flex flex-col gap-4 pb-24">
-      {/* Who you are — small, because the phone is here to do something. */}
-      <Link href={profileHref(user)} className="flex items-center gap-3 min-w-0">
-        <span className="relative w-11 h-11 shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-base font-black text-primary font-poppins overflow-hidden">
-          {user?.avatarUrl ? (
-            <Image
-              src={resolveImageUrl(user.avatarUrl)}
-              alt=""
-              aria-hidden
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          ) : (
-            displayNameOf(user)[0]?.toUpperCase() || "U"
-          )}
-        </span>
-        <span className="min-w-0">
-          <span className="block text-lg font-black uppercase tracking-tight text-white font-poppins leading-none truncate">
-            {displayNameOf(user)}
-          </span>
-          {handleOf(user) && (
-            <span className="block text-[11px] font-mono text-white/45 truncate">
-              {handleOf(user)}
-            </span>
-          )}
-        </span>
-        {awards.length > 0 && (
-          <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-white/45 font-poppins shrink-0">
-            {awards.length} {awards.length === 1 ? "award" : "awards"}
-          </span>
-        )}
-      </Link>
+  let recommended = null;
+  if (!urgent && data.openToJoin.length > 0) {
+    const userGameIds = new Set(data.boards.map((b) => b.game.id));
+    recommended = data.openToJoin.find((o) => o.game?.id && userGameIds.has(o.game.id)) || data.openToJoin[0];
+  }
 
-      <NowCard entry={urgent} />
-
-      <div className="grid grid-cols-2 gap-2.5">
+  if (urgent) {
+    return (
+      <div className="grid grid-cols-3 grid-rows-3 gap-2.5 h-[calc(100dvh-180px)]">
+        {/* ROW 1 */}
+        {/* Name [2x1] */}
         <HubDoor
-          href="/tournaments"
-          title="Compete"
-          live={live}
-          foot={
-            data.boards.length > 0 ? (
-              <span className="flex items-center gap-1">
-                {data.boards.slice(0, 3).map((b) => (
-                  <GameIcon key={b.game.id} game={b.game} size="chip" />
-                ))}
-              </span>
-            ) : undefined
-          }
+          href={profileHref(user)}
+          accent="primary"
+          className="col-span-2 row-span-1"
         >
-          {data.entries.length > 0 ? (
-            <>
-              <span className="text-white font-semibold">
-                {data.entries.length} entered
+          <div className="flex items-center gap-[6%] h-full mt-1">
+            <span className="relative w-[clamp(4rem,20cqw,7rem)] aspect-square shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-[clamp(1.5rem,10cqw,3rem)] font-black text-primary font-poppins overflow-hidden">
+              {user?.avatarUrl ? (
+                <Image src={resolveImageUrl(user.avatarUrl)} alt="" aria-hidden fill className="object-cover" unoptimized />
+              ) : (
+                displayNameOf(user)[0]?.toUpperCase() || "U"
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="text-[clamp(1.5rem,8cqw,2.5rem)] font-black text-white uppercase tracking-tighter font-poppins leading-[0.95] block truncate">
+                {displayNameOf(user)}
               </span>
-              {live && <span className="text-[#FF4D4D]"> · 1 live</span>}
-              <br />
-              {openCount > 0 ? `${openCount} open to join` : "Nothing else open"}
-            </>
-          ) : openCount > 0 ? (
-            <>
-              <span className="text-white font-semibold">{openCount} open to join</span>
-              <br />
-              {data.openToJoin[0]?.name}
-            </>
-          ) : (
-            "Nothing scheduled yet"
-          )}
+              {handleOf(user) && (
+                <span className="text-[clamp(0.75rem,4cqw,1rem)] font-mono text-white/45 block truncate mt-1">
+                  {handleOf(user)}
+                </span>
+              )}
+            </div>
+          </div>
         </HubDoor>
 
-        {/* Was a second door to /leaderboards — two of six went to the same
-            page. Your record belongs with your matches. */}
-        <HubDoor href={`${profileHref(user)}/matches`} title="Your record" accent="record">
-          {record ? (
-            <>
-              <span className="text-white font-semibold">#{record.rank}</span> · {record.points} pts
-              <br />
-              {record.wins}W {record.losses}L {record.draws}D ·{" "}
-              {(record.matchWinPct * 100).toFixed(0)}%
-            </>
-          ) : (
-            "No matches played yet"
-          )}
-        </HubDoor>
-
+        {/* Leaderboard [1x1] */}
         <HubDoor
           href={topBoard ? "/leaderboards" : "/profile/edit#games"}
-          title="Boards"
+          title="Leaderboard"
           accent="board"
+          className="col-span-1 row-span-1"
+        >
+          <span className="text-white font-black font-poppins text-[clamp(0.875rem,12cqw,2rem)] leading-[0.95] uppercase tracking-tighter block line-clamp-2 break-words mt-1">
+            {topBoard && topBoard.myRank ? `${topBoard.game.name} #${topBoard.myRank}` : "UNRANKED"}
+          </span>
+          <span className="text-[clamp(0.7rem,8cqw,0.875rem)] text-white/50 block mt-1">
+            {data.boards.length > 0 ? `${data.boards.length} games` : "Pick games"}
+          </span>
+        </HubDoor>
+
+        {/* ROW 2 */}
+        {/* Latest Tournament [2x1] */}
+        <HubDoor
+          href={`/tournaments/${urgent.id}`}
+          title="Next Match"
+          accent="primary"
+          live={live}
+          className="col-span-2 row-span-1"
           foot={
-            topBoard?.leader ? (
-              <>
-                <FaceStack names={[topBoard.leader.name]} />
-                <span className="text-[10px] text-white/45 ml-2">
-                  {topBoard.leader.name} leads
-                </span>
-              </>
-            ) : undefined
+            <span className="flex items-center gap-1">
+              {urgent.game && <GameIcon game={urgent.game} size="chip" />}
+            </span>
           }
         >
-          {topBoard ? (
-            <>
-              {topBoard.game.name}{" "}
-              <span className="text-white font-semibold">
-                {topBoard.myRank ? `#${topBoard.myRank}` : "unranked"}
+          <div className="mt-1">
+            <span className="text-[clamp(1.5rem,8cqw,2.5rem)] font-black text-white uppercase tracking-tighter font-poppins leading-[0.95] block line-clamp-2 break-words">
+              {urgent.name}
+            </span>
+            <span className="text-[clamp(0.875rem,5cqw,1.125rem)] text-primary font-semibold block mt-1.5 leading-tight">
+              {entryAction(urgent).tone === "live" ? "Action required" : "Awaiting opponent"}
+            </span>
+          </div>
+        </HubDoor>
+
+        {/* Matches [1x1] */}
+        <HubDoor
+          href="/tournaments"
+          title="Matches"
+          accent="record"
+          inverse={true}
+          className="col-span-1 row-span-1 relative group"
+        >
+          <span className="text-black font-black font-poppins text-[clamp(1.5rem,20cqw,3rem)] uppercase tracking-tighter block mt-1">PLAY</span>
+          <div className="absolute bottom-3 right-3 text-black/60 group-hover:text-black transition-colors">
+            <svg className="w-[clamp(1.5rem,15cqw,2.25rem)] h-[clamp(1.5rem,15cqw,2.25rem)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H9.5a4.5 4.5 0 0 1 0-9h1" /><path d="M15 16l4-4-4-4" />
+            </svg>
+          </div>
+        </HubDoor>
+
+        {/* ROW 3 */}
+        {/* Your Record [2x1] */}
+        <HubDoor
+          href={`${profileHref(user)}/matches`}
+          title="Your Record"
+          accent="record"
+          className="col-span-2 row-span-1"
+        >
+          {record ? (
+            <div className="mt-1">
+              <span className="text-white font-black font-poppins text-[clamp(1.5rem,10cqw,2.5rem)] leading-[0.95] block line-clamp-2 break-words">
+                #{record.rank} <span className="text-[clamp(1rem,7cqw,1.5rem)] text-white/70 font-sans tracking-normal font-semibold">· {record.points} pts</span>
               </span>
-              <br />
-              {data.boards.length} {data.boards.length === 1 ? "game" : "games"} you play
-            </>
+              <span className="text-[clamp(0.875rem,5cqw,1.125rem)] text-white/50 block mt-1">
+                {record.wins}W {record.losses}L {record.draws}D · {(record.matchWinPct * 100).toFixed(0)}%
+              </span>
+            </div>
           ) : (
-            "Pick the games you play"
+            <span className="text-[clamp(0.875rem,5cqw,1.125rem)] text-white/50 mt-1 block">No matches played yet</span>
           )}
         </HubDoor>
 
-        <HubDoor href={`${profileHref(user)}#gallery`} title="Collection" accent="collection">
-          {data.collection.medals + data.collection.plaques > 0 ||
-          data.collection.photos + data.collection.builds > 0 ? (
-            <>
-              {data.collection.medals} medals · {data.collection.plaques} plaques
-              <br />
-              {data.collection.photos} photos · {data.collection.builds} builds
-            </>
-          ) : (
-            "Nothing collected yet"
-          )}
-        </HubDoor>
-
+        {/* Community [1x1] */}
         <HubDoor
           href="/community"
           title="Community"
           accent="community"
-          foot={
-            data.community.champion ? <FaceStack names={[data.community.champion.name]} /> : undefined
-          }
+          inverse={true}
+          className="col-span-1 row-span-1"
         >
           {data.community.champion ? (
-            <>
-              <span className="text-white font-semibold">{data.community.champion.name}</span> won{" "}
-              {data.community.champion.tournament}
-            </>
+            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block line-clamp-2 break-words mt-1">{data.community.champion.name}</span>
+          ) : data.community.newMembers > 0 ? (
+            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block mt-1">+{data.community.newMembers} new</span>
           ) : (
-            "No results in yet"
-          )}
-          {data.community.newMembers > 0 && (
-            <>
-              <br />
-              {data.community.newMembers} new this week
-            </>
-          )}
-        </HubDoor>
-
-        <HubDoor href="/#store" title="Store" accent="store">
-          {data.store.featured ? (
-            <>
-              <span className="text-white font-semibold">{data.store.featured.name}</span>
-              <br />
-              {data.store.featured.price} · {data.store.items} items
-            </>
-          ) : (
-            "Nothing listed yet"
+            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block mt-1">View</span>
           )}
         </HubDoor>
       </div>
+    );
+  }
 
+  // NO TOURNAMENT (4-row layout)
+  return (
+    <div className="grid grid-cols-3 grid-rows-4 gap-2.5 h-[calc(100dvh-180px)]">
+      {/* 1. Username Hero [3x2] */}
+      <HubDoor
+        href={profileHref(user)}
+        accent="primary"
+        className="col-span-3 row-span-2"
+        foot={
+          data.boards.length > 0 ? (
+            <span className="flex items-center gap-1">
+              {data.boards.slice(0, 4).map((b) => (
+                <GameIcon key={b.game.id} game={b.game} size="chip" />
+              ))}
+            </span>
+          ) : undefined
+        }
+      >
+        <div className="flex items-center gap-[6%] h-full mt-1">
+          <span className="relative w-[clamp(5rem,20cqw,12rem)] aspect-square shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-[clamp(2rem,10cqw,4rem)] font-black text-primary font-poppins overflow-hidden">
+            {user?.avatarUrl ? (
+              <Image src={resolveImageUrl(user.avatarUrl)} alt="" aria-hidden fill className="object-cover" unoptimized />
+            ) : (
+              displayNameOf(user)[0]?.toUpperCase() || "U"
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="text-[clamp(1.5rem,8cqw,3rem)] font-black text-white uppercase tracking-tighter font-poppins leading-[0.95] block line-clamp-2 break-words">
+              {displayNameOf(user)}
+            </span>
+            {handleOf(user) && (
+              <span className="text-[clamp(0.875rem,4cqw,1.25rem)] font-mono text-white/45 block truncate mt-1.5 mb-2">
+                {handleOf(user)}
+              </span>
+            )}
+            {recommended ? (
+              <span className="text-[clamp(0.875rem,3cqw,1.125rem)] text-white/60 block mt-1 truncate leading-tight">
+                Recommended: {recommended.name}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </HubDoor>
+
+      {/* 2. Leaderboard [2x1] (Swapped to Row 3) */}
+      <HubDoor
+        href={topBoard ? "/leaderboards" : "/profile/edit#games"}
+        title="Leaderboard"
+        accent="board"
+        className="col-span-2 row-span-1"
+        foot={
+          topBoard?.leader ? (
+            <>
+              <FaceStack names={[topBoard.leader.name]} />
+              <span className="text-[10px] text-white/45 truncate">{topBoard.leader.name} leads</span>
+            </>
+          ) : undefined
+        }
+      >
+        <span className="text-white font-black font-poppins text-[clamp(1.25rem,10cqw,2.5rem)] leading-[0.95] uppercase tracking-tighter block line-clamp-2 break-words mt-1">
+          {topBoard && topBoard.myRank ? `${topBoard.game.name} #${topBoard.myRank}` : "UNRANKED"}
+        </span>
+        <span className="text-[clamp(0.75rem,5cqw,1.125rem)] text-white/50 block mt-1">
+          {data.boards.length > 0 ? `${data.boards.length} games tracked` : "Pick the games you play"}
+        </span>
+      </HubDoor>
+
+      {/* 3. Community [1x1] */}
+      <HubDoor
+        href="/community"
+        title="Community"
+        accent="community"
+        inverse={true}
+        className="col-span-1 row-span-1"
+      >
+        {data.community.champion ? (
+          <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block line-clamp-2 break-words mt-1">{data.community.champion.name}</span>
+        ) : data.community.newMembers > 0 ? (
+          <span className="text-[clamp(0.875rem,12cqw,1.5rem)] font-black font-poppins uppercase tracking-wider block mt-1">+{data.community.newMembers} new</span>
+        ) : (
+          <span className="text-[clamp(0.875rem,12cqw,1.5rem)] font-black font-poppins uppercase tracking-wider block mt-1">View</span>
+        )}
+      </HubDoor>
+
+      {/* 4. Your Record [2x1] (Swapped to Row 4) */}
+      <HubDoor
+        href={`${profileHref(user)}/matches`}
+        title="Your Record"
+        accent="record"
+        className="col-span-2 row-span-1"
+      >
+        {record ? (
+          <div className="mt-1">
+            <span className="text-white font-black font-poppins text-[clamp(1.5rem,10cqw,3rem)] leading-[0.95] block truncate">
+              #{record.rank} <span className="text-[clamp(1.125rem,7cqw,2rem)] text-white/70 font-sans tracking-normal font-semibold">· {record.points} pts</span>
+            </span>
+            <span className="text-[clamp(0.875rem,5cqw,1.25rem)] text-white/50 block mt-1">
+              {record.wins}W {record.losses}L {record.draws}D · {(record.matchWinPct * 100).toFixed(0)}%
+            </span>
+          </div>
+        ) : (
+          <span className="text-[clamp(0.875rem,5cqw,1.25rem)] text-white/50 mt-1 block">No matches played yet</span>
+        )}
+      </HubDoor>
+
+      {/* 5. Matches [1x1] (Restored to bottom right) */}
+      <HubDoor
+        href="/tournaments"
+        title="Matches"
+        accent="record"
+        inverse={true}
+        className="col-span-1 row-span-1 relative group"
+      >
+        <span className="text-black font-black font-poppins text-[clamp(1.875rem,20cqw,3.5rem)] uppercase tracking-tighter block mt-1">PLAY</span>
+        <div className="absolute bottom-3 right-3 text-black/60 group-hover:text-black transition-colors">
+          <svg className="w-[clamp(1.5rem,15cqw,2.5rem)] h-[clamp(1.5rem,15cqw,2.5rem)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H9.5a4.5 4.5 0 0 1 0-9h1" /><path d="M15 16l4-4-4-4" />
+          </svg>
+        </div>
+      </HubDoor>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson, displayNameOf } from "../../../utils/api";
 import { TournamentStaff } from "../../../tournaments/types";
 import { useToast } from "../../ui/Toast";
+import SearchableSelect from "../../ui/SearchableSelect";
 
 interface Props {
   tournamentId: string;
@@ -160,18 +161,13 @@ export default function StaffPanel({ tournamentId, isCreator }: Props) {
 
       {isCreator && (
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
-          <select
+          <SearchableSelect
+            options={invitable.map(u => ({ value: u.id, label: u.username }))}
             value={selectedUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            className="flex-1 bg-background border border-white/20 rounded px-2 py-1.5 text-xs text-white focus:border-primary outline-none"
-          >
-            <option value="">Select an organizer…</option>
-            {invitable.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.username}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedUserId}
+            placeholder="Search for an organizer..."
+            className="flex-1"
+          />
           <button
             onClick={handleInvite}
             disabled={!selectedUserId || !!busy}

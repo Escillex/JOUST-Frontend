@@ -1,7 +1,8 @@
 "use client";
 import { isWinnersRound, isLosersRound, losersRoundIndex } from "../roundNumbers";
+import { useRouter } from "next/navigation";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Match, Round, LeaderboardEntry } from "../types";
 import MatchCard from "../../../../components/tournaments/bracket/MatchCard";
 import { displayNameOf } from "../../../../utils/api";
@@ -63,6 +64,20 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
     isChampion?: boolean;
     onOpenScoring: (match: Match, pos?: {x: number, y: number}) => void;
 }>>) => {
+    const router = useRouter();
+    const lastTap = useRef<number>(0);
+
+    const handleTap = (e: React.MouseEvent | React.TouchEvent) => {
+        const now = Date.now();
+        if (now - lastTap.current < 350) {
+            // It's a double tap!
+            e.stopPropagation();
+            const currentPath = window.location.pathname;
+            router.push(`${currentPath}?tab=pairings&matchId=${data.match.id}`);
+        }
+        lastTap.current = now;
+    };
+
     return (
         // pointer-events-auto: React Flow v12 gives a node that is not
         // selectable, draggable or click-handled `pointer-events: none` (all
@@ -75,13 +90,7 @@ const MatchNode = ({ data }: NodeProps<FlowNode<{
             {/* Input handles (incoming from the previous round, either side) */}
             <Handle id="tl" type="target" position={Position.Left} className="!opacity-0 !w-0 !h-0" />
             <Handle id="tr" type="target" position={Position.Right} className="!opacity-0 !w-0 !h-0" />
-            
-            <div onClick={(e) => {
-                e.stopPropagation();
-                if (data.isAdmin) {
-                    data.onOpenScoring(data.match, { x: e.clientX, y: e.clientY });
-                }
-            }}>
+            <div onClick={handleTap}>
                 <MatchCard 
                     match={data.match} 
                     onOpenScoring={() => {}}
@@ -148,6 +157,7 @@ interface EliminationLayoutProps {
     addLog: (action: string, details?: string) => void;
     currentUserId?: string | null;
 }
+
  
 /** Viewport behaviour only — it renders nothing. The controls it used to carry
  *  moved into `CanvasBar`. */
@@ -274,6 +284,7 @@ export default function EliminationLayout({
     addLog,
     currentUserId
 }: EliminationLayoutProps) {
+    const router = useRouter();
     const [trackedUserId, setTrackedUserId] = useState<string | null>(null);
     const [trackedMatchIndex, setTrackedMatchIndex] = useState<number>(0);
 
@@ -782,6 +793,14 @@ export default function EliminationLayout({
                         edges={edges}
                         nodeTypes={nodeTypes}
                         connectionMode={ConnectionMode.Loose}
+                        onNodeClick={(e, node) => {
+                            if (node.type === 'match' && isAdmin) {
+                                const data = node.data as any;
+                                if (data?.match) {
+                                    onOpenScoring(data.match, { x: e.clientX, y: e.clientY });
+                                }
+                            }
+                        }}
                         fitView
                         /* The bracket's text is 12px, but `fitView` was free to
                            zoom to 0.2 to make a large bracket fit — rendering

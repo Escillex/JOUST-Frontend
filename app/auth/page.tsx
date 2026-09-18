@@ -370,6 +370,12 @@ export default function AuthPage() {
       setBusy(false);
       return;
     }
+    
+    if (mode === "signup" && password !== confirmPassword) {
+      setMessage("Error: Passwords do not match.");
+      setBusy(false);
+      return;
+    }
 
     const endpoint = mode === "login" ? API_ENDPOINTS.AUTH.SIGNIN : API_ENDPOINTS.AUTH.SIGNUP;
 
@@ -907,7 +913,7 @@ export default function AuthPage() {
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="relative">
                   <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
-                    {mode === "signup" ? "Handle" : "Email or Username"}
+                    {mode === "signup" ? "Username" : "Email or Username"}
                   </span>
                   <input
                     type="text"
@@ -922,7 +928,7 @@ export default function AuthPage() {
                   />
                   {mode === "signup" && (
                     <p className={`mt-2 text-[11px] ${signupNameError ? "text-[#FF4D4D]" : "text-white/30"}`}>
-                      {signupNameError || "Your @handle. Letters, numbers, dots, underscores and hyphens — no spaces."}
+                      {signupNameError || "Your @username. Letters, numbers, dots, underscores and hyphens — no spaces."}
                     </p>
                   )}
                 </div>
@@ -942,7 +948,7 @@ export default function AuthPage() {
                     />
                     <p className="mt-2 text-[11px] text-white/30">
                       Optional. How your name appears to others — spaces are fine here.
-                      Your @handle above is what people use to find you.
+                      Your @username above is what people use to find you.
                     </p>
                   </div>
                 )}
@@ -979,6 +985,22 @@ export default function AuthPage() {
                     required
                   />
                 </div>
+
+                {mode === "signup" && (
+                  <div className="relative">
+                    <span className="absolute -top-2.5 left-5 bg-component-background px-2 text-[10px] font-black text-primary uppercase tracking-widest z-20">
+                      Confirm Password
+                    </span>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full h-14 bg-transparent border-4 border-white px-6 text-base text-white placeholder:text-white/10 focus:outline-none focus:border-primary transition-all font-poppins"
+                      required
+                    />
+                  </div>
+                )}
 
                 {messageBanner}
 

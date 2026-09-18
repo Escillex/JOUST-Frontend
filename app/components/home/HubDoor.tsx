@@ -23,12 +23,13 @@ const ACCENT: Record<DoorAccent, string> = {
 
 interface HubDoorProps {
   href: string;
-  title: string;
+  title?: string;
   accent?: DoorAccent;
   live?: boolean;
   children: React.ReactNode;
   /** The texture strip along the bottom — icons, faces, a medal row. */
   foot?: React.ReactNode;
+  className?: string;
 }
 
 export default function HubDoor({
@@ -36,25 +37,37 @@ export default function HubDoor({
   title,
   accent = "primary",
   live = false,
+  inverse = false,
   children,
   foot,
-}: HubDoorProps) {
+  className = "",
+}: HubDoorProps & { inverse?: boolean }) {
+  const isInverse = inverse && !live;
+  const inverseBg = isInverse ? ACCENT[accent] : "bg-surface";
+  const textColor = isInverse ? "text-black" : "text-white";
+  const titleColor = isInverse ? "text-black" : "text-white";
+  const descColor = isInverse ? "text-black/80" : "text-white/60";
+
   return (
     <Link
       href={href}
-      className={`group relative flex flex-col gap-1.5 border bg-surface p-4 min-h-[104px] transition-colors ${
-        live ? "border-[#FF4D4D]/55 hover:border-[#FF4D4D]" : "border-white/10 hover:border-white/30"
-      }`}
+      className={`@container group relative flex flex-col h-full w-full gap-1.5 border p-4 min-h-[104px] transition-colors ${inverseBg} ${
+        live ? "border-[#FF4D4D]/55 hover:border-[#FF4D4D]" : isInverse ? "border-transparent" : "border-white/10 hover:border-white/30"
+      } ${className}`}
     >
-      <span
-        aria-hidden
-        className={`absolute inset-x-0 top-0 h-[2px] ${live ? "bg-[#FF4D4D]" : ACCENT[accent]}`}
-      />
-      <span className="text-[11px] font-black uppercase tracking-[0.16em] text-white font-poppins">
-        {title}
-      </span>
-      <div className="text-[11.5px] leading-snug text-white/60">{children}</div>
-      {foot && <div className="mt-auto pt-1.5 flex items-center gap-1.5">{foot}</div>}
+      {!isInverse && (
+        <span
+          aria-hidden
+          className={`absolute inset-x-0 top-0 h-[2px] ${live ? "bg-[#FF4D4D]" : ACCENT[accent]}`}
+        />
+      )}
+      {title && (
+        <span className={`text-[length:min(11px,8cqw)] whitespace-nowrap font-black uppercase tracking-[0.16em] font-poppins ${titleColor}`}>
+          {title}
+        </span>
+      )}
+      <div className={`flex-1 flex flex-col justify-center min-h-0 text-[11.5px] leading-snug ${descColor}`}>{children}</div>
+      {foot && <div className={`mt-auto pt-1.5 flex items-center gap-1.5 ${textColor}`}>{foot}</div>}
     </Link>
   );
 }

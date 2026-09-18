@@ -449,7 +449,12 @@ export const API_ENDPOINTS = {
     // exposes /matches/:id/draw, but that path validates less (it does not
     // reject bestOf > 1 or a points threshold), so it is deliberately unused.
     START:          (id: string) => `/matches/${id}/start`,
+    // Submit a final score (organizers only)
     SUBMIT:         (id: string) => `/matches/${id}/submit`,
+    // Player self-reporting score (goes to pending verification)
+    SELF_REPORT:    (id: string) => `/matches/${id}/self-report`,
+    // Organizer verifies a player-reported score
+    VERIFY:         (id: string) => `/matches/${id}/verify`,
     GAME_RESULT:    (id: string) => `/matches/${id}/game-result`,
     GET_ONE:        (id: string) => `/matches/${id}`,
     TRACKER_OPEN:   (id: string) => `/matches/${id}/tracker/open`,

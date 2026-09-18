@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import ScoringDrawer from "./bracket/ScoringDrawer";
 import type { Match as BracketMatch } from "../../tournaments/[id]/bracket/types";
 import { getTournamentConfig, getTournamentSystem } from "../../utils/formatConfig";
@@ -216,6 +216,8 @@ function MatchCard({
   );
 }
 
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+
 export default function PairingsView({
   tournament,
   currentUserId,
@@ -223,10 +225,15 @@ export default function PairingsView({
   onRefresh,
   debugMode = false,
 }: Props) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   // The match whose drawer is open. Held by id rather than by object so it
   // survives a refetch replacing the tournament — otherwise recording a result
   // closed the drawer under the organiser mid-series.
   const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  
   const rounds = useMemo(() => {
     const list = ((tournament as unknown as { rounds?: RoundLike[] }).rounds ?? [])
       .filter((r) => (r.matches?.length ?? 0) > 0)
@@ -245,6 +252,30 @@ export default function PairingsView({
   }, [rounds]);
 
   const [index, setIndex] = useState(defaultIndex);
+
+  // Sync openMatchId from URL query
+  useEffect(() => {
+    const matchIdParam = searchParams.get("matchId");
+    if (matchIdParam !== openMatchId) {
+      setOpenMatchId(matchIdParam);
+      if (matchIdParam) {
+        const roundIdx = rounds.findIndex(r => r.matches?.some(m => m.id === matchIdParam));
+        if (roundIdx >= 0) {
+          setIndex(roundIdx);
+        }
+      }
+    }
+  }, [searchParams, rounds, openMatchId]);
+
+  // Clear matchId from URL when drawer is closed
+  const handleDrawerClose = () => {
+    setOpenMatchId(null);
+    if (searchParams.has("matchId")) {
+      const next = new URLSearchParams(Array.from(searchParams.entries()));
+      next.delete("matchId");
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    }
+  };
   const round = rounds[Math.min(index, rounds.length - 1)];
 
   if (rounds.length === 0) {
@@ -361,9 +392,9 @@ export default function PairingsView({
           // still carries the shared utilities and their own tracker slot.
           isAdmin={!!canManage}
           debugMode={debugMode}
-          onClose={() => setOpenMatchId(null)}
+          onClose={handleDrawerClose}
           onScore={() => {
-            setOpenMatchId(null);
+            handleDrawerClose();
             void onRefresh?.();
           }}
           onMatchUpdated={() => void onRefresh?.()}

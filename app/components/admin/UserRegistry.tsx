@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 export interface AdminUser {
@@ -31,6 +31,16 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
   const [filter, setFilter] = useState<"ALL" | "REGISTERED" | "GUEST">("ALL");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragAction, setDragAction] = useState<"select" | "deselect">("select");
+  const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleMouseUp = () => setIsDragging(false);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, []);
+
   const filteredUsers = users.filter(u => {
     const usernameMatch = (u.username || "").toLowerCase().includes(searchTerm.toLowerCase());
     const emailMatch = (u.email || "").toLowerCase().includes(searchTerm.toLowerCase());
@@ -49,6 +59,50 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
     } else {
       setSelectedIds(new Set(filteredUsers.map(u => (u.sub || u.id) as string)));
     }
+  };
+
+  const handleRowMouseDown = (e: React.MouseEvent, idx: number, uid: string) => {
+    if ((e.target as HTMLElement).closest('button, a')) return;
+
+    if (e.shiftKey && lastSelectedIdx !== null) {
+      const start = Math.min(lastSelectedIdx, idx);
+      const end = Math.max(lastSelectedIdx, idx);
+      const next = new Set(e.ctrlKey || e.metaKey ? selectedIds : []);
+      for (let i = start; i <= end; i++) {
+        const id = (filteredUsers[i].sub || filteredUsers[i].id) as string;
+        next.add(id);
+      }
+      setSelectedIds(next);
+      e.preventDefault();
+    } else {
+      const isSelected = selectedIds.has(uid);
+      let next = new Set(selectedIds);
+      
+      const isCheckbox = (e.target as HTMLElement).closest('input[type="checkbox"]');
+      if (!e.ctrlKey && !e.metaKey && !isCheckbox) {
+         next = new Set();
+      }
+
+      const willSelect = !isSelected || (!e.ctrlKey && !e.metaKey && !isCheckbox);
+      
+      if (willSelect) next.add(uid);
+      else next.delete(uid);
+
+      setSelectedIds(next);
+      setLastSelectedIdx(idx);
+      
+      setIsDragging(true);
+      setDragAction(willSelect ? "select" : "deselect");
+    }
+  };
+
+  const handleRowMouseEnter = (idx: number, uid: string) => {
+    if (!isDragging) return;
+    const next = new Set(selectedIds);
+    if (dragAction === "select") next.add(uid);
+    else next.delete(uid);
+    setSelectedIds(next);
+    setLastSelectedIdx(idx);
   };
 
   return (
@@ -70,7 +124,16 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  onClick={() => onBatchDelete(Array.from(selectedIds))}
+                  onClick={() => {
+                    const hasAdmin = Array.from(selectedIds).some(id => users.find(u => (u.sub || u.id) === id)?.roles.includes('ADMIN'));
+                    if (hasAdmin) {
+                      alert("If you really wanna delete this account please remove admin permissions from the account");
+                      return;
+                    }
+                    if (window.confirm(`Are you sure you want to delete ${selectedIds.size} user(s)?`)) {
+                      onBatchDelete(Array.from(selectedIds));
+                    }
+                  }}
                   className="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all rounded-md"
                 >
                   Delete Selected ({selectedIds.size})
@@ -137,7 +200,9 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                   key={uid}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className={`group transition-all ${isSelected ? "bg-primary/[0.04]" : "hover:bg-white/[0.02]"}`}
+                  onMouseDown={(e) => handleRowMouseDown(e, idx, uid)}
+                  onMouseEnter={() => handleRowMouseEnter(idx, uid)}
+                  className={`group transition-all select-none ${isSelected ? "bg-primary/[0.04]" : "hover:bg-white/[0.02]"}`}
                 >
                   <td className="px-6 py-4 text-center">
                     <input 
@@ -200,6 +265,10 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                       </button>
                       <button
                         onClick={() => {
+                          if (u.roles.includes('ADMIN')) {
+                            alert("If you really wanna delete this account please remove admin permissions from the account");
+                            return;
+                          }
                           if (confirmingId === uid) { onDelete(uid); setConfirmingId(null); }
                           else setConfirmingId(uid);
                         }}

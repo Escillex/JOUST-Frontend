@@ -9,6 +9,7 @@ export interface Match {
   player2Id?: string | null;
   winnerId?: string | null;
   winner?: { id: string; username: string; isGuest?: boolean } | null;
+  reportedWinnerId?: string | null;
   p1Name?: string | null;
   p2Name?: string | null;
   winnerName?: string | null;

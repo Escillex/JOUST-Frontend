@@ -46,6 +46,7 @@ export interface Game {
   description?: string | null;
   iconUrl?: string | null;
   trackingMode?: "HP" | "POINTS";
+  defaultConfig?: Record<string, any> | null;
   isBuiltin: boolean;
   /** Present on list/get responses. */
   _count?: { tournaments: number };
@@ -104,6 +105,12 @@ export interface Tournament {
    *  tournament. Management controls gate on this rather than on the viewer's
    *  role, so what renders matches what the API will actually permit. */
   canManage?: boolean;
+  /** Computed per request by the backend: whether the bulk guest generator may
+   *  be used, per the "Allow Bulk Guest Creation" setting. Part of the manage
+   *  flow — co-organizers get 403 on the admin-only settings read, so the flag
+   *  travels on the tournament itself. It toggles that one control only; single
+   *  guest add and registered-player invites are not gated. */
+  allowBulkGuestCreation?: boolean;
   status: TournamentStatus;
   guestCleanupAt: string | null;
   createdAt: string;

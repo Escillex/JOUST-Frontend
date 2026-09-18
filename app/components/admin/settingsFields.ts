@@ -66,3 +66,16 @@ export const BACKUP_FIELDS: SettingField[] = [
   { name: "BACKUP_RETENTION", label: "Keep this many", placeholder: "14", help: "Older snapshots are deleted as new ones are taken." },
   { name: "BACKUP_ALLOW_RESTORE", label: "Allow restore", options: ["false", "true"], help: "A restore overwrites the whole database, so it is refused unless this is on. A safety copy is taken first either way." },
 ];
+
+/** Registering participants. Off by default: the manage page hides Participant
+ *  Management and the add-guest / add-registered-user routes refuse, so nobody
+ *  is added to a roster until a deployment deliberately allows it. Players
+ *  joining themselves (the invite link) are never affected. */
+export const PARTICIPATION_FIELDS: SettingField[] = [
+  {
+    name: "DEV_BULK_GUESTS",
+    label: "Allow Bulk Guest Creation",
+    options: ["false", "true"],
+    help: "The switch for the bulk guest generator on a tournament's Players tab. Off = the Bulk Guest Creation panel is hidden and the batch route refuses, which keeps a fat-fingered Generate Guests from flooding a roster with placeholder players. It is a toggle for that one control only — adding a single guest and inviting a registered player are unaffected.",
+  },
+];

@@ -256,11 +256,11 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
         </h2>
 
         {/* The switch is the gate, not a hint: with it off the server refuses
-            POST .../batch-guests outright, so disabling the button below only
-            keeps the UI honest about what will happen. */}
+            participant addition outright, so disabling the add controls below
+            only keeps the UI honest about what will happen. */}
         <div className="relative z-10 mb-8 space-y-3">
           <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
-            Bulk guests
+            Allow Bulk Guest Creation
           </label>
           <button
             onClick={toggleBulkGuests}
@@ -276,8 +276,8 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
           </button>
           <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
             {bulkGuests
-              ? "Generated placeholder entrants can be minted in bulk right now. Turn this off when you are finished testing."
-              : "Off by default — this is the bulk generator only. Adding a walk-in guest to a roster is an ordinary organizer action and is never affected by this switch."}
+              ? "Participant addition is on — guests and registered users can be added to rosters, and this bulk generator can mint placeholder entrants. Turn it off when you are finished testing."
+              : "Off by default — the Player Management controls on a tournament's Players tab are hidden and the add routes refuse. Self-service join is never affected."}
           </p>
         </div>
 
@@ -315,7 +315,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             </div>
             {!bulkGuests && (
               <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
-                Allow bulk guest creation above to use this. Adding guests one at a time on a roster still works.
+                Turn on "Allow Bulk Guest Creation" above to use this — participant addition is gated by the same switch.
               </p>
             )}
           </div>

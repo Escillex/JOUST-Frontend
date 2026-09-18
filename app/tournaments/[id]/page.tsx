@@ -88,6 +88,7 @@ function TournamentViewContent() {
   const [user, setUser] = useState<{ sub: string; id?: string; roles?: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
   const [respondingToInvite, setRespondingToInvite] = useState(false);
   /** The ranking table's rows. Fetched separately from the tournament because
@@ -96,13 +97,11 @@ function TournamentViewContent() {
   const [standingsLoading, setStandingsLoading] = useState(true);
 
   // The open tab lives in the URL, so a player can be sent straight to the
-  // roster or the bracket and Back returns where it should.
   const tabParam = searchParams.get("tab");
-  const requestedTab: TabId = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : "overview";
+  const requestedTab: TabId | null = TAB_IDS.includes(tabParam as TabId) ? (tabParam as TabId) : null;
   const setTab = (tab: TabId) => {
     const next = new URLSearchParams(Array.from(searchParams.entries()));
-    if (tab === "overview") next.delete("tab");
-    else next.set("tab", tab);
+    next.set("tab", tab);
     const qs = next.toString();
     router.replace(qs ? `?${qs}` : `/tournaments/${tournamentId}`, { scroll: false });
   };
@@ -227,7 +226,8 @@ function TournamentViewContent() {
         body: JSON.stringify({ userId: (user as any).id || (user as any).sub }),
       });
       if (res.ok) {
-        router.push(`/tournaments/${tournamentId}`);
+        await fetchData();
+        toast("Successfully joined the tournament!", "success");
       } else {
         // Toast instead of alert(): alert() blocks the whole page and
         // is not allowed in this project.
@@ -238,6 +238,29 @@ function TournamentViewContent() {
       toast("Could not reach the server", "error");
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!user) return;
+    setLeaving(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEAVE(tournamentId!), {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: (user as any).id || (user as any).sub }),
+      });
+      if (res.ok) {
+        await fetchData();
+        toast("Successfully left the tournament", "success");
+      } else {
+        const err = await safeJson(res) || { message: "Failed to leave the tournament" };
+        toast(err.message || "Failed to leave the tournament", "error");
+      }
+    } catch {
+      toast("Could not reach the server", "error");
+    } finally {
+      setLeaving(false);
     }
   };
 
@@ -295,19 +318,16 @@ function TournamentViewContent() {
   const isTree = system === "SINGLE_ELIMINATION" || system === "DOUBLE_ELIMINATION" || system === "HYBRID";
 
   const tabs: { id: TabId; label: string }[] = [
+    ...(isTree ? [{ id: "bracket" as TabId, label: "Bracket" }] : []),
+    ...(hasRounds ? [{ id: "pairings" as TabId, label: "Match Table" }] : []),
+    ...(hasRounds ? [{ id: "standings" as TabId, label: "Standings" }] : []),
     { id: "overview", label: "Overview" },
     { id: "players", label: `Players · ${tournament.participants.length}` },
-    ...(hasRounds ? [{ id: "pairings" as TabId, label: "Pairings" }] : []),
-    ...(hasRounds ? [{ id: "standings" as TabId, label: "Standings" }] : []),
-    ...(isTree ? [{ id: "bracket" as TabId, label: "Bracket" }] : []),
     { id: "builds", label: "Builds" },
   ];
 
-  // Validated against the tabs this tournament actually has, not merely against
-  // every id that exists. `/tournaments/:id/bracket` redirects to `?tab=bracket`,
-  // so a Swiss event's old bracket link was drawing its rounds as an
-  // elimination tree — columns of matches with nothing linking them.
-  const activeTab: TabId = tabs.some((t) => t.id === requestedTab) ? requestedTab : "overview";
+  const defaultTab = tabs[0]?.id || "overview";
+  const activeTab: TabId = (requestedTab && tabs.some((t) => t.id === requestedTab)) ? requestedTab : defaultTab;
 
   const cfg = getTournamentConfig(tournament) as any;
   const isHybrid = system === "HYBRID";
@@ -448,66 +468,61 @@ function TournamentViewContent() {
               </p>
             </div>
 
-            {/* The action block: one button, one reason. */}
+            {/* The action block: only show large button if joining or full */}
             <div className="flex flex-col gap-2 lg:w-80 shrink-0">
-              {action.join ? (
-                <button
-                  onClick={handleJoin}
-                  disabled={joining}
-                  className="h-14 w-full bg-primary text-black font-black text-xs uppercase tracking-[0.2em] hover:bg-primary-light transition-colors disabled:opacity-50"
-                >
-                  {joining ? "Joining…" : action.label}
-                </button>
-              ) : action.disabled ? (
-                <div className="h-14 w-full flex items-center justify-center bg-component-background border-2 border-component-border text-white/40 font-black text-xs uppercase tracking-[0.2em] text-center px-4">
-                  {action.label}
-                </div>
-              ) : (
-                <Link
-                  href={action.href ?? "#"}
-                  className={`h-14 w-full flex items-center justify-center font-black text-xs uppercase tracking-[0.2em] transition-colors ${
-                    action.tone === "primary"
-                      ? "bg-primary text-black hover:bg-primary-light"
-                      : action.tone === "neutral"
-                        ? "bg-white text-black hover:bg-primary"
-                        : "border-2 border-primary text-primary hover:bg-primary hover:text-black"
-                  }`}
-                >
-                  {action.label}
-                </Link>
-              )}
-
-              {action.helper && (
-                <p className="text-xs text-white/60 text-center">{action.helper}</p>
-              )}
-
-              {(canManage || started) && (
-                <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-1">
-                  {/* Gated on canManage, which the server computes — holding the
-                      ORGANIZER role says nothing about THIS tournament. */}
-                  {canManage && (
-                    <Link
-                      href={`/tournaments/${tournamentId}/manage`}
-                      className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
+              {(!started || action.join || action.disabled) && (
+                <>
+                  {action.join ? (
+                    <button
+                      onClick={handleJoin}
+                      disabled={joining}
+                      className="h-10 lg:h-14 w-full bg-primary text-black font-black text-xs uppercase tracking-[0.2em] hover:bg-primary-light transition-colors disabled:opacity-50"
                     >
-                      Manage
+                      {joining ? "Joining…" : action.label}
+                    </button>
+                  ) : action.disabled ? (
+                    <div className="h-10 lg:h-14 w-full flex items-center justify-center bg-component-background border-2 border-component-border text-white/40 font-black text-xs uppercase tracking-[0.2em] text-center px-4">
+                      {action.label}
+                    </div>
+                  ) : (
+                    <Link
+                      href={action.href ?? "#"}
+                      className={`h-10 lg:h-14 w-full flex items-center justify-center font-black text-xs uppercase tracking-[0.2em] transition-colors ${
+                        action.tone === "primary"
+                          ? "bg-primary text-black hover:bg-primary-light"
+                          : action.tone === "neutral"
+                            ? "bg-white text-black hover:bg-primary"
+                            : "border-2 border-primary text-primary hover:bg-primary hover:text-black"
+                      }`}
+                    >
+                      {action.label}
                     </Link>
                   )}
-                  {started && (
-                    <>
-                      <Link
-                        href={`/tournaments/${tournamentId}/report`}
-                        className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
-                      >
-                        Report
-                      </Link>
-                      <Link
-                        href={`/tournaments/${tournamentId}?tab=bracket`}
-                        className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
-                      >
-                        Full bracket
-                      </Link>
-                    </>
+
+                  {action.helper && (
+                    <p className="text-xs text-white/60 text-center mb-1">{action.helper}</p>
+                  )}
+                </>
+              )}
+
+              {(canManage || (isJoined && !started)) && (
+                <div className="flex gap-2 w-full mt-1">
+                  {canManage && (
+                    <Link
+                      href={`/tournaments/${tournamentId}/manage?tab=settings`}
+                      className="flex-1 h-10 flex items-center justify-center border border-white/20 bg-white/5 text-white font-black text-[10px] uppercase tracking-[0.1em] hover:bg-white hover:text-black transition-colors"
+                    >
+                      Manage Tournament
+                    </Link>
+                  )}
+                  {isJoined && !started && (
+                    <button
+                      onClick={handleLeave}
+                      disabled={leaving}
+                      className="flex-1 h-10 flex items-center justify-center border border-[#FF4D4D]/50 text-[#FF4D4D] font-black text-[10px] uppercase tracking-[0.1em] hover:bg-[#FF4D4D] hover:text-black transition-colors disabled:opacity-50"
+                    >
+                      {leaving ? "Leaving…" : "Leave"}
+                    </button>
                   )}
                 </div>
               )}
@@ -515,16 +530,17 @@ function TournamentViewContent() {
           </div>
         </header>
 
-        <div className="flex overflow-x-auto border-b border-component-border -mx-5 px-5 md:mx-0 md:px-0">
-          {tabs.map(tab => (
+        {/* Desktop Tab Row / Mobile Grid Navigator */}
+        <div className="grid grid-cols-3 gap-2 md:flex md:gap-0 md:overflow-x-auto md:border-b md:border-component-border md:-mx-5 md:px-5 lg:mx-0 lg:px-0">
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setTab(tab.id)}
               aria-current={activeTab === tab.id ? "page" : undefined}
-              className={`shrink-0 px-5 py-4 text-[11px] font-black uppercase tracking-widest transition-colors border-b-2 ${
+              className={`flex flex-col items-center justify-center h-12 md:h-auto md:flex-row md:shrink-0 md:px-5 md:py-4 text-[11px] font-black uppercase tracking-widest transition-colors ${
                 activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-white/50 hover:text-white"
+                  ? "border-2 md:border-0 md:border-b-2 border-primary bg-primary/10 md:bg-transparent text-primary"
+                  : "border md:border-0 md:border-b-2 border-white/10 md:border-transparent bg-component-background md:bg-transparent text-white/70 hover:bg-white/5 md:hover:bg-transparent md:hover:text-white"
               }`}
             >
               {tab.label}

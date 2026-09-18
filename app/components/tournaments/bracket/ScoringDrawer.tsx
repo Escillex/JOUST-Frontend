@@ -106,10 +106,7 @@ export default function ScoringDrawer({
     !!currentUserId &&
     (currentUserId === (match.player1?.id ?? match.player1Id) ||
       currentUserId === (match.player2?.id ?? match.player2Id));
-  const canStartMatch =
-    isAdmin ||
-    (isParticipant && getMatchStartWho(formatConfig) === 'STAFF_AND_PARTICIPANTS');
-
+  const canStartMatch = isAdmin;
   const isDraw = match.status === 'COMPLETED' && !match.winnerId && !match.isBye;
   const seriesWinnerName = seriesComplete && !isDraw
     ? (p1Score >= winsNeeded ? p1Name : p2Score >= winsNeeded ? p2Name : (match.winnerId === match.player1?.id ? p1Name : p2Name))
@@ -133,6 +130,53 @@ export default function ScoringDrawer({
       }
     } catch (err) {
       setGameError('Network error recording game win');
+    } finally {
+      setIsSubmittingGame(false);
+    }
+  };
+
+  const handleScoreSubmit = async (playerId: string | null) => {
+    if (isSubmittingGame || seriesComplete) return;
+    setIsSubmittingGame(true);
+    setGameError(null);
+    try {
+      const endpoint = isAdmin ? API_ENDPOINTS.MATCHES.SUBMIT(match.id) : API_ENDPOINTS.MATCHES.SELF_REPORT(match.id);
+      const res = await authenticatedFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winnerId: playerId }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        onMatchUpdated?.();
+        if (isAdmin) onClose(); // Admins bypass verification, modal can close
+      } else {
+        setGameError(data?.message || 'Failed to submit score');
+      }
+    } catch (err) {
+      setGameError('Network error submitting score');
+    } finally {
+      setIsSubmittingGame(false);
+    }
+  };
+
+  const handleVerifyScore = async () => {
+    if (isSubmittingGame) return;
+    setIsSubmittingGame(true);
+    setGameError(null);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.VERIFY(match.id), {
+        method: 'POST',
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        onMatchUpdated?.();
+        onClose();
+      } else {
+        setGameError(data?.message || 'Failed to verify score');
+      }
+    } catch (err) {
+      setGameError('Network error verifying score');
     } finally {
       setIsSubmittingGame(false);
     }
@@ -187,13 +231,18 @@ export default function ScoringDrawer({
                     : 'Start it when you and your opponent sit down. Your organizer records the result.'}
                 </p>
               </div>
-              <button
-                onClick={handleStartMatch}
-                disabled={isStartingMatch}
-                className="px-5 py-2.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-sm hover:brightness-90 transition-all disabled:opacity-50 whitespace-nowrap"
-              >
-                {isStartingMatch ? 'Starting…' : 'Start Match'}
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  onClick={handleStartMatch}
+                  disabled={isStartingMatch}
+                  className="px-5 py-2.5 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-sm hover:brightness-90 transition-all disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isStartingMatch ? 'Starting…' : 'Start Match'}
+                </button>
+                {gameError && (
+                  <p className="text-[10px] text-red-400 font-bold max-w-[200px] text-right leading-tight">{gameError}</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -222,6 +271,36 @@ export default function ScoringDrawer({
                   Win: {p2Name}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── PENDING VERIFICATION BANNER ────────────────────────────────── */}
+          {match.reportedWinnerId && !match.winnerId && (
+            <div className="mb-6 p-6 bg-yellow-500/10 border border-yellow-500/40 rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in zoom-in-95 duration-300">
+              <div className="space-y-1">
+                <span className="text-[9px] font-black text-yellow-500 uppercase tracking-[0.3em] block">
+                  Pending Verification
+                </span>
+                <p className="text-sm font-black text-white uppercase tracking-tight">
+                  Player reported: {match.reportedWinnerId === match.player1?.id ? p1Name : p2Name} wins
+                </p>
+                <p className="text-[10px] text-white/50 leading-tight">
+                  {isAdmin
+                    ? 'Verify this score to advance the bracket, or override it below.'
+                    : 'An organizer must verify this score before the bracket advances.'}
+                </p>
+              </div>
+              {isAdmin && (
+                <div className="flex-shrink-0 flex gap-2">
+                  <button
+                    onClick={handleVerifyScore}
+                    disabled={isSubmittingGame}
+                    className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-sm transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)] hover:shadow-[0_0_20px_rgba(234,179,8,0.4)] disabled:opacity-50"
+                  >
+                    {isSubmittingGame ? 'Verifying...' : 'Approve Score'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -330,14 +409,14 @@ export default function ScoringDrawer({
                         <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] block">Organizer Override</span>
                         <div className="grid grid-cols-2 gap-4">
                           <button
-                            onClick={() => onScore(match.player1?.id || null)}
+                            onClick={() => handleScoreSubmit(match.player1?.id || null)}
                             disabled={!match.player1}
                             className="py-3 bg-white/3 border border-white/5 hover:border-red-500/50 hover:bg-red-500/5 text-white/60 hover:text-white transition-all text-[9px] font-black uppercase tracking-widest rounded-sm cursor-pointer"
                           >
                             Force Match Win: {p1Name}
                           </button>
                           <button
-                            onClick={() => onScore(match.player2?.id || null)}
+                            onClick={() => handleScoreSubmit(match.player2?.id || null)}
                             disabled={!match.player2}
                             className="py-3 bg-white/3 border border-white/5 hover:border-red-500/50 hover:bg-red-500/5 text-white/60 hover:text-white transition-all text-[9px] font-black uppercase tracking-widest rounded-sm cursor-pointer"
                           >
@@ -350,8 +429,8 @@ export default function ScoringDrawer({
                     !seriesComplete ? (
                       <>
                         <button
-                          onClick={() => onScore(match.player1?.id || null)}
-                          disabled={!match.player1}
+                          onClick={() => handleScoreSubmit(match.player1?.id || null)}
+                          disabled={!match.player1 || isSubmittingGame || (!!match.reportedWinnerId && !isAdmin)}
                           className={`w-full py-6 bg-white/3 border border-white/5 hover:border-primary text-white transition-all group px-8 flex justify-between items-center cursor-pointer ${!match.player1 ? 'opacity-30 cursor-not-allowed' : ''}`}
                         >
                           <span className="font-black uppercase tracking-widest text-xs">{p1Name}</span>
@@ -365,8 +444,8 @@ export default function ScoringDrawer({
                         </div>
 
                         <button
-                          onClick={() => onScore(match.player2?.id || null)}
-                          disabled={!match.player2}
+                          onClick={() => handleScoreSubmit(match.player2?.id || null)}
+                          disabled={!match.player2 || isSubmittingGame || (!!match.reportedWinnerId && !isAdmin)}
                           className={`w-full py-6 bg-white/3 border border-white/5 hover:border-primary text-white transition-all group px-8 flex justify-between items-center cursor-pointer ${!match.player2 ? 'opacity-30 cursor-not-allowed' : ''}`}
                         >
                           <span className="font-black uppercase tracking-widest text-xs">{p2Name}</span>

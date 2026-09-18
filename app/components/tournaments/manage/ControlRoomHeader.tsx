@@ -1,8 +1,10 @@
 "use client";
+import { useState } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { useToast } from "../../ui/Toast";
 import ConnectionPill from "../../ui/ConnectionPill";
 import LastUpdated from "../../ui/LastUpdated";
+import ShareModal from "./ShareModal";
 
 interface Props {
   tournament: Tournament;
@@ -17,10 +19,13 @@ interface Props {
    *  consequences, so it must say which mode it is in. */
   connected?: boolean;
   lastUpdated?: Date | null;
+  onAddGuest?: () => void;
+  onInvitePlayer?: () => void;
 }
 
-export default function ControlRoomHeader({ tournament, tournamentId, onBack, onOpenTournament, onStartTournament, onViewBracket, onRefresh, connected, lastUpdated }: Props) {
+export default function ControlRoomHeader({ tournament, tournamentId, onBack, onOpenTournament, onStartTournament, onViewBracket, onRefresh, connected, lastUpdated, onAddGuest, onInvitePlayer }: Props) {
   const { toast } = useToast();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Puts the public invite URL on the clipboard so the organizer can
   // paste it into chat apps. The short slug is preferred; tournaments
@@ -68,8 +73,17 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
     }
   };
 
+  const inviteUrl = `${window.location.origin}/tournaments/invite/${tournament.slug ?? tournament.inviteToken}`;
+
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8 pb-6 border-b border-white/20">
+      {isShareModalOpen && (
+        <ShareModal
+          url={inviteUrl}
+          onClose={() => setIsShareModalOpen(false)}
+          onCopy={handleCopyInvite}
+        />
+      )}
       <div className="space-y-4">
         <button onClick={onBack} className="text-xs text-[#888888] hover:text-white transition-colors flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
@@ -92,31 +106,64 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 w-full md:w-auto mt-4 md:mt-0">
-        {onRefresh && (
-          <button onClick={onRefresh} className="px-4 py-2.5 bg-background border border-white/20 text-white rounded hover:bg-white/10 transition-colors flex items-center justify-center group" title="Refresh Data">
-            <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        )}
-        <button onClick={handleCopyInvite} className="flex-1 md:flex-none px-6 py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors">
-          Copy Invite Link
-        </button>
-        <button onClick={onViewBracket} className="flex-1 md:flex-none px-6 py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors">
-          View Bracket
-        </button>
+      <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0 justify-end">
+        <div className="flex flex-col gap-2 flex-1 md:w-[320px]">
+          {/* Row 1: Share | Toggle Public View */}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setIsShareModalOpen(true)} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+              Share
+            </button>
+            <button onClick={onViewBracket} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+              Toggle Public View
+            </button>
+          </div>
 
-        {tournament.status === "UPCOMING" && (
-          <button onClick={onOpenTournament} className="flex-1 md:flex-none px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors">
-            Open Registration
-          </button>
-        )}
-        {tournament.status === "OPEN" && (
-          <button onClick={onStartTournament} className="flex-1 md:flex-none px-6 py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors">
-            Start Tournament
-          </button>
-        )}
+          {/* Row 2: Add Guest | Invite Player (only when OPEN) */}
+          {tournament.status === "OPEN" && (
+            <div className="grid grid-cols-2 gap-2">
+              {onAddGuest && (
+                <button onClick={onAddGuest} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+                  Add Guest
+                </button>
+              )}
+              {onInvitePlayer && (
+                <button onClick={onInvitePlayer} className="w-full py-2.5 bg-background border border-primary/40 text-primary font-semibold text-xs rounded hover:bg-primary/10 transition-colors whitespace-nowrap">
+                  Invite Player
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Row 3: Refresh (text) | Start Tournament / Open Registration */}
+          {(tournament.status === "UPCOMING" || tournament.status === "OPEN") && (
+            <div className="grid grid-cols-2 gap-2">
+              {onRefresh && (
+                <button onClick={onRefresh} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+                  Refresh
+                </button>
+              )}
+              {tournament.status === "UPCOMING" && (
+                <button onClick={onOpenTournament} className="w-full py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors whitespace-nowrap">
+                  Open Registration
+                </button>
+              )}
+              {tournament.status === "OPEN" && (
+                <button onClick={onStartTournament} className="w-full py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors whitespace-nowrap">
+                  Start Tournament
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Fallback refresh for other statuses */}
+          {tournament.status !== "UPCOMING" && tournament.status !== "OPEN" && onRefresh && (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={onRefresh} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+                Refresh
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -84,7 +84,7 @@ export function actionFor({ tournament: t, userId, isJoined }: Args): Tournament
 
   if (t.status === "ONGOING") {
     if (isJoined) {
-      return { label: "Go to lobby", helper: "This tournament is under way", href: lobby, tone: "primary" };
+      return { label: "Watch bracket", helper: "This tournament is under way", href: bracket, tone: "primary" };
     }
     return {
       label: "Watch bracket",
@@ -112,10 +112,10 @@ export function actionFor({ tournament: t, userId, isJoined }: Args): Tournament
       ? (t.participants?.findIndex((p) => p.userId === userId) ?? -1) + 1
       : 0;
     return {
-      label: "Go to lobby",
+      label: "Registered",
       helper: seat > 0 ? `You're in · seat ${seat} of ${t.maxPlayers}` : "You're in",
-      href: lobby,
-      tone: "primary",
+      disabled: true,
+      tone: "disabled",
     };
   }
 

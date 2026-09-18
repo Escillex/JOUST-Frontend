@@ -40,6 +40,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
   const [editDescription, setEditDescription] = useState("");
   const [editTracking, setEditTracking] = useState<"POINTS" | "HP">("POINTS");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteState, setDeleteState] = useState<{ id: string, step: number, text?: string } | null>(null);
 
   // Resolve-request modal
   const [resolving, setResolving] = useState<GameRequest | null>(null);
@@ -172,6 +173,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
       setError("Failed to delete game");
     } finally {
       setDeletingId(null);
+      setDeleteState(null);
     }
   };
 
@@ -370,20 +372,47 @@ export default function GameManager({ onPendingCountChange }: Props) {
                     <button
                       onClick={() => (editingId === g.id ? setEditingId(null) : startEdit(g))}
                       title={editingId === g.id ? "Stop editing" : "Edit description and tracking"}
-                      className={`text-[10px] font-black uppercase tracking-widest transition-colors px-2 py-1 ${
+                      className={`text-[10px] font-black uppercase tracking-widest transition-colors px-2 py-1 border border-transparent hover:border-white/10 rounded ${
                         editingId === g.id ? "text-primary" : "text-white/60 hover:text-white"
                       }`}
                     >
                       Edit
                     </button>
-                    <button
-                      onClick={() => handleDelete(g.id)}
-                      disabled={deletingId === g.id}
-                      title="Delete game"
-                      className="text-[10px] text-white/60 hover:text-red-500 transition-colors p-2 -m-2 disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      {deletingId === g.id ? "…" : "×"}
-                    </button>
+                    {deleteState?.id === g.id ? (
+                      deleteState.step === 1 ? (
+                        <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/20 rounded px-2 py-0.5">
+                          <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest mr-1">Sure?</span>
+                          <button onClick={() => setDeleteState({ id: g.id, step: 2 })} className="text-[10px] font-black text-red-400 hover:text-red-300 transition-colors px-1">Yes</button>
+                          <button onClick={() => setDeleteState(null)} className="text-[10px] font-black text-white/40 hover:text-white transition-colors px-1">No</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 rounded px-2 py-0.5">
+                          <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest mr-1 shrink-0">Type "yes im sure":</span>
+                          <input 
+                            type="text" 
+                            className="w-24 bg-black/50 border border-red-500/30 text-[9px] font-bold text-red-100 px-1.5 py-0.5 focus:outline-none focus:border-red-500 placeholder-red-900/50 rounded-sm" 
+                            placeholder="yes im sure"
+                            value={deleteState.text || ""}
+                            onChange={e => setDeleteState({ ...deleteState, text: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && deleteState.text === "yes im sure") {
+                                handleDelete(g.id);
+                              }
+                            }}
+                          />
+                          <button onClick={() => handleDelete(g.id)} disabled={deletingId === g.id || deleteState.text !== "yes im sure"} className="text-[10px] font-black text-red-400 hover:text-red-300 transition-colors px-1 disabled:opacity-30 disabled:pointer-events-none shrink-0">{deletingId === g.id ? "…" : "Delete"}</button>
+                          <button onClick={() => setDeleteState(null)} disabled={deletingId === g.id} className="text-[10px] font-black text-white/40 hover:text-white transition-colors px-1 shrink-0">Cancel</button>
+                        </div>
+                      )
+                    ) : (
+                      <button
+                        onClick={() => setDeleteState({ id: g.id, step: 1 })}
+                        title="Delete game"
+                        className="text-[10px] font-black text-white/40 hover:text-red-500 uppercase tracking-widest transition-colors px-2 py-1 border border-transparent hover:border-red-500/20 rounded"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

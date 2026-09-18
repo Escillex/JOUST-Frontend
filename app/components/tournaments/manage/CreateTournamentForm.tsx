@@ -5,6 +5,7 @@ import { TournamentFormatModel, Game } from "../../../tournaments/types";
 import { byeWarningFor } from "../OddFieldStartModal";
 import ImageUpload from "../../ui/ImageUpload";
 import { useImageUpload } from "../../../utils/useImageUpload";
+import SearchableSelect from "../../ui/SearchableSelect";
 
 const inputCls = "w-full h-10 bg-background border border-white/20 px-3 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded appearance-none placeholder:text-white/20";
 const labelCls = "text-xs font-semibold text-[#888888] block mb-1";
@@ -117,6 +118,37 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
   const [pointsThreshold, setPointsThreshold] = useState(0);
   const [startingHp, setStartingHp] = useState(0);
 
+  // Advanced Rules (parity with PresetManager)
+  const [tieBreakerOrder, setTieBreakerOrder] = useState("");
+  const [scoreSubmissionRule, setScoreSubmissionRule] = useState("SELF_REPORT_ALLOWED");
+  const [utilitiesEnabled, setUtilitiesEnabled] = useState(true);
+  const [utilityCoinWho, setUtilityCoinWho] = useState("STAFF_AND_PARTICIPANTS");
+  const [utilityDiceWho, setUtilityDiceWho] = useState("STAFF_AND_PARTICIPANTS");
+  const [utilityTimerWho, setUtilityTimerWho] = useState("STAFF");
+
+  const currentTiebreakers = tieBreakerOrder.split(',').map(s => s.trim()).filter(Boolean);
+  const toggleTiebreaker = (val: string) => {
+    let newTiebreakers = [...currentTiebreakers];
+    if (newTiebreakers.includes(val)) {
+      newTiebreakers = newTiebreakers.filter(t => t !== val);
+    } else {
+      newTiebreakers.push(val);
+    }
+    setTieBreakerOrder(newTiebreakers.join(', '));
+  };
+
+  const TIEBREAKER_OPTIONS = [
+    { value: "omw", label: "Opponents' Match Win % (OMW)" },
+    { value: "gw", label: "Game Win % (GW)" },
+    { value: "oomw", label: "Opponents' Opponents (OOMW)" },
+    { value: "ogw", label: "Opponents' Game Win % (OGW)" },
+    { value: "matchWinPct", label: "Match Win %" },
+    { value: "wins", label: "Total Wins" },
+    { value: "losses", label: "Total Losses" }
+  ];
+
+  const deeperLabelCls = "text-[10px] font-black text-white/60 uppercase tracking-widest mb-2 block";
+
   useEffect(() => {
     setVisitedSteps(prev => new Set(prev).add(activeStep));
   }, [activeStep]);
@@ -212,6 +244,22 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
     }
   }, [format]);
 
+  // Infer tracking defaults when the game changes. An organizer can override
+  // these afterward, but this provides a sane baseline (todo.md obj. 5.1).
+  useEffect(() => {
+    if (!selectedGameId || !games.length) return;
+    const g = games.find((x) => x.id === selectedGameId);
+    if (!g) return;
+    if (g.trackingMode === "HP") {
+      setStartingHp(100);
+      setPointsThreshold(0);
+    } else {
+      setStartingHp(0);
+      // POINTS mode defaults to a threshold of 1 if not specified in defaultConfig
+      setPointsThreshold(1);
+    }
+  }, [selectedGameId, games]);
+
   // The catalog is empty until an admin adds a game, and a tournament cannot be
   // created without one — surface that on the first step rather than letting the
   // organizer fill in three steps and hit a 400 at the end.
@@ -270,6 +318,12 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
       allowDraw,
       pointsThreshold,
       startingHp,
+      tieBreakerOrder: tieBreakerOrder || null,
+      scoreSubmissionRule,
+      utilitiesEnabled,
+      utilityCoinWho,
+      utilityDiceWho,
+      utilityTimerWho,
       placementPointsChampion: placementChampion,
       placementPoints2nd: placement2nd,
       placementPoints3rd: placement3rd,
@@ -483,22 +537,25 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
           </div>
           <div className="pt-2">
             <Field label="Game" required>
-              <select
+              <SearchableSelect
+                options={games.map(g => ({ value: g.id, label: g.name }))}
                 value={selectedGameId}
-                onChange={(e) => setSelectedGameId(e.target.value)}
-                className={inputCls}
+                onChange={(val) => {
+                  setSelectedGameId(val);
+                  const game = games.find((g) => g.id === val);
+                  if (game) {
+                    if (game.trackingMode === 'HP') {
+                      const hp = game.defaultConfig?.startingHp ?? 100;
+                      if (!startingHp) setStartingHp(hp);
+                    } else if (game.trackingMode === 'POINTS') {
+                      const pt = game.defaultConfig?.pointsThreshold ?? 1;
+                      if (!pointsThreshold) setPointsThreshold(pt);
+                    }
+                  }
+                }}
+                placeholder={noGamesConfigured ? "No games available" : "Search for a game..."}
                 disabled={noGamesConfigured}
-                required
-              >
-                <option value="" className="bg-background">
-                  {noGamesConfigured ? "No games available" : "Select a game"}
-                </option>
-                {games.map((g) => (
-                  <option key={g.id} value={g.id} className="bg-background">
-                    {g.name}
-                  </option>
-                ))}
-              </select>
+              />
               {noGamesConfigured && (
                 <p className="mt-2 text-[11px] text-[#FF4D4D] leading-relaxed">
                   No games have been set up yet. An administrator must add a game to the catalog
@@ -590,131 +647,240 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <h4 className="text-xs font-semibold text-[#888888]">How a game is scored</h4>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={pointsThreshold > 0} 
-                  onChange={e => setPointsThreshold(e.target.checked ? 3 : 0)} 
-                  className="w-4 h-4 cursor-pointer accent-primary" 
+      {/* Top-level config: Best Of + Seeding */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <Field label="Best of">
+            <input
+              type="number"
+              value={bestOf}
+              onChange={e => {
+                const val = Number(e.target.value);
+                if (val < 1) setBestOf(1);
+                else if (val % 2 === 0) setBestOf(val + 1);
+                else setBestOf(val);
+              }}
+              min={1}
+              step={2}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+        <div>
+          <Field label="Seeding">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSeedingMode("RANDOM")}
+                className={`flex-1 h-10 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                  seedingMode === "RANDOM"
+                    ? "bg-primary/10 border-primary text-primary"
+                    : "bg-background border-white/10 text-white/60 hover:text-white"
+                }`}
+              >
+                Random Draw
+              </button>
+              <button
+                type="button"
+                onClick={() => setSeedingMode("MANUAL")}
+                className={`flex-1 h-10 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                  seedingMode === "MANUAL"
+                    ? "bg-primary/10 border-primary text-primary"
+                    : "bg-background border-white/10 text-white/60 hover:text-white"
+                }`}
+              >
+                Manual Seeding
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-white/60 leading-relaxed">
+              {seedingMode === "RANDOM"
+                ? "The field is drawn at random when the tournament starts. Any seed order set on the roster is ignored."
+                : "The bracket follows the seed order arranged on the roster. Unseeded entrants are placed last."}
+            </p>
+          </Field>
+        </div>
+      </div>
+
+      {/* Collapsible Advanced Rules & Utilities — matches PresetManager */}
+      <details className="group border border-white/10 rounded overflow-hidden">
+        <summary className="text-[10px] font-black text-white/60 uppercase tracking-widest bg-white/5 p-3 cursor-pointer select-none hover:text-white transition-colors flex items-center gap-2 list-none [&::-webkit-details-marker]:hidden">
+          <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          Advanced Rules &amp; Utilities
+        </summary>
+
+        <div className="p-4 space-y-4 bg-black/40">
+          {/* Points Threshold & HP */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-black/40 border border-white/5 p-3 rounded space-y-2">
+              <label htmlFor="t_enableThreshold" className="flex items-center text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none group/tt">
+                <input
+                  type="checkbox"
+                  id="t_enableThreshold"
+                  checked={pointsThreshold > 0}
+                  onChange={e => setPointsThreshold(e.target.checked ? 1 : 0)}
+                  className="mr-2 cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-white">Win at a points total</span>
+                Points Threshold
+                <span className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors group-hover/tt:border-white group-hover/tt:text-white" title="Match ends immediately when a player reaches this score">?</span>
               </label>
               {pointsThreshold > 0 && (
-                <input type="number" value={pointsThreshold} onChange={e => setPointsThreshold(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
+                <div className="animate-in slide-in-from-top-1 duration-300">
+                  <input type="number" value={pointsThreshold} onChange={e => setPointsThreshold(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
+                </div>
               )}
             </div>
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={startingHp > 0} 
-                  onChange={e => setStartingHp(e.target.checked ? 100 : 0)} 
-                  className="w-4 h-4 cursor-pointer accent-primary" 
+
+            <div className="bg-black/40 border border-white/5 p-3 rounded space-y-2">
+              <label htmlFor="t_enableHp" className="flex items-center text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer select-none group/tt">
+                <input
+                  type="checkbox"
+                  id="t_enableHp"
+                  checked={startingHp > 0}
+                  onChange={e => setStartingHp(e.target.checked ? 100 : 0)}
+                  className="mr-2 cursor-pointer accent-primary"
                 />
-                <span className="text-sm text-white">Track hit points</span>
+                HP-Based Match
+                <span className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors group-hover/tt:border-white group-hover/tt:text-white" title="Players start with HP and lose it. Match ends when a player hits 0">?</span>
               </label>
               {startingHp > 0 && (
-                <input type="number" value={startingHp} onChange={e => setStartingHp(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
+                <div className="animate-in slide-in-from-top-1 duration-300">
+                  <input type="number" value={startingHp} onChange={e => setStartingHp(Math.max(1, Number(e.target.value)))} min={1} className={inputCls} />
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        <div className="space-y-4">
-          <h4 className="text-xs font-semibold text-[#888888]">Match length and draw</h4>
-          <div className="space-y-4">
-            <Field label="Best of">
-              <input 
-                type="number" 
-                value={bestOf} 
-                onChange={e => {
-                  const val = Number(e.target.value);
-                  if (val < 1) setBestOf(1);
-                  else if (val % 2 === 0) setBestOf(val + 1);
-                  else setBestOf(val);
-                }} 
-                min={1} 
-                step={2}
-                className={inputCls} 
-              />
-            </Field>
-            {(format === "SWISS" || format === "ROUND_ROBIN" || format === "HYBRID") && (
-              <Field label={format === "HYBRID" ? "Allow Draws (Swiss phase)" : "Allow Draws"}>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAllowDraw(false)}
-                    className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                      !allowDraw ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
-                    }`}
-                  >
-                    Must have a winner
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAllowDraw(true)}
-                    className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                      allowDraw ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
-                    }`}
-                  >
-                    Draws allowed
-                  </button>
+          {/* Score Submission Rule */}
+          <div className="bg-black/40 border border-white/5 p-3 rounded">
+            <label className={deeperLabelCls}>
+              Score Submission Rule
+              <span className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors hover:border-white hover:text-white" title="Determines who is allowed to submit match scores.">?</span>
+            </label>
+            <select
+              value={scoreSubmissionRule}
+              onChange={e => setScoreSubmissionRule(e.target.value)}
+              className={inputCls}
+            >
+              <option value="SELF_REPORT_ALLOWED" className="bg-background text-white">Self-Report Allowed</option>
+              <option value="ORGANIZER_ONLY" className="bg-background text-white">Organizer Only</option>
+            </select>
+          </div>
+
+          {/* Tiebreakers */}
+          <div className="bg-black/40 border border-white/5 p-3 rounded">
+            <label className={deeperLabelCls}>
+              Tiebreakers
+              <span
+                className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors hover:border-white hover:text-white"
+                title="Select multiple tiebreakers to define the resolution order when players have tied scores."
+              >
+                ?
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {TIEBREAKER_OPTIONS.map(opt => {
+                const idx = currentTiebreakers.indexOf(opt.value);
+                const isSelected = idx !== -1;
+                return (
+                  <label key={opt.value} className="flex items-center space-x-2 text-[10px] font-black text-white/60 uppercase tracking-widest cursor-pointer group/tb hover:text-white transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleTiebreaker(opt.value)}
+                      className="hidden"
+                    />
+                    <div className={`w-4 h-4 flex items-center justify-center border transition-all ${isSelected ? "border-primary bg-primary/20 text-primary" : "border-white/20 bg-background group-hover/tb:border-white/40"}`}>
+                      {isSelected ? (idx + 1) : ""}
+                    </div>
+                    <span className="truncate">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-white/40 italic leading-relaxed mt-2">Click to toggle. The number indicates the tiebreaker order.</p>
+          </div>
+
+          {/* Utilities */}
+          <div className="bg-black/40 border border-white/5 p-3 rounded">
+            <label className={deeperLabelCls}>
+              Match Utilities (Coin Flip, Dice)
+              <span className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors hover:border-white hover:text-white" title="Enable digital coin flips and dice rolls in the match lobby.">?</span>
+            </label>
+            <select
+              value={utilitiesEnabled ? "ENABLED" : "DISABLED"}
+              onChange={e => setUtilitiesEnabled(e.target.value === "ENABLED")}
+              className={inputCls}
+            >
+              <option value="ENABLED" className="bg-background text-white">Enabled</option>
+              <option value="DISABLED" className="bg-background text-white">Disabled</option>
+            </select>
+
+            {utilitiesEnabled && (
+              <div className="grid grid-cols-2 gap-4 mt-4 animate-in slide-in-from-top-1 duration-300">
+                <div>
+                  <label className={deeperLabelCls}>Coin Flip — Who</label>
+                  <select value={utilityCoinWho} onChange={e => setUtilityCoinWho(e.target.value)} className={inputCls}>
+                    <option value="STAFF_AND_PARTICIPANTS" className="bg-background text-white">Staff and Participants</option>
+                    <option value="STAFF_ONLY" className="bg-background text-white">Staff Only</option>
+                  </select>
                 </div>
-                {allowDraw && (bestOf > 1 || pointsThreshold > 0) && (
-                  /* The backend refuses a winnerless submit for a series or a
-                     threshold-scored match, so with these settings the Draw
-                     control never appears during scoring. Said plainly here
-                     rather than leaving the organizer to discover a setting
-                     that does nothing. */
-                  <p className="mt-2 text-[11px] text-[#FFB020] leading-relaxed">
-                    Draws will not be offered while this format uses{" "}
-                    {bestOf > 1 ? "a best-of series" : "point-threshold scoring"}.
-                    Set Best Of to 1{pointsThreshold > 0 ? " and clear the points threshold" : ""} to make them available.
-                  </p>
-                )}
-                {format === "HYBRID" && (
-                  <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
-                    Applies to the Swiss phase only. The top cut is single
-                    elimination, where a match must produce a winner.
-                  </p>
-                )}
-              </Field>
+                <div>
+                  <label className={deeperLabelCls}>Dice Roll — Who</label>
+                  <select value={utilityDiceWho} onChange={e => setUtilityDiceWho(e.target.value)} className={inputCls}>
+                    <option value="STAFF_AND_PARTICIPANTS" className="bg-background text-white">Staff and Participants</option>
+                    <option value="STAFF_ONLY" className="bg-background text-white">Staff Only</option>
+                  </select>
+                </div>
+              </div>
             )}
-            <Field label="Seeding">
+          </div>
+
+          {/* Allow Draws */}
+          {(format === "SWISS" || format === "ROUND_ROBIN" || format === "HYBRID") && (
+            <div className="bg-black/40 border border-white/5 p-3 rounded">
+              <label className={deeperLabelCls}>
+                {format === "HYBRID" ? "Allow Draws (Swiss Phase)" : "Allow Draws"}
+                <span className="ml-2 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/40 text-white/60 text-[9px] cursor-help transition-colors hover:border-white hover:text-white" title="Determines whether players can report a drawn match.">?</span>
+              </label>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setSeedingMode("RANDOM")}
-                  className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                    seedingMode === "RANDOM" ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
+                  onClick={() => setAllowDraw(false)}
+                  className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                    !allowDraw
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-background border-white/10 text-white/60 hover:text-white"
                   }`}
                 >
-                  Random draw
+                  Force Win
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSeedingMode("MANUAL")}
-                  className={`flex-1 h-10 text-xs font-semibold transition-colors rounded border ${
-                    seedingMode === "MANUAL" ? "bg-primary/10 border-primary text-primary" : "bg-background border-white/20 text-[#888888] hover:text-white"
+                  onClick={() => setAllowDraw(true)}
+                  className={`flex-1 h-9 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[4px] ${
+                    allowDraw
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-background border-white/10 text-white/60 hover:text-white"
                   }`}
                 >
-                  Manual seeding
+                  Permit Draws
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
-                {seedingMode === "RANDOM"
-                  ? "The field is drawn at random when the tournament starts. Any seed order set on the roster is ignored."
-                  : "The bracket follows the seed order you arrange on the roster. Unseeded entrants are placed last."}
-              </p>
-            </Field>
-          </div>
+              {allowDraw && (bestOf > 1 || pointsThreshold > 0) && (
+                <p className="text-[10px] text-[#FFB020] leading-relaxed mt-2">
+                  Inert with {bestOf > 1 ? "a best-of series" : "point-threshold scoring"} — set Best Of to 1
+                  {pointsThreshold > 0 ? " and clear the threshold" : ""} for draws to be offered.
+                </p>
+              )}
+              {format === "HYBRID" && (
+                <p className="mt-2 text-[10px] text-white/40 leading-relaxed">
+                  Applies to the Swiss phase only. The top cut is single elimination, where a match must produce a winner.
+                </p>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      </details>
 
       {(format === "SWISS" || format === "HYBRID") && (
         <div className="pt-6 border-t border-white/10">

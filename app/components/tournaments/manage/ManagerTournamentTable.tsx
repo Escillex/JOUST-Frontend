@@ -61,11 +61,9 @@ function Staff({ t, compact = false }: { t: Tournament; compact?: boolean }) {
 
 interface ManagerTournamentTableProps {
   tournaments: Tournament[];
-  onComplete: (id: string) => void;
-  completingId?: string | null;
 }
 
-export default function ManagerTournamentTable({ tournaments, onComplete, completingId }: ManagerTournamentTableProps) {
+export default function ManagerTournamentTable({ tournaments }: ManagerTournamentTableProps) {
   return (
     <>
       {/* Desktop Table */}
@@ -136,15 +134,6 @@ export default function ManagerTournamentTable({ tournaments, onComplete, comple
                     >
                       Manage
                     </Link>
-                    {t.status !== "COMPLETED" && (
-                      <button
-                        onClick={() => onComplete(t.id)}
-                        disabled={!!completingId}
-                        className="px-3 py-1.5 bg-[#FF4D4D]/10 hover:bg-[#FF4D4D] text-[#FF4D4D] hover:text-white border border-[#FF4D4D]/20 text-xs font-semibold rounded transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                      >
-                        {completingId === t.id ? "Finalizing..." : "Finalize"}
-                      </button>
-                    )}
                   </div>
                 </td>
               </tr>
@@ -208,11 +197,6 @@ export default function ManagerTournamentTable({ tournaments, onComplete, comple
                 <Link href={`/tournaments/${t.id}/manage`} className="flex-1 text-center px-2 py-2 bg-primary/10 text-primary border border-primary/20 text-xs font-semibold rounded transition-colors">
                   Manage
                 </Link>
-                {t.status !== "COMPLETED" && (
-                  <button onClick={() => onComplete(t.id)} disabled={!!completingId} className="flex-1 text-center px-2 py-2 bg-[#FF4D4D]/10 text-[#FF4D4D] border border-[#FF4D4D]/20 text-xs font-semibold rounded transition-colors disabled:opacity-50 disabled:pointer-events-none">
-                    {completingId === t.id ? "Finalizing..." : "Finalize"}
-                  </button>
-                )}
              </div>
           </div>
         ))}

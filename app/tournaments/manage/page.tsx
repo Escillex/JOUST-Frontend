@@ -50,26 +50,6 @@ export default function ManageTournaments() {
     checkAuth();
   }, []);
 
-  const [completingId, setCompletingId] = useState<string | null>(null);
-
-  const handleComplete = async (id: string) => {
-    if (completingId) return;
-    setCompletingId(id);
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(id), { method: "PATCH" });
-      if (res.ok) {
-        setMessage("Tournament finalized");
-      } else {
-        const data = await safeJson(res);
-        setMessage(data?.message || "Failed to finalize tournament");
-      }
-      await refresh();
-      setTimeout(() => setMessage(""), 3000);
-    } finally {
-      setCompletingId(null);
-    }
-  };
-
   // The dashboard chrome — heading, refresh, "Create New" — renders immediately
   // and only the table region is skeletoned, so the page is navigable while the
   // tournament list is still in flight instead of being hidden behind a spinner.
@@ -205,8 +185,6 @@ export default function ManageTournaments() {
 
             <ManagerTournamentTable
               tournaments={filtered}
-              onComplete={handleComplete}
-              completingId={completingId}
             />
           </>
         )}

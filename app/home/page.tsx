@@ -90,7 +90,7 @@ export default function HomePage() {
   const ready = !!user && loaded && isMobile !== null;
 
   return (
-    <HomeFrame className="py-8 md:py-16" showPattern={true}>
+    <HomeFrame className="pt-4 md:py-16" showPattern={true}>
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         {failed && ready && (
           <p className="mb-6 border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/70">
@@ -114,14 +114,12 @@ export default function HomePage() {
 function Skeleton({ phone }: { phone: boolean }) {
   if (phone) {
     return (
-      <div className="flex flex-col gap-4 animate-pulse" aria-busy="true">
-        <div className="h-11 w-48 bg-white/10" />
-        <div className="h-36 bg-surface border border-white/10" />
-        <div className="grid grid-cols-2 gap-2.5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[104px] bg-surface border border-white/10" />
-          ))}
-        </div>
+      <div className="grid grid-cols-3 grid-rows-4 gap-2.5 h-[calc(100dvh-160px)] animate-pulse" aria-busy="true">
+        <div className="col-span-3 row-span-2 bg-surface border border-white/10" />
+        <div className="col-span-2 row-span-1 bg-surface border border-white/10" />
+        <div className="col-span-1 row-span-1 bg-surface border border-white/10" />
+        <div className="col-span-2 row-span-1 bg-surface border border-white/10" />
+        <div className="col-span-1 row-span-1 bg-surface border border-white/10" />
       </div>
     );
   }

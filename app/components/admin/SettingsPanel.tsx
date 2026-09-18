@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 // One catalog, rendered by this panel and by the /setup wizard.
-import { MAIL_FIELDS, SECURITY_FIELDS, GOOGLE_FIELDS, type SettingField } from "./settingsFields";
+import { MAIL_FIELDS, SECURITY_FIELDS, GOOGLE_FIELDS, PARTICIPATION_FIELDS, type SettingField } from "./settingsFields";
 
 /** Mirrors the payload of GET /admin/settings. `value` is null for secrets —
  *  they are write-only, so the API reports whether one is set, never what. */
@@ -185,6 +185,13 @@ export default function SettingsPanel() {
         <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Security</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
           {SECURITY_FIELDS.map(field)}
+        </div>
+      </div>
+
+      <div className="bg-background border border-white/10 p-6 space-y-6">
+        <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Participant registration</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+          {PARTICIPATION_FIELDS.map(field)}
         </div>
       </div>
 
