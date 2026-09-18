@@ -3,7 +3,6 @@ import Hero from "./components/Hero";
 import Shop from "./components/Shop";
 import TournamentPreview from "./components/TournamentPreview";
 import SectionDivider from "./components/SectionDivider";
-import Footer from "./components/Footer";
 import FadeIn, { StaggerContainer } from "./components/FadeIn";
 import { API_ENDPOINTS, resolveImageUrl } from "./utils/api";
 import {
@@ -142,7 +141,6 @@ export default async function Home() {
     <div className="flex flex-col bg-background selection:bg-primary selection:text-black min-h-screen overflow-x-hidden">
       <StaggerContainer>
         {blocks.map(renderBlock)}
-        <Footer />
       </StaggerContainer>
     </div>
   );

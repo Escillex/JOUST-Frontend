@@ -108,16 +108,28 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
   return (
     <div className="bg-background border border-white/5 rounded-lg shadow-2xl flex flex-col h-[560px] md:h-[700px] overflow-hidden">
       {/* Header */}
-      <div className="p-4 md:p-6 border-b border-white/10 bg-white/[0.02] space-y-4 md:space-y-6">
-        <div className="flex flex-wrap gap-4 justify-between items-center">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Accounts
-            </h2>
-            <p className="text-[10px] text-white/60 font-medium uppercase mt-1 tracking-widest">{filteredUsers.length} shown</p>
+      <div className="p-4 md:p-6 border-b border-white/10 bg-white/[0.02] space-y-3 md:space-y-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between sm:items-center">
+          <div className="flex items-center justify-between sm:justify-start gap-4">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Accounts
+              </h2>
+              <p className="text-[10px] text-white/60 font-medium uppercase mt-1 tracking-widest">{filteredUsers.length} shown</p>
+            </div>
+            {/* Mobile select-all toggle button */}
+            <div className="flex md:hidden items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-white/15 bg-white/5 text-white/70 hover:text-white rounded"
+              >
+                {selectedIds.size === filteredUsers.length && filteredUsers.length > 0 ? "Deselect All" : "Select All"}
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <AnimatePresence>
               {selectedIds.size > 0 && (
                 <motion.button 
@@ -134,37 +146,40 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
                       onBatchDelete(Array.from(selectedIds));
                     }
                   }}
-                  className="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all rounded-md"
+                  className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all rounded-md text-center"
                 >
-                  Delete Selected ({selectedIds.size})
+                  Delete ({selectedIds.size})
                 </motion.button>
               )}
             </AnimatePresence>
-            <button onClick={onCreateClick} className="px-4 py-2 bg-primary text-black text-[10px] font-bold uppercase tracking-widest hover:shadow-[0_0_15px_rgba(82,185,70,0.4)] transition-all rounded-md">
+            <button
+              onClick={onCreateClick}
+              className="flex-1 sm:flex-initial px-4 py-2 bg-primary text-black text-[10px] font-bold uppercase tracking-widest hover:shadow-[0_0_15px_rgba(82,185,70,0.4)] transition-all rounded-md text-center"
+            >
               Create New User
             </button>
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4">
           <div className="flex-1 relative">
             <input 
               type="text" 
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 px-10 py-3 text-xs text-white placeholder:text-white/60 focus:outline-none focus:border-primary/50 focus:bg-white/[0.07] transition-all rounded-md"
+              className="w-full bg-white/5 border border-white/10 px-10 py-2.5 sm:py-3 text-xs text-white placeholder:text-white/60 focus:outline-none focus:border-primary/50 focus:bg-white/[0.07] transition-all rounded-md"
             />
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <div className="flex shrink-0 bg-white/5 border border-white/10 p-1 rounded-md">
+          <div className="flex shrink-0 bg-white/5 border border-white/10 p-1 rounded-md justify-between sm:justify-start">
             {(["ALL", "REGISTERED", "GUEST"] as const).map(f => (
               <button 
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 md:px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded ${filter === f ? "bg-white/10 text-white" : "text-white/60 hover:text-white/60"}`}
+                className={`flex-1 sm:flex-initial px-3 md:px-4 py-1.5 sm:py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded text-center ${filter === f ? "bg-white/10 text-white" : "text-white/60 hover:text-white/60"}`}
               >
                 {f}
               </button>
@@ -173,9 +188,136 @@ export default function UserRegistry({ users, onDelete, onBatchDelete, onConvert
         </div>
       </div>
 
-      {/* Table */}
+      {/* Content Container */}
       <div className="flex-1 overflow-auto custom-scrollbar bg-background">
-        <table className="w-full min-w-[860px] text-left border-collapse table-fixed">
+        {/* Mobile View: Card-based list */}
+        <div className="md:hidden divide-y divide-white/5 p-3 space-y-3">
+          {filteredUsers.length === 0 ? (
+            <div className="p-8 text-center text-white/40 text-xs uppercase tracking-wider">
+              No users found
+            </div>
+          ) : (
+            filteredUsers.map((u) => {
+              const uid = (u.sub || u.id) as string;
+              const isSelected = selectedIds.has(uid);
+              return (
+                <div
+                  key={uid}
+                  className={`p-3.5 rounded-lg border transition-all space-y-3 ${
+                    isSelected
+                      ? "bg-primary/[0.06] border-primary/40 shadow-[0_0_12px_rgba(82,185,70,0.15)]"
+                      : "bg-white/[0.02] border-white/10"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(uid)}
+                      className="mt-1 w-4 h-4 bg-background border-2 border-white/20 rounded cursor-pointer accent-primary shrink-0"
+                    />
+                    <div className="flex-1 min-w-0 flex items-center gap-3">
+                      <div
+                        className={`w-9 h-9 shrink-0 rounded flex items-center justify-center text-xs font-black border ${
+                          u.isGuest
+                            ? "bg-white/5 text-white/60 border-white/10"
+                            : "bg-primary/10 text-primary border-primary/20"
+                        }`}
+                      >
+                        {u.username ? u.username[0].toUpperCase() : "?"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                          <span className="truncate">{u.username || "Unknown User"}</span>
+                          {u.isGuest && (
+                            <span className="text-[9px] border border-primary/40 px-1 py-0.2 text-primary uppercase tracking-tight rounded font-black bg-primary/5 shrink-0">
+                              GUEST
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-white/50 truncate font-mono mt-0.5">
+                          {u.email || "No Email Provided"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Access Roles */}
+                  <div className="flex flex-wrap gap-1.5 pl-7">
+                    {u.roles?.map((r) => (
+                      <span
+                        key={r}
+                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                          r === "ADMIN"
+                            ? "text-red-500 border-red-500/20 bg-red-500/10"
+                            : r === "ORGANIZER"
+                            ? "text-amber-400 border-amber-400/20 bg-amber-400/10"
+                            : "text-white/60 border-white/10 bg-white/5"
+                        }`}
+                      >
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-white/5">
+                    {u.isGuest && (
+                      <button
+                        type="button"
+                        onClick={() => onConvert(u)}
+                        className="px-3 py-1.5 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded hover:bg-primary hover:text-black uppercase tracking-wider transition-all"
+                      >
+                        Register
+                      </button>
+                    )}
+                    {!u.isGuest && onAward && (
+                      <button
+                        type="button"
+                        onClick={() => onAward(u)}
+                        className="px-3 py-1.5 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded hover:bg-primary hover:text-black uppercase tracking-wider transition-all"
+                      >
+                        Award
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onEdit(u)}
+                      className="px-3 py-1.5 text-[10px] font-bold text-white/70 bg-white/5 border border-white/10 rounded hover:text-white hover:border-white/25 uppercase tracking-wider transition-all"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (u.roles.includes("ADMIN")) {
+                          alert("If you really wanna delete this account please remove admin permissions from the account");
+                          return;
+                        }
+                        if (confirmingId === uid) {
+                          onDelete(uid);
+                          setConfirmingId(null);
+                        } else {
+                          setConfirmingId(uid);
+                        }
+                      }}
+                      className={`px-3 py-1.5 text-[10px] font-bold border rounded uppercase tracking-wider transition-all ${
+                        confirmingId === uid
+                          ? "bg-red-500 text-white border-red-500 animate-pulse"
+                          : "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500 hover:text-white"
+                      }`}
+                    >
+                      {confirmingId === uid ? "Confirm Delete?" : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full data-dense table */}
+        <table className="hidden md:table w-full min-w-[860px] text-left border-collapse table-fixed">
           <thead className="sticky top-0 bg-[#0A0A0A] border-b border-white/10 z-20 shadow-xl">
             <tr>
               <th className="px-6 py-4 w-16 text-center">

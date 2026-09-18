@@ -16,6 +16,7 @@ interface Props {
 interface UserOption {
   id: string;
   username: string;
+  isGuest?: boolean;
 }
 
 export default function InvitePlayerModal({ tournament, tournamentId, onClose, onInvited }: Props) {
@@ -36,9 +37,12 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
     loadUsers();
   }, [loadUsers]);
 
-  // Filter out users who are already participants
+  // Filter out users who are already participants and guests, who cannot accept
+  // an invitation — they are organizer-managed via Add Guest instead.
   const available = users.filter(
-    (u) => !tournament.participants.some((p) => p.userId === u.id)
+    (u) =>
+      !u.isGuest &&
+      !tournament.participants.some((p) => p.userId === u.id)
   );
 
   const handleInvite = async () => {

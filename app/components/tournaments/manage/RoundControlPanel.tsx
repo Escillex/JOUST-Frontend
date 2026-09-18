@@ -8,6 +8,8 @@ import {
   getTieBreakerOrder,
   tieBreakerLabel,
   canOfferDraw,
+  canSeparateTiebreakers,
+  identicalTiebreakersWarning,
 } from "../../../utils/formatConfig";
 
 interface Props {
@@ -33,9 +35,8 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
 
   // The configured tiebreakers, named rather than assumed. Three places in this
   // panel previously asserted OMW% regardless of what was configured.
-  const tieBreakerNames = getTieBreakerOrder(tournament)
-    .map(tieBreakerLabel)
-    .join(" → ");
+  const tieBreakerOrder = getTieBreakerOrder(tournament);
+  const tieBreakerNames = tieBreakerOrder.map(tieBreakerLabel).join(" → ");
   const [strategy, setStrategy] = useState<ResolutionStrategy>("RANDOM");
 
   useEffect(() => {
@@ -67,6 +68,14 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
       setTieDetected(false);
     }
   }, [tournament.status, activeRound, tournament.id]);
+
+  // When the top two are identical on EVERY configured tiebreaker, "breaking
+  // automatically" cannot produce an honest winner — the server refuses it.
+  // Hide the Break Automatically button and point the organizer at the extra
+  // round instead.
+  const canBreakAutomatically =
+    leaderboard.length > 1 &&
+    canSeparateTiebreakers(leaderboard[0], leaderboard[1], tieBreakerOrder);
 
   const handleResolveTie = async (action: 'EXTEND_ROUND' | 'APPLY_TIEBREAKERS') => {
     setIsProcessing(true);
@@ -121,10 +130,12 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
                 TIE DETECTED FOR 1ST PLACE
               </h4>
               <p className="text-xs text-[#FFB800]/80">
-                Multiple players are tied at {leaderboard[0]?.points} points. The tournament has paused completion to allow manual resolution.
+                {!canBreakAutomatically
+                  ? identicalTiebreakersWarning(tieBreakerOrder)
+                  : `Multiple players are tied at ${leaderboard[0]?.points} points. The tournament has paused completion to allow manual resolution.`}
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={canBreakAutomatically ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "grid grid-cols-1 gap-3"}>
               <button
                 onClick={() => handleResolveTie('EXTEND_ROUND')}
                 disabled={isProcessing}
@@ -132,13 +143,15 @@ export default function RoundControlPanel({ tournament, fetchData, setMessage }:
               >
                 Match Tied Players
               </button>
-              <button
-                onClick={() => handleResolveTie('APPLY_TIEBREAKERS')}
-                disabled={isProcessing}
-                className="w-full h-12 bg-background hover:bg-white/10 text-white border border-white/20 font-black text-xs tracking-wider rounded transition-colors disabled:opacity-50 uppercase"
-              >
-                Break Automatically ({tieBreakerNames})
-              </button>
+              {canBreakAutomatically && (
+                <button
+                  onClick={() => handleResolveTie('APPLY_TIEBREAKERS')}
+                  disabled={isProcessing}
+                  className="w-full h-12 bg-background hover:bg-white/10 text-white border border-white/20 font-black text-xs tracking-wider rounded transition-colors disabled:opacity-50 uppercase"
+                >
+                  Break Automatically ({tieBreakerNames})
+                </button>
+              )}
             </div>
           </div>
         ) : (

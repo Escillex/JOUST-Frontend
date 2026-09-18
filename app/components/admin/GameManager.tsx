@@ -28,6 +28,8 @@ export default function GameManager({ onPendingCountChange }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [trackingMode, setTrackingMode] = useState<"POINTS" | "HP">("POINTS");
+  const [startingHp, setStartingHp] = useState<number | "">("");
+  const [pointsThreshold, setPointsThreshold] = useState<number | "">("");
   // The icon is held until the game exists: it is stored against a game id, and
   // there is no id until the create call comes back.
   const [pendingIcon, setPendingIcon] = useState<{ file: File; preview: string } | null>(null);
@@ -39,6 +41,8 @@ export default function GameManager({ onPendingCountChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editTracking, setEditTracking] = useState<"POINTS" | "HP">("POINTS");
+  const [editStartingHp, setEditStartingHp] = useState<number | "">("");
+  const [editPointsThreshold, setEditPointsThreshold] = useState<number | "">("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteState, setDeleteState] = useState<{ id: string, step: number, text?: string } | null>(null);
 
@@ -84,6 +88,8 @@ export default function GameManager({ onPendingCountChange }: Props) {
     setName("");
     setDescription("");
     setTrackingMode("POINTS");
+    setStartingHp("");
+    setPointsThreshold("");
     setError("");
     // The preview is an object URL; drop it or the blob is held for the life of
     // the page.
@@ -95,6 +101,13 @@ export default function GameManager({ onPendingCountChange }: Props) {
     if (!name.trim()) return setError("Name is required");
     setError("");
     try {
+      const cfg: Record<string, any> = {};
+      if (trackingMode === "HP" && startingHp !== "" && Number(startingHp) > 0) {
+        cfg.startingHp = Number(startingHp);
+      } else if (trackingMode === "POINTS" && pointsThreshold !== "" && Number(pointsThreshold) > 0) {
+        cfg.pointsThreshold = Number(pointsThreshold);
+      }
+
       const res = await authenticatedFetch(API_ENDPOINTS.GAMES.BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,6 +115,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
           name: name.trim(),
           description: description || undefined,
           trackingMode,
+          defaultConfig: Object.keys(cfg).length > 0 ? cfg : undefined,
         }),
       });
       if (res.ok) {
@@ -127,6 +141,8 @@ export default function GameManager({ onPendingCountChange }: Props) {
     setEditingId(g.id);
     setEditDescription(g.description ?? "");
     setEditTracking(g.trackingMode === "HP" ? "HP" : "POINTS");
+    setEditStartingHp(g.defaultConfig?.startingHp ?? "");
+    setEditPointsThreshold(g.defaultConfig?.pointsThreshold ?? "");
     setError("");
   };
 
@@ -134,6 +150,13 @@ export default function GameManager({ onPendingCountChange }: Props) {
     setSavingEdit(true);
     setError("");
     try {
+      const cfg: Record<string, any> = {};
+      if (editTracking === "HP" && editStartingHp !== "" && Number(editStartingHp) > 0) {
+        cfg.startingHp = Number(editStartingHp);
+      } else if (editTracking === "POINTS" && editPointsThreshold !== "" && Number(editPointsThreshold) > 0) {
+        cfg.pointsThreshold = Number(editPointsThreshold);
+      }
+
       const res = await authenticatedFetch(API_ENDPOINTS.GAMES.DETAILS(id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -142,6 +165,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
           // field whenever it is present.
           description: editDescription.trim(),
           trackingMode: editTracking,
+          defaultConfig: cfg,
         }),
       });
       if (res.ok) {
@@ -244,8 +268,8 @@ export default function GameManager({ onPendingCountChange }: Props) {
   const inputCls = "w-full bg-background border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary transition-all hover:bg-white/[0.02]";
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center border-b border-white/5 pb-4">
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-white/5 pb-4">
         <div>
           <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">Game Catalog</h3>
           <p className="text-[10px] text-white/60 uppercase tracking-widest mt-1">
@@ -254,7 +278,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
         </div>
         <button
           onClick={() => { if (isCreating) resetForm(); setIsCreating(!isCreating); }}
-          className="px-4 py-1.5 bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all shrink-0"
+          className="self-start sm:self-auto px-4 py-1.5 bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all shrink-0"
         >
           {isCreating ? "CANCEL" : "+ ADD GAME"}
         </button>
@@ -263,7 +287,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
       {/* Pending request queue */}
       {requests.length > 0 && (
         <div className="border border-primary/20 bg-primary/[0.04]">
-          <div className="px-6 py-3 border-b border-primary/20 flex items-center gap-2">
+          <div className="px-4 sm:px-6 py-3 border-b border-primary/20 flex items-center gap-2">
             <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">
               Pending Game Requests
             </span>
@@ -273,7 +297,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
           </div>
           <div className="divide-y divide-white/5">
             {requests.map((r) => (
-              <div key={r.id} className="px-6 py-4 flex items-center justify-between gap-4">
+              <div key={r.id} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-white uppercase tracking-widest truncate">{r.name}</div>
                   <div className="text-[10px] text-white/60 uppercase tracking-widest mt-1">
@@ -285,7 +309,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
                 <button
                   onClick={() => setResolving(r)}
                   aria-label={`Resolve ${r.name}`}
-                  className="px-4 py-1.5 shrink-0 bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
+                  className="self-start sm:self-auto px-4 py-1.5 shrink-0 bg-primary/10 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
                 >
                   Resolve
                 </button>
@@ -296,27 +320,28 @@ export default function GameManager({ onPendingCountChange }: Props) {
       )}
 
       {isCreating && (
-        <div className="bg-white/5 border border-white/10 p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="flex flex-col gap-1.5 w-24 shrink-0">
+        <div className="bg-white/5 border border-white/10 p-4 sm:p-6 md:p-8 space-y-6 animate-in slide-in-from-top-4 duration-500">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+            <div className="flex flex-col gap-1.5 w-20 sm:w-24 shrink-0">
               <label className={labelCls}>Icon</label>
               <ImageUpload
                 currentUrl={pendingIcon?.preview}
                 aspectRatio="aspect-square"
                 label={pendingIcon ? "REPLACE" : "ADD ICON"}
                 uploading={iconUploading}
+                compact
                 onUpload={(file) =>
                   setPendingIcon({ file, preview: URL.createObjectURL(file) })
                 }
                 onDelete={pendingIcon ? () => setPendingIcon(null) : undefined}
               />
             </div>
-            <p className="text-[10px] text-white/60 leading-relaxed self-end pb-1 sm:max-w-[16rem]">
+            <p className="text-[10px] text-white/60 leading-relaxed self-start sm:self-end pb-1 sm:max-w-[16rem]">
               Square image · cropped to 1:1 · stored at 256×256 · transparency kept. Optional — a
               game with no icon shows its first letter.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div>
               <label className={labelCls}>Game Name</label>
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Beyblade" className={inputCls} />
@@ -328,6 +353,31 @@ export default function GameManager({ onPendingCountChange }: Props) {
                 <option value="HP" className="bg-background text-white">HP</option>
               </select>
             </div>
+            {trackingMode === "HP" ? (
+              <div>
+                <label className={labelCls}>Default Starting HP</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={startingHp}
+                  onChange={(e) => setStartingHp(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
+                  placeholder="e.g. 100, 8000"
+                  className={inputCls}
+                />
+              </div>
+            ) : (
+              <div>
+                <label className={labelCls}>Default Points Threshold</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={pointsThreshold}
+                  onChange={(e) => setPointsThreshold(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
+                  placeholder="e.g. 1, 3, 10"
+                  className={inputCls}
+                />
+              </div>
+            )}
             <div>
               <label className={labelCls}>Description</label>
               <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" className={inputCls} />
@@ -350,9 +400,9 @@ export default function GameManager({ onPendingCountChange }: Props) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {games.map((g) => (
-            <div key={g.id} className="bg-background border border-white/5 p-6 hover:border-white/20 transition-all flex flex-col justify-between min-h-[120px]">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 min-w-0">
+            <div key={g.id} className="bg-background border border-white/5 p-4 sm:p-6 hover:border-white/20 transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
                   {/* The retired placeholder is not editable anywhere, icon
                       included — it just shows whatever it has. */}
                   {g.isBuiltin ? (
@@ -360,15 +410,15 @@ export default function GameManager({ onPendingCountChange }: Props) {
                   ) : (
                     <GameIconField game={g} onChanged={fetchGames} />
                   )}
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest break-words">{g.name}</h4>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest break-normal whitespace-normal">{g.name}</h4>
                     {g.isBuiltin && (
-                      <span className="text-[10px] font-black text-[#FFCC00]/70 uppercase tracking-[0.2em]">Retired — not assignable</span>
+                      <span className="text-[10px] font-black text-[#FFCC00]/70 uppercase tracking-[0.2em] block mt-0.5">Retired — not assignable</span>
                     )}
                   </div>
                 </div>
                 {!g.isBuiltin && (
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 self-end sm:self-start">
                     <button
                       onClick={() => (editingId === g.id ? setEditingId(null) : startEdit(g))}
                       title={editingId === g.id ? "Stop editing" : "Edit description and tracking"}
@@ -386,7 +436,7 @@ export default function GameManager({ onPendingCountChange }: Props) {
                           <button onClick={() => setDeleteState(null)} className="text-[10px] font-black text-white/40 hover:text-white transition-colors px-1">No</button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 rounded px-2 py-0.5">
+                        <div className="flex flex-wrap items-center gap-1 bg-red-500/20 border border-red-500/40 rounded px-2 py-1">
                           <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest mr-1 shrink-0">Type "yes im sure":</span>
                           <input 
                             type="text" 
@@ -442,6 +492,33 @@ export default function GameManager({ onPendingCountChange }: Props) {
                       <option value="HP" className="bg-background text-white">HP</option>
                     </select>
                   </div>
+                  {editTracking === "HP" ? (
+                    <div>
+                      <label className={labelCls} htmlFor={`hp-${g.id}`}>Default Starting HP</label>
+                      <input
+                        id={`hp-${g.id}`}
+                        type="number"
+                        min={1}
+                        value={editStartingHp}
+                        onChange={(e) => setEditStartingHp(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
+                        placeholder="e.g. 100, 8000"
+                        className={inputCls}
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className={labelCls} htmlFor={`pts-${g.id}`}>Default Points Threshold</label>
+                      <input
+                        id={`pts-${g.id}`}
+                        type="number"
+                        min={1}
+                        value={editPointsThreshold}
+                        onChange={(e) => setEditPointsThreshold(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
+                        placeholder="e.g. 1, 3, 10"
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleSaveEdit(g.id)}
@@ -471,7 +548,11 @@ export default function GameManager({ onPendingCountChange }: Props) {
                     {g.description || "No description."}
                   </p>
                   <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-3">
-                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{g.trackingMode || "POINTS"}</span>
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                      {g.trackingMode === "HP"
+                        ? `HP (${g.defaultConfig?.startingHp ?? 100})`
+                        : `POINTS${g.defaultConfig?.pointsThreshold ? ` (${g.defaultConfig.pointsThreshold})` : ""}`}
+                    </span>
                     <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
                       {g._count?.tournaments ?? 0} tournament{(g._count?.tournaments ?? 0) === 1 ? "" : "s"}
                     </span>

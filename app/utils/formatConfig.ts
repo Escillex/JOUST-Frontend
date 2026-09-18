@@ -131,10 +131,15 @@ export function getTrackerSettings(config: FormatConfig | null | undefined): {
 export const DEFAULT_TIE_BREAKER_ORDER = ['omw', 'gw', 'oomw'];
 
 export function getTieBreakerOrder(t: TournamentLike): string[] {
-  const configured = getTournamentConfig(t)?.tieBreakerOrder;
-  return configured && configured.length > 0
-    ? configured
-    : DEFAULT_TIE_BREAKER_ORDER;
+  const configured = getTournamentConfig(t)?.tieBreakerOrder as unknown;
+  if (Array.isArray(configured) && configured.length > 0) {
+    return configured.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  }
+  if (typeof configured === "string" && configured.trim().length > 0) {
+    const parsed = configured.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parsed.length > 0) return parsed;
+  }
+  return DEFAULT_TIE_BREAKER_ORDER;
 }
 
 /** Human label for a tiebreaker key, for column headers and messages. */
@@ -150,6 +155,46 @@ export function tieBreakerLabel(key: string): string {
     points: 'Points',
   };
   return labels[key] ?? key;
+}
+
+/** Can the configured tiebreakers tell these two tied entries apart?
+ *
+ *  Mirrors the backend's `tiebreakCriterion` equality check — the same keys
+ *  (with the same empty-order default) and the same 0.0001 epsilon — WITHOUT
+ *  the points comparison, because callers only ask once points are known equal.
+ *  When every metric is identical there is no honest winner to crown, so the
+ *  organizer must extend the round instead of "applying tiebreakers". */
+export function canSeparateTiebreakers(
+  entryA: Record<string, any> | null | undefined,
+  entryB: Record<string, any> | null | undefined,
+  tieBreakerOrder: string[],
+): boolean {
+  if (!entryA || !entryB) return true;
+  const order =
+    tieBreakerOrder.length > 0 ? tieBreakerOrder : DEFAULT_TIE_BREAKER_ORDER;
+  for (const key of order) {
+    const a = Number(entryA[key] ?? 0);
+    const b = Number(entryB[key] ?? 0);
+    if (Math.abs(a - b) > 0.0001) return true;
+  }
+  return false;
+}
+
+/** The warning shown when no tiebreaker separates the top two:
+ *  "OMW, GW, and OOMW are identical. You must extend the round to determine a
+ *  winner." Names the configured order so a custom one is explained honestly,
+ *  matching the refusal the backend throws to the same effect. */
+export function identicalTiebreakersWarning(tieBreakerOrder: string[]): string {
+  const order =
+    tieBreakerOrder.length > 0 ? tieBreakerOrder : DEFAULT_TIE_BREAKER_ORDER;
+  const names = order.map(tieBreakerLabel).map((name) => name.replace(/%$/, ''));
+  const subject =
+    names.length > 1
+      ? `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
+      : names[0] ?? 'the tiebreakers';
+  return `${subject} ${
+    names.length > 1 ? 'are' : 'is'
+  } identical. You must extend the round to determine a winner.`;
 }
 
 /** The tournament's system, however the payload happens to carry `format`. */

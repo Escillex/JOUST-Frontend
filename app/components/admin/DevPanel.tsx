@@ -61,15 +61,31 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
   // Mirrored here rather than re-implemented: same key, so flipping it in either
   // place moves the same switch — two sources of truth would drift immediately.
   const [debugMode, setDebugMode] = useState(false);
+  const [notifExpiryMins, setNotifExpiryMins] = useState(60);
 
   useEffect(() => {
-    try { setDebugMode(localStorage.getItem("joust_debug_mode") === "1"); } catch { /* storage unavailable */ }
+    try { 
+      setDebugMode(localStorage.getItem("joust_debug_mode") === "1"); 
+      const savedExpiry = localStorage.getItem("joust_notif_expiry_mins");
+      if (savedExpiry) {
+        const parsed = parseInt(savedExpiry, 10);
+        if (!isNaN(parsed) && parsed > 0) setNotifExpiryMins(parsed);
+      }
+    } catch { /* storage unavailable */ }
   }, []);
 
   const toggleDebugMode = () => {
     const next = !debugMode;
     setDebugMode(next);
     try { localStorage.setItem("joust_debug_mode", next ? "1" : "0"); } catch { /* ignore */ }
+  };
+
+  const handleSetNotifExpiry = (minutes: number) => {
+    setNotifExpiryMins(minutes);
+    try {
+      localStorage.setItem("joust_notif_expiry_mins", String(minutes));
+      toast(`Match notification expiry set to ${minutes} min`, "success");
+    } catch { /* ignore */ }
   };
 
   // `override` is null when nothing is forcing a mode and the stored setting
@@ -386,6 +402,37 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
               {debugMode
                 ? "Insta-win and random-advance shortcuts are showing on brackets. This browser only."
                 : "Unlocks insta-win / auto-resolve on tournament brackets. Admin-only, stored per browser — not a server setting."}
+            </p>
+          </div>
+
+          <div className="space-y-4 md:col-span-2 border-t border-neutral-800 pt-8">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">
+              Match / Verification Notification Expiry
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "15 min", value: 15 },
+                { label: "30 min", value: 30 },
+                { label: "1 hour", value: 60 },
+                { label: "2 hours", value: 120 },
+                { label: "12 hours", value: 720 },
+                { label: "24 hours", value: 1440 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleSetNotifExpiry(opt.value)}
+                  className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
+                    notifExpiryMins === opt.value
+                      ? "bg-primary text-background border-primary"
+                      : "bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-600"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">
+              Transient match calls and score verification requests older than {notifExpiryMins} minutes are automatically purged from the inbox. Invitations and awards stay until read.
             </p>
           </div>
 

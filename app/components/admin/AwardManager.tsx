@@ -54,20 +54,31 @@ export default function AwardManager() {
 
   const flash = (text: string, ok: boolean) => setMessage({ text, ok });
 
+  const isDuplicateLabel = useMemo(() => {
+    const trimmed = name.trim().toLowerCase();
+    if (!trimmed) return false;
+    return awards.some((a) => a.name.trim().toLowerCase() === trimmed);
+  }, [name, awards]);
+
   const create = async () => {
-    if (!name.trim() || !file) return;
+    const trimmedLabel = name.trim();
+    if (!trimmedLabel || !file) return;
+    if (isDuplicateLabel) {
+      flash(`An award with the label "${trimmedLabel}" already exists. Label must be unique.`, false);
+      return;
+    }
     setCreating(true);
     setMessage(null);
     try {
       const body = new FormData();
-      body.append("name", name.trim());
+      body.append("name", trimmedLabel);
       if (description.trim()) body.append("description", description.trim());
       body.append("kind", kind);
       body.append("image", file);
       const res = await authenticatedFetch(API_ENDPOINTS.AWARDS.CATALOG, { method: "POST", body });
       const data = await safeJson(res);
       if (res.ok) {
-        flash(`"${name.trim()}" created.`, true);
+        flash(`"${trimmedLabel}" created.`, true);
         setName(""); setDescription(""); setFile(null);
         if (fileInput.current) fileInput.current.value = "";
         await load();
@@ -173,15 +184,15 @@ export default function AwardManager() {
       />
 
       {/* Create */}
-      <div className="bg-white/5 border border-white/10 p-8 space-y-6">
+      <div className="bg-white/5 border border-white/10 p-4 sm:p-6 md:p-8 space-y-6">
         <h2 className="text-xs font-black uppercase tracking-[0.3em] text-primary">Create an Award</h2>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {(["MEDAL", "PLAQUE"] as const).map((k) => (
             <button
               key={k}
               onClick={() => setKind(k)}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border transition-all ${
+              className={`flex-1 py-2.5 sm:py-3 px-3 text-[10px] font-black uppercase tracking-widest border transition-all text-center ${
                 kind === k ? "bg-primary text-black border-primary" : "bg-background border-white/10 text-white/60 hover:border-white/30"
               }`}
             >
@@ -190,16 +201,27 @@ export default function AwardManager() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Name</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                  Award Label / Name <span className="text-primary">*</span>
+                </label>
+                {isDuplicateLabel && (
+                  <span className="text-[10px] font-bold text-[#FF4D4D] uppercase tracking-wider">
+                    Label must be unique
+                  </span>
+                )}
+              </div>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={60}
                 placeholder={kind === "MEDAL" ? "Tournament Champion" : "2026 Winter Invitational"}
-                className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary placeholder:text-white/15"
+                className={`w-full h-10 bg-background border px-3 text-sm text-white focus:outline-none transition-all placeholder:text-white/15 ${
+                  isDuplicateLabel ? "border-[#FF4D4D] focus:border-[#FF4D4D]" : "border-white/10 focus:border-primary"
+                }`}
               />
             </div>
             <div className="space-y-1.5">
@@ -240,7 +262,7 @@ export default function AwardManager() {
             </div>
             <button
               onClick={create}
-              disabled={creating || !name.trim() || !file}
+              disabled={creating || !name.trim() || !file || isDuplicateLabel}
               className="px-8 py-3 bg-primary text-black text-[10px] font-black uppercase tracking-[0.3em] disabled:opacity-40"
             >
               {creating ? "Creating..." : "Create Award"}

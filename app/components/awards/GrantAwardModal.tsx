@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_ENDPOINTS, authenticatedFetch, safeJson } from "../../utils/api";
 import type { Award, UserAward } from "../../tournaments/types";
 import Medal from "./Medal";
@@ -96,8 +96,20 @@ export default function GrantAwardModal({ userId, userName, isOpen, onClose, onC
     }
   };
 
-  const medals = catalog.filter((a) => a.kind === "MEDAL");
-  const plaques = catalog.filter((a) => a.kind === "PLAQUE");
+  const [search, setSearch] = useState("");
+
+  const filteredCatalog: Award[] = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter(
+      (a: Award) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.description && a.description.toLowerCase().includes(q)),
+    );
+  }, [catalog, search]);
+
+  const medals = filteredCatalog.filter((a: Award) => a.kind === "MEDAL");
+  const plaques = filteredCatalog.filter((a: Award) => a.kind === "PLAQUE");
   const tile = (a: Award) =>
     `border p-2 transition-all text-left ${
       selected === a.id ? "border-primary bg-primary/10" : "border-white/10 bg-white/[0.02] hover:border-white/30"
@@ -127,30 +139,73 @@ export default function GrantAwardModal({ userId, userName, isOpen, onClose, onC
             </p>
           ) : (
             <>
-              {medals.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Medals</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {medals.map((a) => (
-                      <button key={a.id} onClick={() => setSelected(a.id)} className={tile(a)}>
-                        <Medal name={a.name} imageUrl={a.imageUrl} sizeClass="w-14 h-14 mx-auto" showDetail={false} />
-                        <p className="text-[10px] text-white/70 font-bold mt-1.5 text-center truncate">{a.name}</p>
-                      </button>
-                    ))}
-                  </div>
+              {/* Search by award label / name */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                    Search by Award Label
+                  </label>
+                  {search.trim() && (
+                    <span className="text-[10px] text-primary font-bold">
+                      {filteredCatalog.length} matching award{filteredCatalog.length === 1 ? "" : "s"}
+                    </span>
+                  )}
                 </div>
-              )}
-              {plaques.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">Plaques</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {plaques.map((a) => (
-                      <button key={a.id} onClick={() => setSelected(a.id)} className={tile(a)}>
-                        <Plaque name={a.name} imageUrl={a.imageUrl} size="sm" />
-                      </button>
-                    ))}
-                  </div>
+                <div className="relative">
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Type award label to find medals or plaques..."
+                    className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/20"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {filteredCatalog.length === 0 ? (
+                <div className="p-6 text-center border border-white/5 bg-white/[0.01]">
+                  <p className="text-sm text-white/40">No awards match label &quot;{search}&quot;.</p>
+                </div>
+              ) : (
+                <>
+                  {medals.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">
+                        Medals ({medals.length})
+                      </p>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {medals.map((a: Award) => (
+                          <button key={a.id} onClick={() => setSelected(a.id)} className={tile(a)}>
+                            <Medal name={a.name} imageUrl={a.imageUrl} sizeClass="w-14 h-14 mx-auto" showDetail={false} />
+                            <p className="text-[10px] text-white/70 font-bold mt-1.5 text-center truncate">{a.name}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {plaques.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">
+                        Plaques ({plaques.length})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {plaques.map((a: Award) => (
+                          <button key={a.id} onClick={() => setSelected(a.id)} className={tile(a)}>
+                            <Plaque name={a.name} imageUrl={a.imageUrl} size="sm" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="space-y-1.5">

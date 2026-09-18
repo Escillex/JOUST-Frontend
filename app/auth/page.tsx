@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { API_ENDPOINTS, API_URL, authenticatedFetch, safeJson } from "../utils/api";
 import FadeIn, { StaggerContainer } from "../components/FadeIn";
-import Footer from "../components/Footer";
 
 import { useUser } from "../components/UserProvider";
 import GoogleButton from "../components/auth/GoogleButton";
@@ -1060,8 +1059,6 @@ export default function AuthPage() {
           </FadeIn>
         </StaggerContainer>
       </main>
-
-      <Footer />
     </div>
   );
 }

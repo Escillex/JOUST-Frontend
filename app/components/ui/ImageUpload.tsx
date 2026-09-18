@@ -24,6 +24,8 @@ interface ImageUploadProps {
   cropAspectRatio?: number;
   label?: string;
   placeholder?: React.ReactNode;
+  /** When rendered in compact tiles (e.g. 64-80px icons), use scaled-down touch overlay buttons */
+  compact?: boolean;
 }
 
 export default function ImageUpload({
@@ -35,6 +37,7 @@ export default function ImageUpload({
   cropAspectRatio,
   label = "UPDATE IMAGE",
   placeholder,
+  compact = false,
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -138,27 +141,35 @@ export default function ImageUpload({
         {/* Scanline overlay */}
         <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_2px]" />
 
-        {/* Action overlay. On a pointer device it appears on hover (or when a
-            control has keyboard focus); a touch screen has no hover, so there
-            it is a permanent bar along the bottom instead of an invisible
-            layer the owner could never find. */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4 [@media(hover:none)]:opacity-100 [@media(hover:none)]:top-auto [@media(hover:none)]:flex-row [@media(hover:none)]:flex-wrap [@media(hover:none)]:justify-center [@media(hover:none)]:gap-2 [@media(hover:none)]:p-2 [@media(hover:none)]:bg-black/75">
+        <div className={`absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col items-center justify-center ${
+          compact
+            ? "gap-1 p-1 [@media(hover:none)]:opacity-100 [@media(hover:none)]:top-auto [@media(hover:none)]:flex-col [@media(hover:none)]:gap-1 [@media(hover:none)]:p-1 [@media(hover:none)]:bg-black/85"
+            : "gap-4 [@media(hover:none)]:opacity-100 [@media(hover:none)]:top-auto [@media(hover:none)]:flex-row [@media(hover:none)]:flex-wrap [@media(hover:none)]:justify-center [@media(hover:none)]:gap-2 [@media(hover:none)]:p-2 [@media(hover:none)]:bg-black/75"
+        }`}>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="min-h-11 px-6 py-2 bg-primary text-black font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:scale-100"
+            className={`${
+              compact
+                ? "w-full py-1 px-1.5 bg-primary text-black font-black text-[9px] tracking-wider truncate"
+                : "min-h-11 px-6 py-2 bg-primary text-black font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-transform"
+            } disabled:opacity-50 disabled:scale-100`}
           >
-            {uploading ? "UPLOADING..." : label}
+            {uploading ? "..." : label}
           </button>
 
           {currentUrl && onDelete && !uploading && (
             <button
               type="button"
               onClick={onDelete}
-              className="min-h-11 px-3 text-[11px] font-bold text-red-400 hover:text-red-300 tracking-widest uppercase"
+              className={`${
+                compact
+                  ? "w-full py-0.5 text-[8px] font-bold text-red-400 hover:text-red-300 tracking-wider uppercase truncate"
+                  : "min-h-11 px-3 text-[11px] font-bold text-red-400 hover:text-red-300 tracking-widest uppercase"
+              }`}
             >
-              Remove image
+              {compact ? "Remove" : "Remove image"}
             </button>
           )}
         </div>

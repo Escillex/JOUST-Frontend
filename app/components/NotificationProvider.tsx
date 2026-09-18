@@ -34,13 +34,48 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 // Socket origin is resolved centrally in utils/api.ts - see the comment there.
 
-// How often to re-fetch while the socket is down. The socket is the fast path;
-// this is the floor that keeps the bell honest on a flaky connection.
-const FALLBACK_POLL_MS = 60000;
+// Poll intervals:
+// - Disconnected: frequent polling (15s) so the user doesn't miss invites or match calls.
+// - Connected: low-frequency safety-net poll (45s) in case the socket is in an untrusted origin
+//   room or a packet was dropped silently.
+const DISCONNECTED_POLL_MS = 15000;
+const CONNECTED_SAFETY_POLL_MS = 45000;
 
 // Cap on how many notifications are held in memory. The dropdown only ever shows
 // the recent ones, and an unbounded list would grow for the whole session.
 const MAX_ITEMS = 50;
+
+// Transient notifications (matches and score verifications) expire after a configurable duration.
+// Defaults to 60 minutes. Can be adjusted in Dev Tools (stored in localStorage: joust_notif_expiry_mins).
+// Invitations, awards, placements, and moderations stay until read.
+const DEFAULT_EXPIRATION_MINUTES = 60;
+const TRANSIENT_TYPES = new Set([
+  "MATCH_READY",
+  "SCORE_PENDING",
+  "MATCH_RESULT",
+  "MATCH_TIMER_ENDED",
+]);
+
+export function getNotificationExpiryMinutes(): number {
+  if (typeof window === "undefined") return DEFAULT_EXPIRATION_MINUTES;
+  try {
+    const raw = localStorage.getItem("joust_notif_expiry_mins");
+    if (!raw) return DEFAULT_EXPIRATION_MINUTES;
+    const val = parseInt(raw, 10);
+    return isNaN(val) || val <= 0 ? DEFAULT_EXPIRATION_MINUTES : val;
+  } catch {
+    return DEFAULT_EXPIRATION_MINUTES;
+  }
+}
+
+function isExpired(notification: AppNotification, expiryMinutes: number): boolean {
+  if (notification.type === "GUEST_CLEANUP_SCHEDULED") return true;
+  if (TRANSIENT_TYPES.has(notification.type)) {
+    const ageMs = Date.now() - new Date(notification.createdAt).getTime();
+    return ageMs > expiryMinutes * 60 * 1000;
+  }
+  return false;
+}
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
@@ -56,8 +91,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const res = await authenticatedFetch(API_ENDPOINTS.NOTIFICATIONS.LIST);
     if (!res.ok) return;
     const data = await safeJson(res);
-    setItems(data?.items ?? []);
-    setUnreadCount(data?.unreadCount ?? 0);
+    const rawItems: AppNotification[] = data?.items ?? [];
+    const expiryMins = getNotificationExpiryMinutes();
+    // Filter out internal housekeeping noise and expired transient alerts
+    const filtered = rawItems.filter((n) => !isExpired(n, expiryMins));
+    const unreadFiltered = filtered.filter((n) => !n.read).length;
+    setItems(filtered);
+    setUnreadCount(unreadFiltered);
   }, [hasInbox]);
 
   useEffect(() => {
@@ -82,19 +122,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       reconnection: true,
     });
 
-    // The server places this socket in its private user room during the
-    // handshake, using the same cookie, so there is nothing to subscribe to here.
     socket.on("connect", () => {
       setConnected(true);
-      // Resync on every (re)connect. A notification emitted while this socket
-      // was down went to a room we were not in, so the live handler below never
-      // saw it — the push is not replayed on reconnect. Without this refetch a
-      // phone that slept through a disconnect shows a stale bell until the next
-      // fallback poll or a manual reload (the reported symptom).
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Notifications] Socket connected:", socket.id);
+      }
+      // Resync on every (re)connect to fetch any notifications emitted while down.
       void refreshRef.current();
     });
-    socket.on("disconnect", () => setConnected(false));
+
+    socket.on("disconnect", (reason) => {
+      setConnected(false);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Notifications] Socket disconnected:", reason);
+      }
+    });
+
+    socket.on("connect_error", (err) => {
+      setConnected(false);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[Notifications] Socket connect error:", err.message);
+      }
+    });
+
     socket.on("notification:new", (payload: AppNotification) => {
+      if (payload.type === "GUEST_CLEANUP_SCHEDULED") return;
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Notifications] Live notification received:", payload);
+      }
       setItems((prev) => [{ ...payload, read: false }, ...prev].slice(0, MAX_ITEMS));
       setUnreadCount((prev) => prev + 1);
     });
@@ -104,11 +159,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     };
   }, [hasInbox]);
 
-  // Fallback poll: only runs while the socket is down, so a healthy connection
-  // costs nothing. This is what keeps the bell correct on venue Wi-Fi.
+  // Continuous backup polling:
+  // Runs at 15s when disconnected, and 45s when connected (as a guaranteed safety net).
   useEffect(() => {
-    if (!hasInbox || connected) return;
-    const timer = setInterval(() => void refreshRef.current(), FALLBACK_POLL_MS);
+    if (!hasInbox) return;
+    const intervalMs = connected ? CONNECTED_SAFETY_POLL_MS : DISCONNECTED_POLL_MS;
+    const timer = setInterval(() => void refreshRef.current(), intervalMs);
     return () => clearInterval(timer);
   }, [hasInbox, connected]);
 

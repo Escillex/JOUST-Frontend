@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import ScoringDrawer from "./bracket/ScoringDrawer";
 import type { Match as BracketMatch } from "../../tournaments/[id]/bracket/types";
-import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, tieBreakerLabel } from "../../utils/formatConfig";
+import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, tieBreakerLabel, canSeparateTiebreakers, identicalTiebreakersWarning } from "../../utils/formatConfig";
 import Image from "next/image";
 import Link from "next/link";
 import type { Tournament } from "../../tournaments/types";
@@ -345,9 +345,16 @@ export default function PairingsView({
     standings[0]?.points > 0 &&
     standings[0]?.points === standings[1]?.points;
 
-  const tieBreakerNames = getTieBreakerOrder(tournament)
-    .map(tieBreakerLabel)
-    .join(" → ");
+  const tieBreakerOrder = getTieBreakerOrder(tournament);
+  const tieBreakerNames = tieBreakerOrder.map(tieBreakerLabel).join(" → ");
+
+  // When the top two are identical on EVERY configured tiebreaker, "applying
+  // tiebreakers" cannot produce an honest winner — the server refuses it. Hide
+  // the Apply button and point the organizer at the extra round instead.
+  const tiebreakersIdentical =
+    isFirstPlaceTie &&
+    standings.length > 1 &&
+    !canSeparateTiebreakers(standings[0], standings[1], tieBreakerOrder);
 
   const handleResolveTie = async (action: "EXTEND_ROUND" | "APPLY_TIEBREAKERS") => {
     setIsResolvingTie(true);
@@ -440,21 +447,27 @@ export default function PairingsView({
               {displayNameOf(standings[0] as never, standings[0]?.username)} and {displayNameOf(standings[1] as never, standings[1]?.username)} are tied at {standings[0]?.points} points
             </p>
             <p className="text-[11px] text-white/60">
-              {canManage
+              {tiebreakersIdentical ? (
+                <span className="text-amber-300 font-bold">
+                  {identicalTiebreakersWarning(tieBreakerOrder)}
+                </span>
+              ) : canManage
                 ? "Tournament auto-completion is paused. Apply secondary tiebreakers or extend with an extra round to finalize."
                 : "Awaiting organizer tiebreak resolution to declare the final champion."}
             </p>
           </div>
           {canManage && (
             <div className="flex flex-wrap gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleResolveTie("APPLY_TIEBREAKERS")}
-                disabled={isResolvingTie}
-                className="px-4 py-2.5 bg-amber-400 hover:bg-white text-black text-[10px] font-black uppercase tracking-widest font-poppins transition-colors disabled:opacity-50"
-              >
-                {isResolvingTie ? "Resolving…" : `Apply Tiebreakers (${tieBreakerNames})`}
-              </button>
+              {!tiebreakersIdentical && (
+                <button
+                  type="button"
+                  onClick={() => handleResolveTie("APPLY_TIEBREAKERS")}
+                  disabled={isResolvingTie}
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-white text-black text-[10px] font-black uppercase tracking-widest font-poppins transition-colors disabled:opacity-50"
+                >
+                  {isResolvingTie ? "Resolving…" : `Apply Tiebreakers (${tieBreakerNames})`}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleResolveTie("EXTEND_ROUND")}

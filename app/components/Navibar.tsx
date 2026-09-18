@@ -133,19 +133,25 @@ export default function Navibar() {
           {/* Desktop Navigation */}
           <nav className={`hidden md:flex items-center ${inManageMode ? "gap-7" : "gap-10"}`}>
             {navLinks.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive =
+                inManageMode
+                  ? pathname === link.href || (link.href === "/tournaments/manage" && pathname.startsWith("/tournaments/manage"))
+                  : pathname === link.href || (link.name === "Manage" && pathname.startsWith("/admin"));
               const linkDelays: Record<string, number> = {
                 Home: 0,
                 Tournaments: 0.1,
                 Leaderboards: 0.2,
                 Admin: 0.3,
               };
+              const isManageWithAdmin = link.name === "Manage" && isAdmin && !inManageMode;
+
               return (
                 <motion.div
                   key={link.name}
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: linkDelays[link.name] ?? 0.1, type: "spring", stiffness: 300, damping: 20 }}
+                  className={isManageWithAdmin ? "relative group" : undefined}
                 >
                   <Link
                     href={link.href}
@@ -172,6 +178,23 @@ export default function Navibar() {
                       />
                     )}
                   </Link>
+
+                  {/* Hover dropdown for Manage to reveal Admin if user is admin */}
+                  {isManageWithAdmin && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50 pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 transition-all duration-200">
+                      <div className="min-w-[180px] bg-component-background border-2 border-component-border shadow-[0_10px_30px_rgba(0,0,0,0.8)] py-1 overflow-hidden backdrop-blur-md">
+                        <Link
+                          href="/admin"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-primary hover:bg-white/5 transition-all font-poppins"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 text-primary shrink-0">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                          </svg>
+                          <span>Admin Panel</span>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               );
             })}

@@ -28,6 +28,7 @@ export default function GameIconField({
         aspectRatio="aspect-square"
         label={game.iconUrl ? "REPLACE" : "ADD ICON"}
         uploading={uploading}
+        compact
         placeholder={<GameIcon game={game} size="tile" />}
         onUpload={async (file) => {
           const url = await upload(API_ENDPOINTS.IMAGES.UPLOAD_GAME_ICON(game.id), file);

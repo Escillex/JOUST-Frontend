@@ -428,15 +428,15 @@ export default function AdminDashboard() {
 
 
   return (
-    <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col px-4 md:px-6 py-8 gap-0`}>
+    <div className={`min-h-screen bg-background text-[#E0E0E0] ${inter.className} flex flex-col px-3 sm:px-4 md:px-6 py-6 sm:py-8 gap-0`}>
       {!setupDone && (
         <a
           href="/setup"
-          className="mb-6 flex items-center justify-between gap-4 border border-primary/40 bg-primary/5 px-5 py-4 hover:bg-primary/10 transition-colors"
+          className="mb-6 flex items-center justify-between gap-4 border border-primary/40 bg-primary/5 px-4 sm:px-5 py-3 sm:py-4 hover:bg-primary/10 transition-colors"
         >
           <span className="space-y-1">
             <span className="block text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Setup not finished</span>
-            <span className="block text-[13px] text-[#B0B0B0] leading-relaxed">
+            <span className="block text-xs sm:text-[13px] text-[#B0B0B0] leading-relaxed">
               Email, two-factor sign-in and backups have never been confirmed on this deployment.
             </span>
           </span>
@@ -510,8 +510,8 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto w-full flex flex-col">
         {/* Two levels, both plain: the group, then what is inside it. No folder
             metaphor, no brand tab — the navbar already says where you are. */}
-        <div className="border-b border-white/10">
-          <div className="flex flex-wrap items-center gap-1">
+        <div className="border-b border-white/10 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1 min-w-max pb-px">
             {ADMIN_GROUPS.map((group) => {
               const isActive = group.tabs.some((t) => t.tab === activeTab);
               // A badge on a sub-tab has to be visible from the group, or it is
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
                 <button
                   key={group.key}
                   onClick={() => { const first = group.tabs.find((t) => t.tab); if (first?.tab) setActiveTab(first.tab); }}
-                  className={`px-4 py-3 text-[13px] font-semibold transition-colors border-b-2 -mb-[2px] ${
+                  className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-[13px] font-semibold transition-colors border-b-2 -mb-[2px] shrink-0 ${
                     isActive
                       ? "border-primary text-white"
                       : "border-transparent text-[#E0E0E0]/45 hover:text-[#E0E0E0]"
@@ -531,7 +531,7 @@ export default function AdminDashboard() {
                 >
                   {group.label}
                   {badge > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center text-[10px] font-semibold text-black bg-[#FF4D4D] rounded-full px-1.5">
+                    <span className="ml-1.5 sm:ml-2 inline-flex items-center justify-center text-[10px] font-semibold text-black bg-[#FF4D4D] rounded-full px-1.5">
                       {badge}
                     </span>
                   )}
@@ -545,39 +545,41 @@ export default function AdminDashboard() {
           const group = ADMIN_GROUPS.find((g) => g.tabs.some((t) => t.tab === activeTab));
           if (!group) return null;
           return (
-            <div className="flex flex-wrap items-center gap-2 py-4">
-              {group.tabs.map(({ tab, href, label }) => {
-                const base =
-                  "px-3 h-8 inline-flex items-center text-xs font-semibold rounded border transition-colors";
-                if (href) {
+            <div className="flex items-center gap-2 py-3 sm:py-4 overflow-x-auto scrollbar-none">
+              <div className="flex items-center gap-2 min-w-max">
+                {group.tabs.map(({ tab, href, label }) => {
+                  const base =
+                    "px-3 h-8 inline-flex items-center text-xs font-semibold rounded border transition-colors shrink-0";
+                  if (href) {
+                    return (
+                      <a
+                        key={href}
+                        href={href}
+                        className={`${base} border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20`}
+                      >
+                        {label} <span aria-hidden className="ml-1.5 text-[#E0E0E0]/30">→</span>
+                      </a>
+                    );
+                  }
+                  const count = tab === "MODERATION" ? openReports : tab === "GAMES" ? pendingGameRequests : 0;
                   return (
-                    <a
-                      key={href}
-                      href={href}
-                      className={`${base} border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20`}
+                    <button
+                      key={tab}
+                      onClick={() => tab && setActiveTab(tab)}
+                      className={`px-3 h-8 text-xs font-semibold rounded border transition-colors shrink-0 ${
+                        activeTab === tab
+                          ? "bg-white/10 border-white/20 text-white"
+                          : "border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20"
+                      }`}
                     >
-                      {label} <span aria-hidden className="ml-1.5 text-[#E0E0E0]/30">→</span>
-                    </a>
+                      {label}
+                      {count > 0 && (
+                        <span className="ml-2 text-[10px] font-semibold text-[#FF4D4D]">{count}</span>
+                      )}
+                    </button>
                   );
-                }
-                const count = tab === "MODERATION" ? openReports : tab === "GAMES" ? pendingGameRequests : 0;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => tab && setActiveTab(tab)}
-                    className={`px-3 h-8 text-xs font-semibold rounded border transition-colors ${
-                      activeTab === tab
-                        ? "bg-white/10 border-white/20 text-white"
-                        : "border-white/10 text-[#E0E0E0]/45 hover:text-[#E0E0E0] hover:border-white/20"
-                    }`}
-                  >
-                    {label}
-                    {count > 0 && (
-                      <span className="ml-2 text-[10px] font-semibold text-[#FF4D4D]">{count}</span>
-                    )}
-                  </button>
-                );
-              })}
+                })}
+              </div>
             </div>
           );
         })()}
@@ -738,7 +740,7 @@ export default function AdminDashboard() {
                 <h1 className="text-2xl font-semibold text-white">Format Presets</h1>
                 <p className="text-sm text-[#E0E0E0]/45 mt-2">Manage standardized tournament configurations and rulesets for organizers.</p>
               </div>
-              <div className="bg-background border border-white/10 p-10">
+              <div className="bg-background border border-white/10 p-4 sm:p-6 md:p-10">
                 <PresetManager />
               </div>
             </motion.div>
@@ -754,7 +756,7 @@ export default function AdminDashboard() {
                 <h1 className="text-2xl font-semibold text-white">Games</h1>
                 <p className="text-sm text-[#E0E0E0]/45 mt-2">The games organizers can attach to tournaments. Requests from organizers arrive as notifications.</p>
               </div>
-              <div className="bg-background border border-white/10 p-10">
+              <div className="bg-background border border-white/10 p-4 sm:p-6 md:p-10">
                 <GameManager onPendingCountChange={setPendingGameRequests} />
               </div>
             </motion.div>

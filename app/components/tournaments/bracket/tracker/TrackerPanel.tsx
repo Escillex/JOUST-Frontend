@@ -73,20 +73,51 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
   const canAdjustP1 = isAdmin || (isPlayerInMatch && (isSelfP1 || scoreRule === 'SELF_REPORT_ALLOWED'));
   const canAdjustP2 = isAdmin || (isPlayerInMatch && (isSelfP2 || scoreRule === 'SELF_REPORT_ALLOWED'));
 
-  // Derive dynamic adjustment steps based on starting value and pointsThreshold
-  const getSteps = (val: number, maxThreshold?: number) => {
-    const limit = Math.min(val, maxThreshold ?? val);
-    if (limit <= 2) return { large: null, small: 1 };
-    if (val > 20000) return { large: 10000, small: 1000 };
-    if (val > 2000) return { large: 1000, small: 100 };
-    if (val > 200) return { large: 100, small: 10 };
-    if (val > 20) return { large: 10, small: 1 };
-    if (val > 5) return { large: 5, small: 1 };
-    return { large: 2, small: 1 };
+  // Derive dynamic adjustment steps based on mode, starting HP, and pointsThreshold.
+  // In HP mode, provides proportional fractional increments (e.g. max/2, max/4, max/8, down to min step)
+  const getSteps = (mode: string, startingVal: number, pointsThreshold?: number) => {
+    if (mode === 'HP') {
+      const max = Math.max(1, startingVal);
+      // Ceil rounded to highest order of magnitude:
+      // e.g. 1565 has order 1000 -> ceil(1565 / 1000) * 1000 = 2000.
+      // 750 has order 100 -> ceil(750 / 100) * 100 = 800.
+      // 25 has order 10 -> ceil(25 / 10) * 10 = 30.
+      const roundToHighest = (n: number) => {
+        if (n <= 10) return Math.ceil(n);
+        const power = Math.pow(10, Math.floor(Math.log10(n)));
+        return Math.ceil(n / power) * power;
+      };
+
+      const half = roundToHighest(max / 2);
+      const quarter = roundToHighest(max / 4);
+      const eighth = roundToHighest(max / 8);
+      // Smallest clean base unit for fine adjustments
+      const basePower = Math.pow(10, Math.max(0, Math.floor(Math.log10(max)) - 2));
+      const small = basePower;
+
+      // Unique sorted set of positive steps:
+      const stepsArr = Array.from(new Set([half, quarter, eighth, small]))
+        .filter((s) => s > 0)
+        .sort((a, b) => b - a); // descending order
+
+      return {
+        mode: 'HP' as const,
+        options: stepsArr,
+      };
+    }
+
+    // Points mode: threshold decides max meaningful steps
+    const threshold = pointsThreshold && pointsThreshold > 0 ? pointsThreshold : startingVal;
+    if (threshold <= 1) return { mode: 'POINTS' as const, options: [1] };
+    if (threshold <= 3) return { mode: 'POINTS' as const, options: [1] };
+    if (threshold <= 10) return { mode: 'POINTS' as const, options: [5, 1] };
+    if (threshold <= 50) return { mode: 'POINTS' as const, options: [10, 5, 1] };
+    return { mode: 'POINTS' as const, options: [10, 1] };
   };
+
   const steps = activeLog
-    ? getSteps(activeLog.startingValue, formatConfig?.pointsThreshold ?? undefined)
-    : { large: null, small: 1 };
+    ? getSteps(activeLog.mode, activeLog.startingValue, formatConfig?.pointsThreshold)
+    : { mode: 'POINTS' as const, options: [1] };
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -541,15 +572,23 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
                 isUpdating={isUpdating}
               />
               {canAdjustP1 && (
-                <div className="flex items-center gap-2">
-                  {steps.large !== null && (
-                    <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(1, -steps.large!)} />
-                  )}
-                  <AdjustButton label={`−${steps.small}`} onClick={() => handleUpdateValue(1, -steps.small)} />
-                  <AdjustButton label={`+${steps.small}`} onClick={() => handleUpdateValue(1, steps.small)} />
-                  {steps.large !== null && (
-                    <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(1, steps.large!)} />
-                  )}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Minus buttons in descending order (e.g. -4000, -2000, -1000, -100) */}
+                  {steps.options.map((stepVal) => (
+                    <AdjustButton
+                      key={`p1-sub-${stepVal}`}
+                      label={`−${stepVal}`}
+                      onClick={() => handleUpdateValue(1, -stepVal)}
+                    />
+                  ))}
+                  {/* Plus buttons in ascending order (e.g. +100, +1000, +2000, +4000) */}
+                  {[...steps.options].reverse().map((stepVal) => (
+                    <AdjustButton
+                      key={`p1-add-${stepVal}`}
+                      label={`+${stepVal}`}
+                      onClick={() => handleUpdateValue(1, stepVal)}
+                    />
+                  ))}
                   <ManualInput value={activeLog.player1Value} onSet={(v) => handleSetValue(1, v)} />
                 </div>
               )}
@@ -570,16 +609,24 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
                 isUpdating={isUpdating}
               />
               {canAdjustP2 && (
-                <div className="flex items-center gap-2 justify-end">
+                <div className="flex items-center gap-1.5 justify-end flex-wrap">
                   <ManualInput value={activeLog.player2Value} onSet={(v) => handleSetValue(2, v)} />
-                  {steps.large !== null && (
-                    <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(2, -steps.large!)} />
-                  )}
-                  <AdjustButton label={`−${steps.small}`} onClick={() => handleUpdateValue(2, -steps.small)} />
-                  <AdjustButton label={`+${steps.small}`} onClick={() => handleUpdateValue(2, steps.small)} />
-                  {steps.large !== null && (
-                    <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(2, steps.large!)} />
-                  )}
+                  {/* Minus buttons in descending order */}
+                  {steps.options.map((stepVal) => (
+                    <AdjustButton
+                      key={`p2-sub-${stepVal}`}
+                      label={`−${stepVal}`}
+                      onClick={() => handleUpdateValue(2, -stepVal)}
+                    />
+                  ))}
+                  {/* Plus buttons in ascending order */}
+                  {[...steps.options].reverse().map((stepVal) => (
+                    <AdjustButton
+                      key={`p2-add-${stepVal}`}
+                      label={`+${stepVal}`}
+                      onClick={() => handleUpdateValue(2, stepVal)}
+                    />
+                  ))}
                 </div>
               )}
             </div>

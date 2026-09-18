@@ -250,13 +250,15 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
     if (!selectedGameId || !games.length) return;
     const g = games.find((x) => x.id === selectedGameId);
     if (!g) return;
+    const gameDefaultHp = g.defaultConfig?.startingHp ?? 100;
+    const gameDefaultThreshold = g.defaultConfig?.pointsThreshold ?? 1;
+
     if (g.trackingMode === "HP") {
-      setStartingHp(100);
+      setStartingHp(gameDefaultHp);
       setPointsThreshold(0);
     } else {
       setStartingHp(0);
-      // POINTS mode defaults to a threshold of 1 if not specified in defaultConfig
-      setPointsThreshold(1);
+      setPointsThreshold(gameDefaultThreshold);
     }
   }, [selectedGameId, games]);
 
@@ -952,17 +954,17 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
             sign-up switch used to hide the date fields outright, so the default
             path — "Open now" — produced a tournament with no date at all, on a
             step called Schedule. They are different columns: one is the status,
-            the other is when the thing is played. */}
-        <Field label="Date">
+            the other is when registration/the tournament opens. */}
+        <Field label="Registration Start Date">
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
           {!date && (
             <p className="mt-2 text-[11px] text-[#F5A623] leading-relaxed">
-              Without a date this tournament shows no date anywhere — not on its page, and not on
+              Without a date this tournament shows no schedule date anywhere — not on its page, and not on
               the browse list.
             </p>
           )}
         </Field>
-        <Field label="Start time">
+        <Field label="Registration Start Time">
           <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} disabled={!date} className={`${inputCls} disabled:opacity-40`} />
           {date && !startTime && (
             <p className="mt-2 text-[11px] text-[#F5A623] leading-relaxed">
@@ -982,12 +984,12 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
             className={inputCls}
           >
             <option value="IMMEDIATE">Open now</option>
-            <option value="SCHEDULED">Not open yet</option>
+            <option value="SCHEDULED">Scheduled / Not open yet</option>
           </select>
           <p className="mt-2 text-[11px] text-[#888888] leading-relaxed">
             {startNow
-              ? "People can enter as soon as it is created, and it starts at the time above."
-              : "Nobody can enter until you open sign-ups from the tournament's settings."}
+              ? "Registration opens immediately upon creation. Tournament bracket/matches are started manually by you once players are ready."
+              : "Registration opens automatically at the date and time above (or manually whenever you choose from tournament settings)."}
           </p>
         </Field>
         <Field label="Who can find it">

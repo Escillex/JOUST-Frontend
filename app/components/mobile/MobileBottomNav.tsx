@@ -229,8 +229,8 @@ export default function MobileBottomNav() {
             </Link>
           )}
 
-          {/* System Administrator Panel */}
-          {user?.roles?.includes("ADMIN") && inManageMode && (
+          {/* System Administrator Panel — always accessible to admins */}
+          {user?.roles?.includes("ADMIN") && (
             <Link
               href="/admin"
               onClick={() => setIsMenuOpen(false)}

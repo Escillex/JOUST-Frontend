@@ -122,7 +122,7 @@ export default function ActivityLog() {
   };
 
   return (
-    <div className="bg-background border border-white/10 p-6 space-y-5">
+    <div className="bg-background border border-white/10 p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h3 className="text-[11px] font-bold text-white/60 uppercase tracking-[0.2em]">Activity Log</h3>
@@ -170,47 +170,85 @@ export default function ActivityLog() {
           {query || category ? "Nothing matches these filters." : "No actions recorded yet."}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[720px]">
-            <thead>
-              <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 border-b border-white/10">
-                <th className="py-2 pr-4 w-28">When</th>
-                <th className="py-2 pr-4 w-44">Who</th>
-                <th className="py-2 pr-4">What</th>
-                <th className="py-2 w-24 text-right">Type</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {entries.map((e) => (
-                <tr key={e.id} className="align-top hover:bg-white/[0.02]">
-                  <td className="py-2.5 pr-4 text-[11px] text-white/60 whitespace-nowrap" title={new Date(e.createdAt).toLocaleString()}>
-                    {ago(e.createdAt)}
-                  </td>
-                  <td className="py-2.5 pr-4">
-                    <p className="text-xs text-white font-semibold truncate">{e.actorName}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-white/60">{roleOf(e.actorRoles)}</p>
-                  </td>
-                  <td className="py-2.5 pr-4 text-xs text-white/80 leading-relaxed">
-                    {e.summary}
-                    {e.tournamentId && (
-                      <Link
-                        href={`/tournaments/${e.tournamentId}/report`}
-                        className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-primary"
-                      >
-                        Report →
-                      </Link>
-                    )}
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 ${CATEGORY_TONE[e.category] ?? "text-white/60 border-white/10"}`}>
+        <>
+          {/* Mobile view (cards) */}
+          <div className="md:hidden divide-y divide-white/5 space-y-3">
+            {entries.map((e) => (
+              <div key={e.id} className="pt-3 first:pt-0 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-xs text-white font-semibold">{e.actorName}</span>
+                    <span className="text-[10px] uppercase tracking-widest text-white/60 ml-2">
+                      {roleOf(e.actorRoles)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[9px] font-bold uppercase tracking-widest border px-1.5 py-0.2 rounded-sm ${CATEGORY_TONE[e.category] ?? "text-white/60 border-white/10"}`}>
                       {e.category.toLowerCase()}
                     </span>
-                  </td>
+                    <span className="text-[10px] text-white/40 whitespace-nowrap" title={new Date(e.createdAt).toLocaleString()}>
+                      {ago(e.createdAt)}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-white/80 leading-relaxed">
+                  {e.summary}
+                  {e.tournamentId && (
+                    <Link
+                      href={`/tournaments/${e.tournamentId}/report`}
+                      className="ml-2 text-[10px] font-bold uppercase tracking-widest text-primary hover:underline inline-block"
+                    >
+                      Report →
+                    </Link>
+                  )}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop view (table) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left min-w-[720px]">
+              <thead>
+                <tr className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 border-b border-white/10">
+                  <th className="py-2 pr-4 w-28">When</th>
+                  <th className="py-2 pr-4 w-44">Who</th>
+                  <th className="py-2 pr-4">What</th>
+                  <th className="py-2 w-24 text-right">Type</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {entries.map((e) => (
+                  <tr key={e.id} className="align-top hover:bg-white/[0.02]">
+                    <td className="py-2.5 pr-4 text-[11px] text-white/60 whitespace-nowrap" title={new Date(e.createdAt).toLocaleString()}>
+                      {ago(e.createdAt)}
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <p className="text-xs text-white font-semibold truncate">{e.actorName}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-white/60">{roleOf(e.actorRoles)}</p>
+                    </td>
+                    <td className="py-2.5 pr-4 text-xs text-white/80 leading-relaxed">
+                      {e.summary}
+                      {e.tournamentId && (
+                        <Link
+                          href={`/tournaments/${e.tournamentId}/report`}
+                          className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-primary"
+                        >
+                          Report →
+                        </Link>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 ${CATEGORY_TONE[e.category] ?? "text-white/60 border-white/10"}`}>
+                        {e.category.toLowerCase()}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {cursor && !loading && (
