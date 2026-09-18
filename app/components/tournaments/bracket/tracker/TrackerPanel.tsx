@@ -11,7 +11,7 @@ import LastUpdated from '../../../ui/LastUpdated';
 import GameBar from './GameBar';
 import GameSeriesScore from './GameSeriesScore';
 import PlayerToolkit from './PlayerToolkit';
-import { canOfferDraw } from '../../../../utils/formatConfig';
+import { canOfferDraw, getMatchStartWho, getScoreSubmissionRule } from '../../../../utils/formatConfig';
 
 interface TrackerPanelProps {
   match: Match;
@@ -57,11 +57,26 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
 
   const isPlayerInMatch = currentUserId === match.player1?.id || currentUserId === match.player2?.id || currentUserId === match.player1Id || currentUserId === match.player2Id;
   const canManipulate = isAdmin || isPlayerInMatch;
-  const canAdjustP1 = isAdmin || (isPlayerInMatch && (currentUserId === match.player1?.id || currentUserId === match.player1Id));
-  const canAdjustP2 = isAdmin || (isPlayerInMatch && (currentUserId === match.player2?.id || currentUserId === match.player2Id));
+  // Full player scoring: staff always; a player of this match when the
+  // tournament's `scoreSubmissionRule` allows it (the default). This gates
+  // opening a game, submitting a result and reaching the opponent's number.
+  // The server makes the same decision in MatchService.reportGameResult /
+  // TrackerService (the routes are JwtAuthGuard-only — a guard cannot read the
+  // config), so a stale row here fails closed with a 403, it never bypasses a
+  // gate.
+  const scoreRule = getScoreSubmissionRule(formatConfig);
+  const canScore = isAdmin || (isPlayerInMatch && scoreRule === 'SELF_REPORT_ALLOWED');
+  const isSelfP1 = currentUserId === match.player1?.id || currentUserId === match.player1Id;
+  const isSelfP2 = currentUserId === match.player2?.id || currentUserId === match.player2Id;
+  // Own slot can always be moved by the player in the match (self-scoring,
+  // 2026-08-09); the opponent's slot is staff-only unless player scoring is on.
+  const canAdjustP1 = isAdmin || (isPlayerInMatch && (isSelfP1 || scoreRule === 'SELF_REPORT_ALLOWED'));
+  const canAdjustP2 = isAdmin || (isPlayerInMatch && (isSelfP2 || scoreRule === 'SELF_REPORT_ALLOWED'));
 
-  // Derive dynamic adjustment steps based on starting value
-  const getSteps = (val: number) => {
+  // Derive dynamic adjustment steps based on starting value and pointsThreshold
+  const getSteps = (val: number, maxThreshold?: number) => {
+    const limit = Math.min(val, maxThreshold ?? val);
+    if (limit <= 2) return { large: null, small: 1 };
     if (val > 20000) return { large: 10000, small: 1000 };
     if (val > 2000) return { large: 1000, small: 100 };
     if (val > 200) return { large: 100, small: 10 };
@@ -69,7 +84,9 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
     if (val > 5) return { large: 5, small: 1 };
     return { large: 2, small: 1 };
   };
-  const steps = activeLog ? getSteps(activeLog.startingValue) : { large: 10, small: 1 };
+  const steps = activeLog
+    ? getSteps(activeLog.startingValue, formatConfig?.pointsThreshold ?? undefined)
+    : { large: null, small: 1 };
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -136,7 +153,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
   // ── Admin actions ─────────────────────────────────────────────────────────────
 
   const handleOpenTracker = async () => {
-    if (!isAdmin) return;
+    if (!canScore) return;
     setIsUpdating(true); setError(null);
     const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.TRACKER_OPEN(match.id), {
       method: 'POST',
@@ -153,10 +170,8 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
 
   const handleUpdateValue = async (player: 1 | 2, delta: number) => {
     if (!activeLog || !canManipulate) return;
-    if (!isAdmin) {
-      if (player === 1 && !canAdjustP1) return;
-      if (player === 2 && !canAdjustP2) return;
-    }
+    if (player === 1 && !canAdjustP1) return;
+    if (player === 2 && !canAdjustP2) return;
     const key = player === 1 ? 'player1Value' : 'player2Value';
     const current = player === 1 ? activeLog.player1Value : activeLog.player2Value;
     const next = Math.max(0, current + delta);
@@ -171,7 +186,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
     fetchLogs();
 
     if (res.ok) {
-      if (isAdmin) {
+      if (canScore) {
         if (activeLog.mode === 'HP' && next === 0) {
           // HP hits 0 → other player wins
           const otherVal = player === 1 ? activeLog.player2Value : activeLog.player1Value;
@@ -192,10 +207,8 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
 
   const handleSetValue = async (player: 1 | 2, value: number) => {
     if (!activeLog || !canManipulate) return;
-    if (!isAdmin) {
-      if (player === 1 && !canAdjustP1) return;
-      if (player === 2 && !canAdjustP2) return;
-    }
+    if (player === 1 && !canAdjustP1) return;
+    if (player === 2 && !canAdjustP2) return;
     const key = player === 1 ? 'player1Value' : 'player2Value';
     const clamped = Math.max(0, value);
     setIsUpdating(true);
@@ -208,7 +221,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
     fetchLogs();
 
     if (res.ok) {
-      if (isAdmin) {
+      if (canScore) {
         if (activeLog.mode === 'HP' && clamped === 0) {
           // HP hits 0 → other player wins
           const otherVal = player === 1 ? activeLog.player2Value : activeLog.player1Value;
@@ -250,7 +263,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
-  if (isLoading) {
+  if (isLoading && logs.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -450,14 +463,16 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
         )}
       </AnimatePresence>
 
-      {/* Game series scoreboard */}
-      <GameSeriesScore
-        player1Wins={p1Wins}
-        player2Wins={p2Wins}
-        winsNeeded={winsNeeded}
-        player1Name={p1Name}
-        player2Name={p2Name}
-      />
+      {/* Game series scoreboard - only needed when series has more than 1 game */}
+      {winsNeeded > 1 && (
+        <GameSeriesScore
+          player1Wins={p1Wins}
+          player2Wins={p2Wins}
+          winsNeeded={winsNeeded}
+          player1Name={p1Name}
+          player2Name={p2Name}
+        />
+      )}
 
       {/* Past games recap */}
       {logs.filter(l => !l.trackerActive && l.completedAt).length > 0 && (
@@ -527,10 +542,14 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
               />
               {canAdjustP1 && (
                 <div className="flex items-center gap-2">
-                  <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(1, -steps.large)} />
+                  {steps.large !== null && (
+                    <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(1, -steps.large!)} />
+                  )}
                   <AdjustButton label={`−${steps.small}`} onClick={() => handleUpdateValue(1, -steps.small)} />
                   <AdjustButton label={`+${steps.small}`} onClick={() => handleUpdateValue(1, steps.small)} />
-                  <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(1, steps.large)} />
+                  {steps.large !== null && (
+                    <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(1, steps.large!)} />
+                  )}
                   <ManualInput value={activeLog.player1Value} onSet={(v) => handleSetValue(1, v)} />
                 </div>
               )}
@@ -553,18 +572,25 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
               {canAdjustP2 && (
                 <div className="flex items-center gap-2 justify-end">
                   <ManualInput value={activeLog.player2Value} onSet={(v) => handleSetValue(2, v)} />
-                  <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(2, -steps.large)} />
+                  {steps.large !== null && (
+                    <AdjustButton label={`−${steps.large}`} onClick={() => handleUpdateValue(2, -steps.large!)} />
+                  )}
                   <AdjustButton label={`−${steps.small}`} onClick={() => handleUpdateValue(2, -steps.small)} />
                   <AdjustButton label={`+${steps.small}`} onClick={() => handleUpdateValue(2, steps.small)} />
-                  <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(2, steps.large)} />
+                  {steps.large !== null && (
+                    <AdjustButton label={`+${steps.large}`} onClick={() => handleUpdateValue(2, steps.large!)} />
+                  )}
                 </div>
               )}
             </div>
           </div>
           )}
 
-          {/* Submit game result (admin only) */}
-          {isAdmin && (
+          {/* Submit game result — staff always; a player when the tournament
+              allows player scoring. The server defers a player's deciding game
+              to pending verification, and Draw stays staff-only (a draw carries
+              no winner to defer, so an organizer must confirm it). */}
+          {canScore && (
             <div className="flex flex-col gap-2 pt-2 border-t border-white/5 mt-2">
               <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Submit Game Result</span>
               <div className="flex gap-2">
@@ -586,7 +612,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
                     drawn result stalls (SE) or silently drops player 1 into the
                     losers bracket (DE), so the control must not exist there even
                     when allowDraw is set. See canOfferDraw. */}
-                {canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
+                {isAdmin && canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
                   <button
                     onClick={() => setConfirmState({ type: 'draw' })}
                     disabled={isUpdating}
@@ -600,18 +626,18 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
           )}
 
           {/* Player notice banner */}
-          {!isAdmin && isPlayerInMatch && hasPointsOrHp && (
+          {!isAdmin && canScore && hasPointsOrHp && (
             <div className="mt-2 p-3 bg-white/5 border border-white/10 text-center flex flex-col gap-1">
               <span className="text-[9px] font-black uppercase tracking-widest text-primary animate-pulse">
                 Live Match Editor
               </span>
               <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/40">
-                You may adjust your values. Organizer has final submission rights.
+                Player scoring is on — record each game as it finishes. A result that decides the series is held for the organizer&apos;s review.
               </span>
               {((activeLog.mode === 'HP' && (activeLog.player1Value === 0 || activeLog.player2Value === 0)) || 
                 (activeLog.mode === 'POINTS' && formatConfig?.pointsThreshold && (activeLog.player1Value >= formatConfig.pointsThreshold || activeLog.player2Value >= formatConfig.pointsThreshold))) && (
                 <span className="text-[10px] font-black uppercase tracking-widest text-amber-500 mt-2">
-                  Threshold Met — Awaiting Organizer Verification
+                  Game Decided — Record the Result
                 </span>
               )}
             </div>
@@ -621,6 +647,20 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
         /* No active log — either all games done, or tracker not yet opened */
         <div className="flex flex-col items-center gap-4 py-6 border border-dashed border-white/10">
           {(() => {
+            // A player-driven deciding result sits pending review — the series is
+            // decided and the bracket does not move until an organizer verifies.
+            if (match.reportedWinnerId && !match.winnerId) {
+              return (
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                    ● Awaiting Organizer Verification
+                  </span>
+                  <span className="text-[9px] font-mono uppercase tracking-wider text-white/40">
+                    Result submitted · Series held pending approval
+                  </span>
+                </div>
+              );
+            }
             const seriesDecided = p1Wins >= winsNeededForSeries || p2Wins >= winsNeededForSeries;
             if (match.winnerId || seriesDecided) {
               return (
@@ -631,7 +671,7 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
                 </span>
               );
             }
-            if (isAdmin && match.status === 'ONGOING') {
+            if (canScore && match.status === 'ONGOING') {
               return (
                 <>
                   <span className="text-[10px] font-black uppercase tracking-widest text-white/30">
@@ -647,9 +687,28 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
                 </>
               );
             }
+            // A PENDING match shows the Start Match banner above (ScoringDrawer).
+            // Only say "waiting for the organizer" when the viewer cannot start
+            // it themselves — a player of the match may, unless the tournament
+            // set matchStartWho to the strict STAFF mode. Once the match is
+            // live the next step belongs to whoever can score: the organizer,
+            // or the players themselves when the tournament allows it.
+            const canPlayerStart =
+              !isAdmin &&
+              isPlayerInMatch &&
+              match.status === 'PENDING' &&
+              getMatchStartWho(formatConfig) === 'STAFF_AND_PARTICIPANTS';
+            let notice = 'Waiting for organizer to start game';
+            if (canPlayerStart) {
+              notice = 'Not started — use Start Match above';
+            } else if (!isAdmin && isPlayerInMatch && match.status === 'ONGOING') {
+              notice = canScore
+                ? 'Match is live — open a game to start scoring'
+                : 'Match is live — the organizer opens each game';
+            }
             return (
               <span className="text-[10px] font-black uppercase tracking-widest text-white/20">
-                Waiting for organizer to start game
+                {notice}
               </span>
             );
           })()}

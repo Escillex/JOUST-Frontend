@@ -178,6 +178,7 @@ export interface Tournament {
           isGuest?: boolean;
       } | null;
       winnerId?: string | null;
+      reportedWinnerId?: string | null;
       winner?: {
         id: string;
         username?: string;

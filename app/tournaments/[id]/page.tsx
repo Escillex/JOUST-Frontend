@@ -13,6 +13,8 @@ import {
   profileHref,
 } from "../../utils/api";
 import { Tournament } from "../types";
+import { usePolling } from "../../utils/usePolling";
+import { useTournamentSocket } from "../../utils/useTournamentSocket";
 import {
   getTieBreakerOrder,
   getTournamentConfig,
@@ -120,28 +122,36 @@ function TournamentViewContent() {
     setPendingInviteId(mine?.id ?? null);
   }, [tournamentId]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const [meRes, tRes] = await Promise.all([
-        authenticatedFetch(API_ENDPOINTS.AUTH.ME),
-        authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!))
-      ]);
+      if (!silent) {
+        const [meRes, tRes] = await Promise.all([
+          authenticatedFetch(API_ENDPOINTS.AUTH.ME),
+          authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!))
+        ]);
 
-      if (meRes.ok) {
-        const data = await safeJson(meRes);
-        if (data) setUser(data);
-        await loadInvitation(data);
-      }
-      if (tRes.ok) {
-        const data = await safeJson(tRes);
-        if (data) setTournament(data);
+        if (meRes.ok) {
+          const data = await safeJson(meRes);
+          if (data) setUser(data);
+          await loadInvitation(data);
+        }
+        if (tRes.ok) {
+          const data = await safeJson(tRes);
+          if (data) setTournament(data);
+        }
+      } else {
+        const tRes = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.GET_ONE(tournamentId!));
+        if (tRes.ok) {
+          const data = await safeJson(tRes);
+          if (data) setTournament(data);
+        }
       }
 
     } catch (error) {
       console.error("Fetch failed:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [tournamentId, loadInvitation]);
 
@@ -183,6 +193,18 @@ function TournamentViewContent() {
       router.push("/tournaments");
     }
   }, [tournamentId, fetchData, router]);
+
+  const { connected } = useTournamentSocket(tournamentId, {
+    onTournamentUpdate: () => fetchData(true),
+  });
+
+  // temporary polling block - fallback behind the WebSocket connection
+  usePolling(
+    () => fetchData(true),
+    connected ? 60000 : 10000,
+    !!tournament && tournament.status !== "COMPLETED",
+  );
+  // end of temporary polling block
 
   useEffect(() => {
     if (tournament?.name) {
@@ -714,6 +736,10 @@ function TournamentViewContent() {
                 tournament={tournament}
                 currentUserId={myId}
                 canManage={!!tournament.canManage}
+                // A player starting their own match, or a result being
+                // recorded, must resurface — without this the drawer keeps the
+                // stale PENDING state and Start Match appears to do nothing.
+                onRefresh={() => fetchData(true)}
               />
             </motion.div>
           )}

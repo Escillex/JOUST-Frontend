@@ -202,12 +202,16 @@ export type RawConfig = Record<string, unknown> & {
 
 // Utility-permission keys live at the config root (like seedingMode) — they
 // belong to the event, not a hybrid Swiss phase, and resolveConfig reads them
-// root-first on the backend.
+// root-first on the backend. scoreSubmissionRule and matchStartWho alike: both
+// are properties of the event, and the backend resolves them root-first with
+// the phase1 alias as fallback (format-config.helper.ts).
 const UTILITY_KEYS = new Set([
   'utilitiesEnabled',
   'utilityCoinWho',
   'utilityDiceWho',
   'utilityTimerWho',
+  'scoreSubmissionRule',
+  'matchStartWho',
 ]);
 
 export function configValueLocation(key: string): ConfigLocation {
@@ -296,6 +300,31 @@ export function systemExplanation(system: string | null | undefined): string | n
   return SYSTEM_EXPLANATIONS[system] ?? null;
 }
 
+export type ScoreSubmissionRule = "STAFF_ONLY" | "SELF_REPORT_ALLOWED";
+
+/** Who may record the outcome of a match.
+ *
+ *  Mirrors `resolveScoreSubmissionRule` in the backend's
+ *  `format-config.helper.ts` exactly, including its default: unless an
+ *  organizer has set STAFF_ONLY, the players may score the match themselves.
+ *  The server enforces this in `MatchService.reportGameResult` /
+ *  `TrackerService` (the routes are JwtAuthGuard-only — a guard cannot read the
+ *  config), and a player-scored deciding result is held as pending verification
+ *  until an organizer reviews it. This only decides whether to draw the
+ *  controls. Read root-first, exactly like the backend; a phased (hybrid) config
+ *  can also carry the key inside phase1. */
+export function getScoreSubmissionRule(
+  config: FormatConfig | null | undefined,
+): ScoreSubmissionRule {
+  const raw = config as Record<string, unknown> | null | undefined;
+  const root = raw?.scoreSubmissionRule;
+  const phase1 = (raw?.phase1 as Record<string, unknown> | undefined)
+    ?.scoreSubmissionRule;
+  return root === "STAFF_ONLY" || phase1 === "STAFF_ONLY"
+    ? "STAFF_ONLY"
+    : "SELF_REPORT_ALLOWED";
+}
+
 /** Who may move a match from PENDING to ONGOING.
  *
  *  Mirrors `resolveMatchStart` in the backend's `format-config.helper.ts`,
@@ -303,10 +332,16 @@ export function systemExplanation(system: string | null | undefined): string | n
  *  the strict setting a supervised venue opts into — it is not the norm, because
  *  at a casual event the players are at the table and the organizer is not.
  *  The server enforces this in `MatchService.startMatch`; this only decides
- *  whether to draw the button. */
+ *  whether to draw the button. Root-first, phase1 fallback — same as the
+ *  backend's resolution. */
 export function getMatchStartWho(
   config: FormatConfig | null | undefined,
 ): "STAFF" | "STAFF_AND_PARTICIPANTS" {
-  const raw = (config as Record<string, unknown> | null | undefined)?.matchStartWho;
-  return raw === "STAFF" ? "STAFF" : "STAFF_AND_PARTICIPANTS";
+  const raw = config as Record<string, unknown> | null | undefined;
+  const root = raw?.matchStartWho;
+  const phase1 = (raw?.phase1 as Record<string, unknown> | undefined)
+    ?.matchStartWho;
+  return root === "STAFF" || phase1 === "STAFF"
+    ? "STAFF"
+    : "STAFF_AND_PARTICIPANTS";
 }

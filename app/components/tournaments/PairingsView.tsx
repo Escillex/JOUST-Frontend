@@ -1,13 +1,14 @@
 "use client";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import ScoringDrawer from "./bracket/ScoringDrawer";
 import type { Match as BracketMatch } from "../../tournaments/[id]/bracket/types";
-import { getTournamentConfig, getTournamentSystem } from "../../utils/formatConfig";
+import { getTournamentConfig, getTournamentSystem, getTieBreakerOrder, tieBreakerLabel } from "../../utils/formatConfig";
 import Image from "next/image";
 import Link from "next/link";
 import type { Tournament } from "../../tournaments/types";
-import { displayNameOf, profileHref, resolveImageUrl } from "../../utils/api";
+import { displayNameOf, profileHref, resolveImageUrl, authenticatedFetch, API_ENDPOINTS, safeJson } from "../../utils/api";
 import { roundLabel } from "../../utils/tournamentStatus";
+import { useToast } from "../ui/Toast";
 
 /**
  * The pairings for a round — the primary view for every system
@@ -30,6 +31,7 @@ interface MatchLike {
   player1Score?: number;
   player2Score?: number;
   winnerId?: string | null;
+  reportedWinnerId?: string | null;
   p1Name?: string | null;
   p2Name?: string | null;
 }
@@ -139,23 +141,28 @@ function MatchCard({
 }) {
   const done = match.status === "COMPLETED";
   const live = match.status === "ONGOING";
+  const isAwaitingVerification = !done && !!match.reportedWinnerId && !match.winnerId;
   const p1 = match.player1;
   const p2 = match.player2;
   const s1 = done || live ? (match.player1Score ?? 0) : null;
   const s2 = done || live ? (match.player2Score ?? 0) : null;
   const p1Won = done && !!match.winnerId && match.winnerId === (p1?.id ?? match.player1Id);
   const p2Won = done && !!match.winnerId && match.winnerId === (p2?.id ?? match.player2Id);
+  const p1ReportedWon = isAwaitingVerification && match.reportedWinnerId === (p1?.id ?? match.player1Id);
+  const p2ReportedWon = isAwaitingVerification && match.reportedWinnerId === (p2?.id ?? match.player2Id);
 
   return (
     <div
-      className={`flex flex-col border bg-component-background ${
+      className={`flex flex-col border bg-component-background transition-all ${
         mine
           ? "border-primary/55"
-          : live
-            ? "border-[#FF4D4D]/50"
-            : done
-              ? "border-white/10"
-              : "border-[#e8c53d]/30"
+          : isAwaitingVerification
+            ? "border-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.1)]"
+            : live
+              ? "border-[#FF4D4D]/50"
+              : done
+                ? "border-white/10"
+                : "border-[#e8c53d]/30"
       }`}
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/5">
@@ -164,28 +171,46 @@ function MatchCard({
         </span>
         <span
           className={`text-[9px] font-black uppercase tracking-widest font-poppins ${
-            done ? "text-primary" : live ? "text-[#FF4D4D]" : "text-[#e8c53d]"
+            done
+              ? "text-primary"
+              : isAwaitingVerification
+                ? "text-amber-400"
+                : live
+                  ? "text-[#FF4D4D]"
+                  : "text-[#e8c53d]"
           }`}
         >
-          {live && (
+          {isAwaitingVerification ? (
+            <span
+              aria-hidden
+              className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 align-middle animate-pulse"
+            />
+          ) : live ? (
             <span
               aria-hidden
               className="inline-block w-1.5 h-1.5 rounded-full bg-[#FF4D4D] mr-1.5 align-middle animate-pulse"
             />
-          )}
-          {done ? "Full time" : live ? "Being played" : "Pending"}
+          ) : null}
+          {done
+            ? "Full time"
+            : isAwaitingVerification
+              ? "Awaiting verification"
+              : live
+                ? "Being played"
+                : "Pending"}
         </span>
       </div>
 
-      <Side side={p1} fallback={match.p1Name} won={p1Won} lost={done && p2Won} score={s1} />
+      <Side side={p1} fallback={match.p1Name} won={p1Won || p1ReportedWon} lost={done && p2Won} score={s1} />
       <span className="border-t border-white/5" />
-      <Side side={p2} fallback={match.p2Name} won={p2Won} lost={done && p1Won} score={s2} />
+      <Side side={p2} fallback={match.p2Name} won={p2Won || p2ReportedWon} lost={done && p1Won} score={s2} />
 
       {(canManage || mine) && !match.isBye && (
         <div className="px-3 py-2 border-t border-white/5">
           {/* Opens the per-match drawer. Staff get scoring; a player of this
-              match gets the same drawer read-only, which is where the shared
-              coin/dice/timer and their own half of the score tracker live.
+              match gets in too — the shared coin/dice/timer, their own tracker
+              slot, and (when the tournament allows player scoring) the win
+              controls, whose deciding result waits for the organizer's review.
               Gating this on `canManage` alone left the player controls the API
               still honours with no way in the interface to reach them. */}
           <button
@@ -194,20 +219,28 @@ function MatchCard({
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] font-poppins transition-colors ${
               done
                 ? "border border-white/15 text-white/60 hover:text-white hover:border-white/35"
-                : canManage
-                  ? "bg-primary text-black hover:bg-white"
-                  : "border border-primary/60 text-primary hover:bg-primary hover:text-black"
+                : isAwaitingVerification
+                  ? canManage
+                    ? "bg-amber-400 text-black hover:bg-white"
+                    : "border border-amber-400/60 text-amber-400 hover:bg-amber-400 hover:text-black"
+                  : canManage
+                    ? "bg-primary text-black hover:bg-white"
+                    : "border border-primary/60 text-primary hover:bg-primary hover:text-black"
             }`}
           >
             {canManage
               ? done
                 ? "Edit result"
-                : live
-                  ? "Enter result"
-                  : "Start match"
+                : isAwaitingVerification
+                  ? "Verify result"
+                  : live
+                    ? "Enter result"
+                    : "Start match"
               : done
                 ? "View result"
-                : "Open match"}{" "}
+                : isAwaitingVerification
+                  ? "Review match"
+                  : "Open match"}{" "}
             <span aria-hidden>→</span>
           </button>
         </div>
@@ -233,6 +266,7 @@ export default function PairingsView({
   // survives a refetch replacing the tournament — otherwise recording a result
   // closed the drawer under the organiser mid-series.
   const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  const openMatchRef = useRef<MatchLike | undefined>(undefined);
   
   const rounds = useMemo(() => {
     const list = ((tournament as unknown as { rounds?: RoundLike[] }).rounds ?? [])
@@ -253,19 +287,21 @@ export default function PairingsView({
 
   const [index, setIndex] = useState(defaultIndex);
 
-  // Sync openMatchId from URL query
+  // Open from the URL — the live viewer links into a specific match
+  // (`?matchId=…`). Deliberately does not read or depend on `openMatchId`: a
+  // drawer opened by clicking a card has no matchId in the URL, so the old
+  // `matchIdParam !== openMatchId` comparison saw `null !== <id>` on the very
+  // next render and set the id straight back to null — the drawer flashed open
+  // and closed instantly.
   useEffect(() => {
     const matchIdParam = searchParams.get("matchId");
-    if (matchIdParam !== openMatchId) {
-      setOpenMatchId(matchIdParam);
-      if (matchIdParam) {
-        const roundIdx = rounds.findIndex(r => r.matches?.some(m => m.id === matchIdParam));
-        if (roundIdx >= 0) {
-          setIndex(roundIdx);
-        }
-      }
-    }
-  }, [searchParams, rounds, openMatchId]);
+    if (!matchIdParam) return;
+    setOpenMatchId(matchIdParam);
+    const roundIdx = rounds.findIndex((r) =>
+      r.matches?.some((m) => m.id === matchIdParam),
+    );
+    if (roundIdx >= 0) setIndex(roundIdx);
+  }, [searchParams, rounds]);
 
   // Clear matchId from URL when drawer is closed
   const handleDrawerClose = () => {
@@ -277,6 +313,83 @@ export default function PairingsView({
     }
   };
   const round = rounds[Math.min(index, rounds.length - 1)];
+
+  // Tie detection on tournament completion pause
+  const [standings, setStandings] = useState<any[]>([]);
+  const [isResolvingTie, setIsResolvingTie] = useState(false);
+  const { toast } = useToast();
+
+  const allMatchesFinished = useMemo(() => {
+    return rounds.length > 0 && rounds.every((r) =>
+      (r.matches ?? []).length > 0 && (r.matches ?? []).every((m) => m.status === "COMPLETED"),
+    );
+  }, [rounds]);
+
+  useEffect(() => {
+    if (tournament.status === "ONGOING" && allMatchesFinished) {
+      authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.LEADERBOARD(tournament.id))
+        .then(safeJson)
+        .then((data) => {
+          if (Array.isArray(data)) setStandings(data);
+        })
+        .catch(() => {});
+    } else {
+      setStandings([]);
+    }
+  }, [tournament.status, tournament.id, allMatchesFinished]);
+
+  const isFirstPlaceTie =
+    tournament.status === "ONGOING" &&
+    allMatchesFinished &&
+    standings.length > 1 &&
+    standings[0]?.points > 0 &&
+    standings[0]?.points === standings[1]?.points;
+
+  const tieBreakerNames = getTieBreakerOrder(tournament)
+    .map(tieBreakerLabel)
+    .join(" → ");
+
+  const handleResolveTie = async (action: "EXTEND_ROUND" | "APPLY_TIEBREAKERS") => {
+    setIsResolvingTie(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.RESOLVE_TIE(tournament.id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        toast(data?.message || (action === "EXTEND_ROUND" ? "Tiebreaker round generated" : "Tie resolved"), "success");
+        await onRefresh?.();
+      } else {
+        toast(data?.message || "Failed to resolve tie", "error");
+      }
+    } catch {
+      toast("Error resolving tie", "error");
+    } finally {
+      setIsResolvingTie(false);
+    }
+  };
+
+  const handleCompleteTournament = async () => {
+    setIsResolvingTie(true);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(tournament.id), {
+        method: "PATCH",
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        toast("Tournament marked as completed", "success");
+        await onRefresh?.();
+      } else {
+        toast(data?.message || "Failed to complete tournament", "error");
+      }
+    } catch {
+      toast("Error completing tournament", "error");
+    } finally {
+      setIsResolvingTie(false);
+    }
+  };
 
   if (rounds.length === 0) {
     return (
@@ -292,9 +405,20 @@ export default function PairingsView({
   const reported = matches.filter((m) => m.status === "COMPLETED").length;
   // Re-resolved from the latest data every render, so the drawer shows the
   // match as it is now rather than as it was when it was clicked.
-  const openMatch = openMatchId
+  // We keep a fallback ref to the last resolved match so that background
+  // refreshes or array recomputations do not briefly drop openMatch to undefined
+  // and trigger entrance/exit animations (closing and reopening the modal).
+  const foundMatch = openMatchId
     ? rounds.flatMap((r) => r.matches ?? []).find((m) => m.id === openMatchId)
     : undefined;
+
+  if (foundMatch) {
+    openMatchRef.current = foundMatch;
+  } else if (!openMatchId) {
+    openMatchRef.current = undefined;
+  }
+
+  const openMatch = openMatchId ? (foundMatch ?? openMatchRef.current) : undefined;
 
   const isMine = (m: MatchLike) =>
     !!currentUserId &&
@@ -305,6 +429,69 @@ export default function PairingsView({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* ── TIE DETECTED / READY FOR COMPLETION BANNER ──────────────────────── */}
+      {isFirstPlaceTie && (
+        <div className="border border-amber-400/50 bg-amber-400/10 p-5 rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-amber-400 block">
+              ● Final Round Complete · Tie for 1st Place
+            </span>
+            <p className="text-sm font-black uppercase tracking-tight text-white font-poppins">
+              {displayNameOf(standings[0] as never, standings[0]?.username)} and {displayNameOf(standings[1] as never, standings[1]?.username)} are tied at {standings[0]?.points} points
+            </p>
+            <p className="text-[11px] text-white/60">
+              {canManage
+                ? "Tournament auto-completion is paused. Apply secondary tiebreakers or extend with an extra round to finalize."
+                : "Awaiting organizer tiebreak resolution to declare the final champion."}
+            </p>
+          </div>
+          {canManage && (
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleResolveTie("APPLY_TIEBREAKERS")}
+                disabled={isResolvingTie}
+                className="px-4 py-2.5 bg-amber-400 hover:bg-white text-black text-[10px] font-black uppercase tracking-widest font-poppins transition-colors disabled:opacity-50"
+              >
+                {isResolvingTie ? "Resolving…" : `Apply Tiebreakers (${tieBreakerNames})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleResolveTie("EXTEND_ROUND")}
+                disabled={isResolvingTie}
+                className="px-4 py-2.5 border border-amber-400/60 hover:bg-amber-400/20 text-amber-400 text-[10px] font-black uppercase tracking-widest font-poppins transition-colors disabled:opacity-50"
+              >
+                Add Tiebreaker Round
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* All finished and no tie, but tournament still ONGOING — organizer prompt */}
+      {!isFirstPlaceTie && allMatchesFinished && tournament.status === "ONGOING" && canManage && (
+        <div className="border border-primary/40 bg-primary/10 p-5 rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-primary block">
+              ● All Matches Completed
+            </span>
+            <p className="text-sm font-black uppercase tracking-tight text-white font-poppins">
+              Ready to finalize tournament
+            </p>
+            <p className="text-[11px] text-white/60">
+              All rounds are concluded. Click below to finalize the standings and declare the champion.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCompleteTournament}
+            disabled={isResolvingTie}
+            className="px-5 py-2.5 bg-primary hover:bg-white text-black text-[10px] font-black uppercase tracking-widest font-poppins transition-colors disabled:opacity-50 shrink-0"
+          >
+            {isResolvingTie ? "Finalizing…" : "Finalize Tournament"}
+          </button>
+        </div>
+      )}
       {/* Round rail: done, current, later — the shape of the event at a glance. */}
       <div className="flex items-center gap-2 flex-wrap">
         {rounds.map((r, i) => {
@@ -333,39 +520,62 @@ export default function PairingsView({
         </span>
       </div>
 
-      {myMatch && (
-        <div className="border border-primary/45 bg-gradient-to-b from-primary/10 to-primary/[0.02] p-5 flex flex-col gap-2">
-          <span className="text-[9px] font-black uppercase tracking-[0.25em] text-primary font-poppins">
-            Your match
-          </span>
-          <p className="text-xl font-black uppercase tracking-tight text-white font-poppins leading-tight">
-            {myMatch.isBye
-              ? "Bye this round"
-              : `${nameOf(myMatch.player1, myMatch.p1Name)} vs ${nameOf(myMatch.player2, myMatch.p2Name)}`}
-          </p>
-          <p className="text-xs text-white/60">
-            {roundLabel(round.roundNumber)}
-            {myMatch.status === "COMPLETED" && (
-              <span className="text-white/45">
-                {" · "}
-                reported {myMatch.player1Score ?? 0}–{myMatch.player2Score ?? 0}
-              </span>
+      {myMatch && (() => {
+        const isMyMatchAwaiting = myMatch.status !== "COMPLETED" && !!myMatch.reportedWinnerId && !myMatch.winnerId;
+        return (
+          <div className={`border p-5 flex flex-col gap-2 ${
+            isMyMatchAwaiting
+              ? "border-amber-400/50 bg-gradient-to-b from-amber-400/10 to-amber-400/[0.02]"
+              : "border-primary/45 bg-gradient-to-b from-primary/10 to-primary/[0.02]"
+          }`}>
+            <span className={`text-[9px] font-black uppercase tracking-[0.25em] font-poppins ${
+              isMyMatchAwaiting ? "text-amber-400" : "text-primary"
+            }`}>
+              Your match
+            </span>
+            <p className="text-xl font-black uppercase tracking-tight text-white font-poppins leading-tight">
+              {myMatch.isBye
+                ? "Bye this round"
+                : `${nameOf(myMatch.player1, myMatch.p1Name)} vs ${nameOf(myMatch.player2, myMatch.p2Name)}`}
+            </p>
+            <p className="text-xs text-white/60">
+              {roundLabel(round.roundNumber)}
+              {myMatch.status === "COMPLETED" && (
+                <span className="text-white/45">
+                  {" · "}
+                  reported {myMatch.player1Score ?? 0}–{myMatch.player2Score ?? 0}
+                </span>
+              )}
+              {isMyMatchAwaiting && (
+                <span className="text-amber-400">
+                  {" · "}
+                  score reported · awaiting verification
+                </span>
+              )}
+              {!isMyMatchAwaiting && myMatch.status === "ONGOING" && <span className="text-[#FF4D4D]"> · being played</span>}
+              {!isMyMatchAwaiting && myMatch.status === "PENDING" && <span className="text-[#e8c53d]"> · not started</span>}
+            </p>
+            {!myMatch.isBye && (
+              <button
+                type="button"
+                onClick={() => setOpenMatchId(myMatch.id)}
+                className={`self-start mt-1 inline-flex items-center gap-1.5 px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] font-poppins transition-colors ${
+                  isMyMatchAwaiting
+                    ? "bg-amber-400 text-black hover:bg-white"
+                    : "bg-primary text-black hover:bg-white"
+                }`}
+              >
+                {myMatch.status === "COMPLETED"
+                  ? "View result"
+                  : isMyMatchAwaiting
+                    ? "Review match"
+                    : "Open match"}{" "}
+                <span aria-hidden>→</span>
+              </button>
             )}
-            {myMatch.status === "ONGOING" && <span className="text-[#FF4D4D]"> · being played</span>}
-            {myMatch.status === "PENDING" && <span className="text-[#e8c53d]"> · not started</span>}
-          </p>
-          {!myMatch.isBye && (
-            <button
-              type="button"
-              onClick={() => setOpenMatchId(myMatch.id)}
-              className="self-start mt-1 inline-flex items-center gap-1.5 px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] font-poppins bg-primary text-black hover:bg-white transition-colors"
-            >
-              {myMatch.status === "COMPLETED" ? "View result" : "Open match"}{" "}
-              <span aria-hidden>→</span>
-            </button>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         {matches.map((m, i) => (
@@ -375,7 +585,9 @@ export default function PairingsView({
             index={i}
             canManage={canManage}
             mine={!!myMatch && m.id === myMatch.id}
-            onOpen={() => setOpenMatchId(m.id)}
+            onOpen={() => {
+              setOpenMatchId(m.id);
+            }}
           />
         ))}
       </div>
@@ -388,8 +600,10 @@ export default function PairingsView({
           tournamentId={tournament.id}
           tournamentStatus={tournament.status}
           currentUserId={currentUserId}
-          // Staff score; a player of the match gets the read-only side, which
-          // still carries the shared utilities and their own tracker slot.
+          // Staff score; a player of the match gets the player side, which
+          // carries the shared utilities, their tracker slot and — under the
+          // default scoreSubmissionRule — the win controls, with the deciding
+          // result held for an organizer's review.
           isAdmin={!!canManage}
           debugMode={debugMode}
           onClose={handleDrawerClose}

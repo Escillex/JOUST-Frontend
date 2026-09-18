@@ -57,6 +57,8 @@ export default function MatchCard({
   // displayed as if everyone had lost it.
   const isDraw = isCompleted && !match.winnerId && !match.isBye;
 
+  const isAwaitingVerification = !isCompleted && !!match.reportedWinnerId && !match.winnerId;
+
   // The same vocabulary the pairings view uses — it is the same match.
   const stateLabel = match.isBye
     ? 'Bye'
@@ -64,9 +66,11 @@ export default function MatchCard({
       ? 'Draw'
       : isCompleted
         ? 'Full time'
-        : isOngoing
-          ? 'Being played'
-          : 'Pending';
+        : isAwaitingVerification
+          ? 'Awaiting verification'
+          : isOngoing
+            ? 'Being played'
+            : 'Pending';
 
   // Score: show actual series game wins whenever they exist (both ongoing and completed)
   const hasSeriesScore = (match.player1Score ?? 0) > 0 || (match.player2Score ?? 0) > 0;
@@ -99,9 +103,11 @@ export default function MatchCard({
       ? 'bg-white/25'
       : isCompleted
         ? 'bg-primary/70'
-        : isOngoing
-          ? 'bg-[#FF4D4D]'
-          : 'bg-transparent';
+        : isAwaitingVerification
+          ? 'bg-amber-400 animate-pulse'
+          : isOngoing
+            ? 'bg-[#FF4D4D]'
+            : 'bg-transparent';
 
   return (
     <div

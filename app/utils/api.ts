@@ -455,6 +455,10 @@ export const API_ENDPOINTS = {
     SELF_REPORT:    (id: string) => `/matches/${id}/self-report`,
     // Organizer verifies a player-reported score
     VERIFY:         (id: string) => `/matches/${id}/verify`,
+    // Organizer rejects / clears a disputed player-reported score
+    REJECT_REPORT:  (id: string) => `/matches/${id}/reject-report`,
+    // Organizer rolls back / resets a completed match score
+    RESET:          (id: string) => `/matches/${id}/reset`,
     GAME_RESULT:    (id: string) => `/matches/${id}/game-result`,
     GET_ONE:        (id: string) => `/matches/${id}`,
     TRACKER_OPEN:   (id: string) => `/matches/${id}/tracker/open`,

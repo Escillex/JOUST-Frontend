@@ -14,7 +14,7 @@ const TrackerPanel = dynamic(() => import('./tracker/TrackerPanel'), {
 });
 import GameSeriesScore from './tracker/GameSeriesScore';
 import { authenticatedFetch, safeJson, API_ENDPOINTS } from '../../../utils/api';
-import { canOfferDraw, getMatchStartWho } from '../../../utils/formatConfig';
+import { canOfferDraw, getMatchStartWho, getScoreSubmissionRule } from '../../../utils/formatConfig';
 
 interface Props {
   match: Match | null;
@@ -106,7 +106,22 @@ export default function ScoringDrawer({
     !!currentUserId &&
     (currentUserId === (match.player1?.id ?? match.player1Id) ||
       currentUserId === (match.player2?.id ?? match.player2Id));
-  const canStartMatch = isAdmin;
+  // Full player scoring: staff always; a player of this match when the
+  // tournament's scoreSubmissionRule allows it (the default). Gates the
+  // quick-mode win controls. The server decides the same way (the routes are
+  // JwtAuthGuard-only and MatchService defers a player's deciding result to
+  // pending verification), so this only draws the buttons.
+  const canScore =
+    isAdmin || (isParticipant && getScoreSubmissionRule(formatConfig) === 'SELF_REPORT_ALLOWED');
+  // Staff always; the two players when the tournament's `matchStartWho` allows
+  // it (the default). Organizer-only start is the strict, supervised setting
+  // rather than the built-in behaviour it used to be — the server makes the
+  // same decision in MatchService.startMatch, so this is which button to draw,
+  // not who is allowed.
+  const canStartMatch =
+    isAdmin ||
+    (isParticipant &&
+      getMatchStartWho(formatConfig) === 'STAFF_AND_PARTICIPANTS');
   const isDraw = match.status === 'COMPLETED' && !match.winnerId && !match.isBye;
   const seriesWinnerName = seriesComplete && !isDraw
     ? (p1Score >= winsNeeded ? p1Name : p2Score >= winsNeeded ? p2Name : (match.winnerId === match.player1?.id ? p1Name : p2Name))
@@ -177,6 +192,48 @@ export default function ScoringDrawer({
       }
     } catch (err) {
       setGameError('Network error verifying score');
+    } finally {
+      setIsSubmittingGame(false);
+    }
+  };
+
+  const handleRejectScore = async () => {
+    if (isSubmittingGame) return;
+    setIsSubmittingGame(true);
+    setGameError(null);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.REJECT_REPORT(match.id), {
+        method: 'POST',
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        onMatchUpdated?.();
+      } else {
+        setGameError(data?.message || 'Failed to reject score report');
+      }
+    } catch (err) {
+      setGameError('Network error rejecting score');
+    } finally {
+      setIsSubmittingGame(false);
+    }
+  };
+
+  const handleResetMatch = async () => {
+    if (isSubmittingGame) return;
+    setIsSubmittingGame(true);
+    setGameError(null);
+    try {
+      const res = await authenticatedFetch(API_ENDPOINTS.MATCHES.RESET(match.id), {
+        method: 'POST',
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        onMatchUpdated?.();
+      } else {
+        setGameError(data?.message || 'Failed to reset match');
+      }
+    } catch (err) {
+      setGameError('Network error resetting match');
     } finally {
       setIsSubmittingGame(false);
     }
@@ -293,6 +350,13 @@ export default function ScoringDrawer({
               {isAdmin && (
                 <div className="flex-shrink-0 flex gap-2">
                   <button
+                    onClick={handleRejectScore}
+                    disabled={isSubmittingGame}
+                    className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-black uppercase tracking-[0.2em] rounded-sm transition-all disabled:opacity-50"
+                  >
+                    {isSubmittingGame ? 'Working…' : 'Dispute / Reject'}
+                  </button>
+                  <button
                     onClick={handleVerifyScore}
                     disabled={isSubmittingGame}
                     className="px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-sm transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)] hover:shadow-[0_0_20px_rgba(234,179,8,0.4)] disabled:opacity-50"
@@ -319,12 +383,23 @@ export default function ScoringDrawer({
                       Series: {p1Score} — {p2Score}
                     </p>
                   </div>
-                  <button
-                    onClick={onClose}
-                    className="mt-2 px-8 py-3 bg-white/5 border border-white/10 hover:border-primary hover:bg-primary/10 hover:text-primary text-white/60 text-[10px] font-black uppercase tracking-[0.3em] transition-all rounded-sm"
-                  >
-                    Close Window
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={onClose}
+                      className="px-8 py-3 bg-white/5 border border-white/10 hover:border-primary hover:bg-primary/10 hover:text-primary text-white/60 text-[10px] font-black uppercase tracking-[0.3em] transition-all rounded-sm"
+                    >
+                      Close Window
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={handleResetMatch}
+                        disabled={isSubmittingGame}
+                        className="px-4 py-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-sm disabled:opacity-50"
+                      >
+                        {isSubmittingGame ? 'Resetting…' : 'Rollback / Reset Match'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               <TrackerPanel
@@ -370,7 +445,7 @@ export default function ScoringDrawer({
                 </div>
               )}
 
-              {isAdmin ? (
+              {canScore ? (
                 <>
                   {bestOf > 1 ? (
                     <div className="space-y-6">
@@ -397,6 +472,15 @@ export default function ScoringDrawer({
                             </button>
                           </div>
 
+                          {/* A deciding game submitted by a player is deferred
+                              server-side into pending verification; the yellow
+                              banner renders once the match refreshes. */}
+                          {!isAdmin && (
+                            <p className="text-[9px] font-black text-white/25 uppercase tracking-widest text-center">
+                              A win that ends the series waits for the organizer&apos;s review
+                            </p>
+                          )}
+
                           {gameError && (
                             <div className="text-[9px] font-black text-red-500 uppercase tracking-widest text-center pt-2">
                               {gameError}
@@ -405,6 +489,7 @@ export default function ScoringDrawer({
                         </>
                       )}
 
+                      {isAdmin && (
                       <div className="pt-6 border-t border-white/5 space-y-4">
                         <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] block">Organizer Override</span>
                         <div className="grid grid-cols-2 gap-4">
@@ -424,6 +509,7 @@ export default function ScoringDrawer({
                           </button>
                         </div>
                       </div>
+                      )}
                     </div>
                   ) : (
                     !seriesComplete ? (
@@ -451,6 +537,13 @@ export default function ScoringDrawer({
                           <span className="font-black uppercase tracking-widest text-xs">{p2Name}</span>
                           <span className="text-[9px] font-black text-primary opacity-0 group-hover:opacity-100 uppercase tracking-widest transition-all">WINNER ▸</span>
                         </button>
+                        {/* A player's report is deferred into pending verification; a
+                            non-participant never sees this branch at all. */}
+                        {!isAdmin && (
+                          <p className="text-[9px] font-black text-white/25 uppercase tracking-widest text-center">
+                            Your report waits for the organizer&apos;s review
+                          </p>
+                        )}
                       </>
                     ) : null
                   )}
@@ -459,8 +552,10 @@ export default function ScoringDrawer({
                       winnerless submit (no series, no threshold scoring) AND the
                       system check that used to be missing here: on an elimination
                       bracket a draw stalls or corrupts the bracket, so the button
-                      must not be reachable even if allowDraw was set. */}
-                  {!seriesComplete && canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
+                      must not be reachable even if allowDraw was set. Draws stay
+                      staff-only: a drawn result carries no winner to defer, so a
+                      player-scored draw could never be reviewed. */}
+                  {isAdmin && !seriesComplete && canOfferDraw({ system, config: formatConfig, phase: match.phase }) && (
                     <div className="pt-4 border-t border-white/5">
                       <button
                         onClick={() => onScore(null)}
@@ -487,6 +582,18 @@ export default function ScoringDrawer({
                           Series Score: {match.player1Score ?? 0} — {match.player2Score ?? 0}
                         </p>
                       </div>
+                      {isAdmin && (
+                        <div className="pt-2 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={handleResetMatch}
+                            disabled={isSubmittingGame}
+                            className="px-4 py-2 border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-mono text-[9px] uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {isSubmittingGame ? 'Resetting...' : 'Rollback / Reset Match'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : isDraw ? (
                     /* Without this branch a drawn match fell through to the

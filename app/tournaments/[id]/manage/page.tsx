@@ -580,6 +580,30 @@ function ControlRoomContent() {
           onRefresh={fetchData}
           connected={connected}
           lastUpdated={lastUpdated}
+          onCompleteTournament={
+            tournament.status === "ONGOING" &&
+            hasRounds &&
+            (tournament.rounds ?? []).every((r) =>
+              (r.matches ?? []).length > 0 && (r.matches ?? []).every((m) => m.status === "COMPLETED"),
+            )
+              ? async () => {
+                  try {
+                    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.COMPLETE(tournamentId!), {
+                      method: "PATCH",
+                    });
+                    const data = await safeJson(res);
+                    if (res.ok) {
+                      toast("Tournament completed", "success");
+                      await fetchData();
+                    } else {
+                      toast(data?.message || "Failed to complete tournament", "error");
+                    }
+                  } catch {
+                    toast("Error completing tournament", "error");
+                  }
+                }
+              : undefined
+          }
         />
 
         {/* Builds only appears when the tournament actually asks for builds —

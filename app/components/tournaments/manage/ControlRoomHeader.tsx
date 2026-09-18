@@ -21,9 +21,10 @@ interface Props {
   lastUpdated?: Date | null;
   onAddGuest?: () => void;
   onInvitePlayer?: () => void;
+  onCompleteTournament?: () => void;
 }
 
-export default function ControlRoomHeader({ tournament, tournamentId, onBack, onOpenTournament, onStartTournament, onViewBracket, onRefresh, connected, lastUpdated, onAddGuest, onInvitePlayer }: Props) {
+export default function ControlRoomHeader({ tournament, tournamentId, onBack, onOpenTournament, onStartTournament, onViewBracket, onRefresh, connected, lastUpdated, onAddGuest, onInvitePlayer, onCompleteTournament }: Props) {
   const { toast } = useToast();
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -134,7 +135,7 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
             </div>
           )}
 
-          {/* Row 3: Refresh (text) | Start Tournament / Open Registration */}
+          {/* Row 3: Refresh (text) | Start Tournament / Open Registration / Finalize Tournament */}
           {(tournament.status === "UPCOMING" || tournament.status === "OPEN") && (
             <div className="grid grid-cols-2 gap-2">
               {onRefresh && (
@@ -143,7 +144,7 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
                 </button>
               )}
               {tournament.status === "UPCOMING" && (
-                <button onClick={onOpenTournament} className="w-full py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors whitespace-nowrap">
+                 <button onClick={onOpenTournament} className="w-full py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors whitespace-nowrap">
                   Open Registration
                 </button>
               )}
@@ -155,8 +156,24 @@ export default function ControlRoomHeader({ tournament, tournamentId, onBack, on
             </div>
           )}
 
+          {/* Ongoing tournament actions: Refresh + Finalize if all matches complete */}
+          {tournament.status === "ONGOING" && (
+            <div className="grid grid-cols-2 gap-2">
+              {onRefresh && (
+                <button onClick={onRefresh} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
+                  Refresh
+                </button>
+              )}
+              {onCompleteTournament && (
+                <button onClick={onCompleteTournament} className="w-full py-2.5 bg-primary text-black font-semibold text-xs rounded hover:brightness-90 transition-colors whitespace-nowrap">
+                  Finalize Tournament
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Fallback refresh for other statuses */}
-          {tournament.status !== "UPCOMING" && tournament.status !== "OPEN" && onRefresh && (
+          {tournament.status !== "UPCOMING" && tournament.status !== "OPEN" && tournament.status !== "ONGOING" && onRefresh && (
             <div className="grid grid-cols-2 gap-2">
               <button onClick={onRefresh} className="w-full py-2.5 bg-background border border-white/20 text-white font-semibold text-xs rounded hover:bg-white/10 transition-colors whitespace-nowrap">
                 Refresh
