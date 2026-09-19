@@ -107,6 +107,22 @@ interface Stats {
   totalTournaments: number; activeTournaments: number; completedTournaments: number;
 }
 
+/**
+ * Keep a degraded/older deployment from handing an error envelope or wrapped
+ * collection to list components. The current API returns arrays, but this
+ * boundary makes the admin shell safe when a barebones production instance
+ * returns `{ data: [...] }` (or an empty response) instead.
+ */
+function collectionPayload<T>(value: unknown, keys: string[]): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (!value || typeof value !== "object") return [];
+  for (const key of keys) {
+    const candidate = (value as Record<string, unknown>)[key];
+    if (Array.isArray(candidate)) return candidate as T[];
+  }
+  return [];
+}
+
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -227,8 +243,8 @@ export default function AdminDashboard() {
         authenticatedFetch(API_ENDPOINTS.AUTH.USERS),
         authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.BASE),
       ]);
-      const usersData: AdminUser[]       = (await safeJson(usersRes))  ?? [];
-      const tourneyData: AdminTournament[] = (await safeJson(tourneyRes)) ?? [];
+      const usersData = collectionPayload<AdminUser>(await safeJson(usersRes), ["users", "data", "items"]);
+      const tourneyData = collectionPayload<AdminTournament>(await safeJson(tourneyRes), ["tournaments", "data", "items"]);
 
       setUsers(usersData);
       setTournaments(tourneyData);

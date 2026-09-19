@@ -229,7 +229,22 @@ export default function MobileBottomNav() {
           )}
 
           {user?.roles?.some((role) => role === "ADMIN" || role === "ORGANIZER") && (
-            <Link href="/tournaments/manage/guests" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-4 border border-white/10 px-6 py-4 text-[10px] font-black uppercase tracking-widest text-primary">Guest registration</Link>
+            <Link
+              href="/tournaments/manage/guests"
+              onClick={() => setIsMenuOpen(false)}
+              className={`flex items-center gap-4 px-6 py-4 text-[10px] font-black uppercase tracking-widest border transition-all rounded-xl font-poppins ${
+                pathname === "/tournaments/manage/guests"
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "bg-foreground/5 border-foreground/5 text-white/60 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 shrink-0">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M19 8v6M16 11h6" />
+              </svg>
+              GUEST REGISTRATION
+            </Link>
           )}
 
           {/* System Administrator Panel — always accessible to admins */}
