@@ -32,6 +32,11 @@ const CARD_WIDTH = 212;
  *  instead of the magic gap the losers bracket used to sit behind. */
 const CARD_HEIGHT = 74;
 const BASE_MATCH_GAP = 150;
+/** Pure knockout trees use five mirrored columns for an eight-player cut.
+ *  These tighter dimensions keep that complete championship shape in view;
+ *  the roomier constants above remain in force for double elimination. */
+const MIRRORED_COLUMN_WIDTH = 252;
+const MIRRORED_MATCH_GAP = 118;
 /** Air between the bottom of the winners bracket and the losers captions,
  *  with the divider set into the middle of it (option 1B). */
 const HALF_GAP = 190;
@@ -322,9 +327,25 @@ export default function EliminationLayout({
     const zoomOnPinch = !panOnScroll;
     const panOnScrollMode = (isShiftPressed ? "horizontal" : "vertical") as PanOnScrollMode;
 
-    const winnersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => isWinnersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
-    const losersRounds = useMemo(() => tournament?.rounds?.filter((r: Round) => isLosersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
-    const grandFinals = useMemo(() => tournament?.rounds?.filter((r: Round) => r.roundNumber >= 200).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber) || [], [tournament]);
+    const system = tournament?.system ?? (typeof tournament?.format === 'object' ? tournament.format?.system : null);
+    const eliminationRounds = useMemo(() => {
+        const rounds: Round[] = tournament?.rounds ?? [];
+        if (system !== 'HYBRID') return rounds;
+
+        // Swiss results seed the cut, but they are not feeders in its knockout
+        // tree. Keeping them out here prevents their round numbers and match
+        // counts from creating blank columns and recursive Y-spacing jumps.
+        return rounds
+            .map((round: Round) => ({
+                ...round,
+                matches: round.matches.filter((match: Match) => match.phase === 2),
+            }))
+            .filter((round: Round) => round.matches.length > 0);
+    }, [system, tournament?.rounds]);
+
+    const winnersRounds = useMemo(() => eliminationRounds.filter((r: Round) => isWinnersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber), [eliminationRounds]);
+    const losersRounds = useMemo(() => eliminationRounds.filter((r: Round) => isLosersRound(r.roundNumber)).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber), [eliminationRounds]);
+    const grandFinals = useMemo(() => eliminationRounds.filter((r: Round) => r.roundNumber >= 200).sort((a: Round, b: Round) => a.roundNumber - b.roundNumber), [eliminationRounds]);
 
     // Helper to find the round number of a match
     const getMatchRoundInfo = useCallback((matchId: string): number => {
@@ -454,7 +475,7 @@ export default function EliminationLayout({
             // ── Symmetric knockout layout: both halves converge on a central final ──
             const totalRounds = winnersRounds.length;
             const lastColumn = 2 * (totalRounds - 1);
-            const centerX = (totalRounds - 1) * COLUMN_WIDTH;
+            const centerX = (totalRounds - 1) * MIRRORED_COLUMN_WIDTH;
             const finalMatch: Match = finalRound.matches[0];
 
             // Matches feeding into each match, ordered by matchIndex
@@ -483,7 +504,7 @@ export default function EliminationLayout({
             if (finalFeeders[1]) assignSide(finalFeeders[1], 'R');
 
             const columnX = (rIdx: number, s: BracketSide) =>
-                s === 'C' ? centerX : s === 'R' ? (lastColumn - rIdx) * COLUMN_WIDTH : rIdx * COLUMN_WIDTH;
+                s === 'C' ? centerX : s === 'R' ? (lastColumn - rIdx) * MIRRORED_COLUMN_WIDTH : rIdx * MIRRORED_COLUMN_WIDTH;
 
             // Vertical positions: opening matches stack downward within their half,
             // later matches sit at the midpoint of the matches feeding them.
@@ -500,7 +521,7 @@ export default function EliminationLayout({
                     } else {
                         const s = sideMap.get(m.id) || 'L';
                         leafSlots[s] += 1;
-                        matchYMap.set(m.id, leafSlots[s] * BASE_MATCH_GAP);
+                        matchYMap.set(m.id, leafSlots[s] * MIRRORED_MATCH_GAP);
                     }
                 });
             });
@@ -508,9 +529,10 @@ export default function EliminationLayout({
             // Stage name per column (shown mirrored on both sides)
             const stageLabel = (rIdx: number, round: Round): string => {
                 const fromEnd = totalRounds - 1 - rIdx;
+                if (fromEnd === 0) return 'CHAMPIONSHIP FINAL';
                 if (fromEnd === 1) return 'SEMI-FINALS';
                 if (fromEnd === 2) return 'QUARTER-FINALS';
-                if (round.matches.length === Math.pow(2, fromEnd)) return `ROUND OF ${Math.pow(2, fromEnd + 1)}`;
+                if (fromEnd === 3) return 'ROUND OF 16';
                 return `ROUND ${round.roundNumber}`;
             };
 
@@ -522,8 +544,8 @@ export default function EliminationLayout({
                     nodes.push({
                         id: `header-round-${round.roundNumber}`,
                         type: 'header',
-                        position: { x: centerX, y: 50 },
-                        data: { label: 'FINAL', sublabel: 'CHAMPIONSHIP' },
+                        position: { x: centerX, y: 24 },
+                        data: { label: stageLabel(rIdx, round), sublabel: 'GRAND FINAL' },
                         draggable: false, selectable: false
                     });
                 } else {
@@ -533,7 +555,7 @@ export default function EliminationLayout({
                         nodes.push({
                             id: `header-round-${round.roundNumber}-${s}`,
                             type: 'header',
-                            position: { x: columnX(rIdx, s), y: 50 },
+                            position: { x: columnX(rIdx, s), y: 24 },
                             data: { label: stageLabel(rIdx, round), sublabel: `ROUND ${round.roundNumber}` },
                             draggable: false, selectable: false
                         });
@@ -545,7 +567,7 @@ export default function EliminationLayout({
                     nodes.push({
                         id: match.id,
                         type: 'match',
-                        position: { x: columnX(rIdx, s), y: matchYMap.get(match.id) ?? BASE_MATCH_GAP },
+                        position: { x: columnX(rIdx, s), y: matchYMap.get(match.id) ?? MIRRORED_MATCH_GAP },
                         data: { match, isAdmin, updating, leaderboard, trackedUserId, currentUserId, focusedMatchId, seeds, isChampion: isDecider(match), onOpenScoring },
                         draggable: false
                     });

@@ -22,6 +22,7 @@ import InvitePlayerModal from "../../../components/tournaments/manage/InvitePlay
 import RoundControlPanel from "../../../components/tournaments/manage/RoundControlPanel";
 import ManageSection from "../../../components/tournaments/manage/ManageSection";
 import PairingsView from "../../../components/tournaments/PairingsView";
+import TournamentCompletionBanner from "../../../components/tournaments/TournamentCompletionBanner";
 import { uniqueGuestNames } from "../../../utils/guestName";
 
 type ManageTab = "rounds" | "players" | "settings" | "builds";
@@ -238,13 +239,22 @@ function ControlRoomContent() {
 
   const handleAddGuest = async () => {
     if (isAddingGuest) return;
-    if (!guestUsername || !tournament || tournament.participants.length >= tournament.maxPlayers) {
+    const requestedName = guestUsername.trim();
+    if (!requestedName || !tournament || tournament.participants.length >= tournament.maxPlayers) {
       toast("Tournament at maximum capacity", "error"); return;
+    }
+    const existingGuest = tournament.participants.find(
+      (participant) => participant.user.isGuest &&
+        participant.user.username.trim().toLocaleLowerCase() === requestedName.toLocaleLowerCase(),
+    );
+    if (existingGuest) {
+      toast(`${existingGuest.user.username} is already on this roster`, "error");
+      return;
     }
     setIsAddingGuest(true);
     try {
       const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN_GUEST(tournamentId!), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: guestUsername }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: requestedName }),
       });
       const data = await safeJson(res);
       if (res.ok) { 
@@ -604,6 +614,12 @@ function ControlRoomContent() {
                 }
               : undefined
           }
+        />
+
+        <TournamentCompletionBanner
+          tournament={tournament}
+          onViewResults={() => setManageTab("rounds")}
+          onUpdated={() => fetchData(true)}
         />
 
         {/* Builds only appears when the tournament actually asks for builds —

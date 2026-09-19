@@ -34,6 +34,7 @@ interface MatchLike {
   reportedWinnerId?: string | null;
   p1Name?: string | null;
   p2Name?: string | null;
+  phase?: number;
 }
 
 interface RoundLike {
@@ -608,7 +609,7 @@ export default function PairingsView({
       {openMatch && (canManage || isMine(openMatch)) && (
         <ScoringDrawer
           match={openMatch as unknown as BracketMatch}
-          formatConfig={getTournamentConfig(tournament) ?? undefined}
+          formatConfig={getTournamentConfig(tournament, openMatch.phase) ?? undefined}
           system={getTournamentSystem(tournament) ?? undefined}
           tournamentId={tournament.id}
           tournamentStatus={tournament.status}

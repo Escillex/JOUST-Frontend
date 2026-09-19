@@ -129,6 +129,10 @@ export interface Tournament {
   }[];
   formatId: string;
   format: string | TournamentFormatModel;
+  /** Snapshotted when the tournament starts, so a played tournament remains
+   *  renderable even if its original format preset is later deleted. */
+  system?: TournamentFormat | null;
+  formatName?: string | null;
   /** The game being played, chosen at creation independent of the format and
    *  required — there is no fallback game. Nullable only for legacy rows that
    *  predate the catalog or still sit on the retired placeholder (todo.md §5). */
@@ -163,6 +167,8 @@ export interface Tournament {
     roundNumber: number;
     matches: {
       id: string;
+      /** HYBRID only: 1 = Swiss, 2 = single-elimination top cut. */
+      phase?: number;
       player1Id?: string | null;
       player2Id?: string | null;
       player1?: {
@@ -210,6 +216,7 @@ export interface Tournament {
 export interface FormatConfig {
   winsToAdvance?: number;
   swissRounds?: number;
+  topCutSize?: number;
   swissPointsForWin?: number;
   swissPointsForDraw?: number;
   swissPointsForLoss?: number;

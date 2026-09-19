@@ -342,7 +342,17 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
     // backend resolves it from the root first (see format-config.helper.ts).
     const config =
       format === "HYBRID"
-        ? { seedingMode, phase1: rules, phase2: { topCutSize } }
+        ? {
+            ...rules,
+            seedingMode,
+            phase1: rules,
+            phase2: {
+              topCutSize,
+              startingHp,
+              pointsThreshold,
+              bestOf: rules.bestOf,
+            },
+          }
         : { ...rules, seedingMode };
 
     const body = {
@@ -719,7 +729,11 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
                   type="checkbox"
                   id="t_enableThreshold"
                   checked={pointsThreshold > 0}
-                  onChange={e => setPointsThreshold(e.target.checked ? 1 : 0)}
+                  onChange={e => {
+                    const enabled = e.target.checked;
+                    setPointsThreshold(enabled ? 1 : 0);
+                    if (enabled) setStartingHp(0);
+                  }}
                   className="mr-2 cursor-pointer accent-primary"
                 />
                 Points Threshold
@@ -738,7 +752,11 @@ export default function CreateTournamentForm({ onSuccess, onError, onDiscard }: 
                   type="checkbox"
                   id="t_enableHp"
                   checked={startingHp > 0}
-                  onChange={e => setStartingHp(e.target.checked ? 100 : 0)}
+                  onChange={e => {
+                    const enabled = e.target.checked;
+                    setStartingHp(enabled ? 100 : 0);
+                    if (enabled) setPointsThreshold(0);
+                  }}
                   className="mr-2 cursor-pointer accent-primary"
                 />
                 HP-Based Match

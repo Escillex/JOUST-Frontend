@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MatchGameLog, GameTrackingMode, FormatConfig } from '../../../../tournaments/types';
+import { MatchGameLog, FormatConfig } from '../../../../tournaments/types';
 import { Match } from '../../../../tournaments/[id]/bracket/types';
 import { authenticatedFetch, safeJson, API_ENDPOINTS, displayNameOf } from '../../../../utils/api';
 import { usePolling } from '../../../../utils/usePolling';
@@ -11,7 +11,7 @@ import LastUpdated from '../../../ui/LastUpdated';
 import GameBar from './GameBar';
 import GameSeriesScore from './GameSeriesScore';
 import PlayerToolkit from './PlayerToolkit';
-import { canOfferDraw, getMatchStartWho, getScoreSubmissionRule } from '../../../../utils/formatConfig';
+import { canOfferDraw, getMatchStartWho, getScoreSubmissionRule, getTrackerSettings } from '../../../../utils/formatConfig';
 
 interface TrackerPanelProps {
   match: Match;
@@ -42,12 +42,8 @@ export default function TrackerPanel({ match, formatConfig, system, isAdmin, cur
 
   const bestOf = formatConfig?.bestOf ?? 1;
   const winsNeeded = Math.ceil(bestOf / 2);
-  const trackingMode: GameTrackingMode = formatConfig?.startingHp ? 'HP' : 'POINTS';
-  const defaultStartingValue = formatConfig?.startingHp 
-    ? formatConfig.startingHp 
-    : (formatConfig?.pointsThreshold ? formatConfig.pointsThreshold : winsNeeded);
-
-  const hasPointsOrHp = !!(formatConfig?.startingHp || formatConfig?.pointsThreshold);
+  const trackerSettings = getTrackerSettings(formatConfig);
+  const hasPointsOrHp = trackerSettings.useTracker;
 
   const activeLog = logs.find(l => l.trackerActive) ?? null;
   const p1Wins = match.player1Score ?? 0;

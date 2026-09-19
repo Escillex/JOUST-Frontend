@@ -67,10 +67,7 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
           toast(d?.message || "Could not add the player", "error");
         }
       } else {
-        // Regular invite: use the /join endpoint — the player gets added but
-        // we frame it as an invite in the UI. A future backend endpoint can
-        // send a notification instead; for now this adds them directly.
-        const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.JOIN(tournamentId), {
+        const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.INVITE_PLAYER(tournamentId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: selectedUserId }),
@@ -132,8 +129,8 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
 
           {!forceAdd && (
             <p className="text-[11px] text-[#888888] leading-relaxed">
-              The player will be added to the tournament. In a future update, a notification
-              will be sent to let them accept or decline.
+              The player will receive an invitation and can accept or decline it from their
+              notifications and tournament page.
             </p>
           )}
           {forceAdd && (

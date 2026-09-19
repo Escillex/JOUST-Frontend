@@ -84,12 +84,13 @@ export default function ConvertGuestModal({ guest, isOpen, onClose, onSubmit }: 
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-0.5">Password</label>
               <input
-                type="password" required
+                type="password" required minLength={8}
                 value={formData.password}
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
                 className="w-full h-10 bg-background border border-white/10 px-3 text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-white/60 rounded-sm"
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
               />
+              <p className="text-[10px] text-white/40">Use at least 8 characters.</p>
             </div>
           </div>
 

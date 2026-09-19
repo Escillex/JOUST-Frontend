@@ -74,6 +74,15 @@ export default function FormatRulesPanel({
   const advancedFields = fields.filter(f => advancedKeys.includes(f.key));
 
   const handleChange = (field: ConfigField, rawValue: string | boolean) => {
+    // HP and points tracking are two modes, not independent switches. Clear
+    // the other mode as soon as one is enabled so the saved tournament cannot
+    // make different views infer different scoring labels.
+    if (field.key === "pointsThreshold" && Number(rawValue) > 0) {
+      onRuleChange("startingHp", 0);
+    }
+    if (field.key === "startingHp" && Number(rawValue) > 0) {
+      onRuleChange("pointsThreshold", 0);
+    }
     if (isBooleanField(field)) {
       onRuleChange(field.key, Boolean(rawValue));
       return;
@@ -315,6 +324,7 @@ export default function FormatRulesPanel({
                 onChange={e => {
                   const checked = e.target.checked;
                   onRuleChange('startingHp', checked ? 100 : 0);
+                  if (checked) onRuleChange('pointsThreshold', 0);
                 }} 
                 className="w-4 h-4 cursor-pointer accent-primary" 
               />

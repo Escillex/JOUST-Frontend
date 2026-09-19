@@ -325,6 +325,11 @@ export const API_ENDPOINTS = {
     ACCEPT: (id: string) => `/organizers/invitations/${id}/accept`,
     DECLINE: (id: string) => `/organizers/invitations/${id}/decline`,
   },
+  PARTICIPANT_INVITATIONS: {
+    LIST: '/participant-invitations',
+    ACCEPT: (id: string) => `/participant-invitations/${id}/accept`,
+    DECLINE: (id: string) => `/participant-invitations/${id}/decline`,
+  },
   TOURNAMENTS: {
     BASE: '/tournaments',
     // Only the tournaments this user may manage; the backend applies the same
@@ -334,6 +339,7 @@ export const API_ENDPOINTS = {
     START: (id: string) => `/tournaments/starttournament/${id}`,
     COMPLETE: (id: string) => `/tournaments/${id}/complete`,
     JOIN: (id: string) => `/tournaments/${id}/participants/join`,
+    INVITE_PLAYER: (id: string) => `/tournaments/${id}/participants/invite`,
     JOIN_GUEST: (id: string) => `/tournaments/${id}/participants/guest`,
     LEAVE: (id: string) => `/tournaments/${id}/participants/leave`,
     UPDATE_SEED: (tournamentId: string, userId: string) => `/tournaments/${tournamentId}/participants/${userId}/seed`,

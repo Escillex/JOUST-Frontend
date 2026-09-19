@@ -15,10 +15,15 @@ export function getRawTournamentConfig(t: TournamentLike): Record<string, any> {
   return (t?.config as Record<string, any>) ?? fromFormat ?? {};
 }
 
-/** Scoring view of the config — for HYBRID the scoring rules live under phase1
- *  (mirrors the backend's resolveConfig aliasing). */
-export function getTournamentConfig(t: TournamentLike): FormatConfig {
+/** Scoring view of the config — for HYBRID the scoring rules live under phase1,
+ *  while phase 2 inherits them unless overridden (mirrors backend resolveConfig). */
+export function getTournamentConfig(t: TournamentLike, phase: number = 1): FormatConfig {
   const raw = getRawTournamentConfig(t);
+  const p1 = (raw.phase1 && typeof raw.phase1 === "object") ? (raw.phase1 as Record<string, any>) : {};
+  const p2 = (raw.phase2 && typeof raw.phase2 === "object") ? (raw.phase2 as Record<string, any>) : {};
+  if (phase === 2) {
+    return { ...raw, ...p1, ...p2 } as FormatConfig;
+  }
   return ((raw.phase1 as Record<string, any>) ?? raw) as FormatConfig;
 }
 

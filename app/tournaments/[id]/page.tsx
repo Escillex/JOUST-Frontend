@@ -66,6 +66,7 @@ import StandingsTable from "../../components/tournaments/StandingsTable";
 import type { LeaderboardEntry } from "./bracket/types";
 import GameIcon from "../../components/ui/GameIcon";
 import ProfileAvatar from "../../components/profile/ProfileAvatar";
+import TournamentCompletionBanner from "../../components/tournaments/TournamentCompletionBanner";
 import { formatWhen, stateLine } from "../../utils/tournamentStatus";
 import { actionFor } from "../../utils/tournamentAction";
 
@@ -92,6 +93,7 @@ function TournamentViewContent() {
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
+  const [pendingParticipantInviteId, setPendingParticipantInviteId] = useState<string | null>(null);
   const [respondingToInvite, setRespondingToInvite] = useState(false);
   /** The ranking table's rows. Fetched separately from the tournament because
    *  the standings are computed, not stored on it. */
@@ -108,18 +110,28 @@ function TournamentViewContent() {
     router.replace(qs ? `?${qs}` : `/tournaments/${tournamentId}`, { scroll: false });
   };
 
-  // Only organizers can be invited to co-manage, so this request is skipped for
-  // everyone else rather than fired on every tournament page view.
+  // Co-organizer invitations are role-gated; player invitations are available
+  // to every signed-in account, so both inboxes are checked here.
   const loadInvitation = useCallback(async (me: { roles?: string[] } | null) => {
     const canBeInvited = me?.roles?.some((r) => r === "ORGANIZER" || r === "ADMIN");
-    if (!canBeInvited) return;
-    const res = await authenticatedFetch(API_ENDPOINTS.ORGANIZERS.MY_INVITATIONS);
-    if (!res.ok) return;
-    const invitations = await safeJson(res);
-    const mine = Array.isArray(invitations)
-      ? invitations.find((i: { tournamentId: string }) => i.tournamentId === tournamentId)
-      : null;
-    setPendingInviteId(mine?.id ?? null);
+    if (canBeInvited) {
+      const res = await authenticatedFetch(API_ENDPOINTS.ORGANIZERS.MY_INVITATIONS);
+      if (res.ok) {
+        const invitations = await safeJson(res);
+        const mine = Array.isArray(invitations)
+          ? invitations.find((i: { tournamentId: string }) => i.tournamentId === tournamentId)
+          : null;
+        setPendingInviteId(mine?.id ?? null);
+      }
+    }
+    const playerRes = await authenticatedFetch(API_ENDPOINTS.PARTICIPANT_INVITATIONS.LIST);
+    if (playerRes.ok) {
+      const invitations = await safeJson(playerRes);
+      const mine = Array.isArray(invitations)
+        ? invitations.find((i: { tournamentId: string }) => i.tournamentId === tournamentId)
+        : null;
+      setPendingParticipantInviteId(mine?.id ?? null);
+    }
   }, [tournamentId]);
 
   const fetchData = useCallback(async (silent = false) => {
@@ -212,17 +224,28 @@ function TournamentViewContent() {
     }
   }, [tournament?.name]);
 
-  const respondToInvitation = async (accept: boolean) => {
-    if (!pendingInviteId || respondingToInvite) return;
+  const respondToInvitation = async (accept: boolean, kind: "organizer" | "participant" = "organizer") => {
+    const invitationId = kind === "organizer" ? pendingInviteId : pendingParticipantInviteId;
+    if (!invitationId || respondingToInvite) return;
     setRespondingToInvite(true);
     try {
       const endpoint = accept
-        ? API_ENDPOINTS.ORGANIZERS.ACCEPT(pendingInviteId)
-        : API_ENDPOINTS.ORGANIZERS.DECLINE(pendingInviteId);
+        ? kind === "organizer"
+          ? API_ENDPOINTS.ORGANIZERS.ACCEPT(invitationId)
+          : API_ENDPOINTS.PARTICIPANT_INVITATIONS.ACCEPT(invitationId)
+        : kind === "organizer"
+          ? API_ENDPOINTS.ORGANIZERS.DECLINE(invitationId)
+          : API_ENDPOINTS.PARTICIPANT_INVITATIONS.DECLINE(invitationId);
       const res = await authenticatedFetch(endpoint, { method: "PATCH" });
       if (res.ok) {
-        setPendingInviteId(null);
-        toast(accept ? "You now co-manage this tournament" : "Invitation declined", "success");
+        if (kind === "organizer") setPendingInviteId(null);
+        else setPendingParticipantInviteId(null);
+        toast(
+          accept
+            ? kind === "organizer" ? "You now co-manage this tournament" : "You joined the tournament"
+            : "Invitation declined",
+          "success",
+        );
         // Accepting changes what this viewer may do, so the tournament is
         // refetched to pick up its new canManage.
         if (accept) await fetchData();
@@ -327,7 +350,7 @@ function TournamentViewContent() {
   const myId = user?.sub || (user as any)?.id;
   const isJoined = tournament.participants.some(p => p.userId === myId);
   const when = formatWhen(tournament.date);
-  const system = typeof tournament.format === "object" ? tournament.format?.system : null;
+  const system = tournament.system ?? (typeof tournament.format === "object" ? tournament.format?.system : null);
   const action = actionFor({ tournament, userId: myId, isJoined });
   const canManage = tournament.canManage;
   const started = tournament.status === "ONGOING" || tournament.status === "COMPLETED";
@@ -353,6 +376,22 @@ function TournamentViewContent() {
 
   const cfg = getTournamentConfig(tournament) as any;
   const isHybrid = system === "HYBRID";
+  const tournamentRounds = tournament.rounds ?? [];
+  const hasTopCutMatches = isHybrid && tournamentRounds.some((round) =>
+    round.matches.some((match) => match.phase === 2),
+  );
+  const swissRoundNumbers = tournamentRounds
+    .filter((round) => round.matches.some((match) => match.phase === 1))
+    .map((round) => round.roundNumber);
+  const currentSwissRound = swissRoundNumbers.length > 0
+    ? Math.max(...swissRoundNumbers)
+    : null;
+  const configuredSwissRounds = getTournamentConfig(tournament, 1).swissRounds;
+  const totalSwissRounds = configuredSwissRounds ?? Math.max(
+    1,
+    Math.ceil(Math.log2(Math.max(2, tournament.participants.length))),
+  );
+  const topCutSize = getTournamentConfig(tournament, 2).topCutSize ?? 8;
   const points = [
     `1st ${cfg?.placementPointsChampion ?? 10}`,
     `2nd ${cfg?.placementPoints2nd ?? 7}`,
@@ -436,6 +475,30 @@ function TournamentViewContent() {
               </button>
               <button
                 onClick={() => respondToInvitation(false)}
+                disabled={respondingToInvite}
+                className="px-6 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 text-white/60 hover:text-white disabled:opacity-40"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pendingParticipantInviteId && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between border border-primary/30 bg-primary/5 px-6 py-5">
+            <span className="text-[11px] font-black uppercase tracking-widest text-primary">
+              You have been invited to join this tournament
+            </span>
+            <div className="flex gap-3">
+              <button
+                onClick={() => respondToInvitation(true, "participant")}
+                disabled={respondingToInvite}
+                className="px-6 py-2 text-[10px] font-black uppercase tracking-widest bg-primary text-black disabled:opacity-40"
+              >
+                {respondingToInvite ? "Working…" : "Accept"}
+              </button>
+              <button
+                onClick={() => respondToInvitation(false, "participant")}
                 disabled={respondingToInvite}
                 className="px-6 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 text-white/60 hover:text-white disabled:opacity-40"
               >
@@ -551,6 +614,12 @@ function TournamentViewContent() {
             </div>
           </div>
         </header>
+
+        <TournamentCompletionBanner
+          tournament={tournament}
+          onViewResults={() => setTab("standings")}
+          onUpdated={() => fetchData(true)}
+        />
 
         {/* Desktop Tab Row / Mobile Grid Navigator */}
         <div className="grid grid-cols-3 gap-2 md:flex md:gap-0 md:overflow-x-auto md:border-b md:border-component-border md:-mx-5 md:px-5 lg:mx-0 lg:px-0">
@@ -776,7 +845,62 @@ function TournamentViewContent() {
                   COMPLETED tournaments meant every started tournament, in every
                   system, told its players the bracket had not been drawn yet,
                   forever, including finished ones with a champion. */}
-              {!hasRounds ? (
+              {isHybrid && !hasTopCutMatches ? (
+                <div className="min-h-[420px] border border-white/10 bg-[#0c0c0c] px-5 py-12 md:px-12 flex items-center justify-center">
+                  <div className="w-full max-w-2xl flex flex-col items-center text-center">
+                    <div className="relative w-16 h-16 mb-6 flex items-center justify-center" aria-hidden>
+                      <span className="w-12 h-12 rounded-full border-2 border-primary/30" />
+                      <span className="absolute w-3.5 h-3.5 rounded-full bg-primary shadow-[0_0_15px_rgba(82,185,70,0.8)]" />
+                    </div>
+
+                    <p className="text-[10px] font-black uppercase tracking-[0.35em] text-primary mb-2">
+                      Phase 1: Swiss Stage {hasRounds ? "In Progress" : "Upcoming"}
+                    </p>
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
+                      Waiting for Swiss Rounds to be Over
+                    </h2>
+                    <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/55">
+                      The Top Cut bracket will appear here automatically once the Swiss rounds are complete and the final standings are locked.
+                    </p>
+
+                    <dl className="mt-8 grid w-full max-w-md grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                      <div className="border border-white/10 bg-white/[0.03] p-4">
+                        <dt className="text-[9px] font-black uppercase tracking-[0.25em] text-white/40">Current stage</dt>
+                        <dd className="mt-1 text-xs font-black uppercase text-white">
+                          {currentSwissRound === null
+                            ? "Swiss rounds not started"
+                            : `Swiss Round ${Math.min(currentSwissRound, totalSwissRounds)} of ${totalSwissRounds}`}
+                        </dd>
+                      </div>
+                      <div className="border border-white/10 bg-white/[0.03] p-4">
+                        <dt className="text-[9px] font-black uppercase tracking-[0.25em] text-white/40">Cut criteria</dt>
+                        <dd className="mt-1 text-xs font-black uppercase text-primary">
+                          Top {topCutSize} advance
+                        </dd>
+                      </div>
+                    </dl>
+
+                    {hasRounds && (
+                      <div className="mt-8 flex w-full max-w-md flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setTab("pairings")}
+                          className="flex-1 h-11 border border-primary bg-primary text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white hover:border-white transition-colors"
+                        >
+                          View Match Table
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTab("standings")}
+                          className="flex-1 h-11 border border-white/15 bg-white/5 text-white text-[10px] font-black uppercase tracking-[0.2em] hover:border-primary hover:text-primary transition-colors"
+                        >
+                          View Standings
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : !hasRounds ? (
                 /* Before the start there are no rounds to draw, so this is the
                    one place `BracketPreview` belongs: with manual seeding it
                    previews the intended first round, and with a random draw it

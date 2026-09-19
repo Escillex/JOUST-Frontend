@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JOUST · Completion Banner Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script>tailwind.config = { theme: { extend: { colors: { primary: '#52B946' }, fontFamily: { sans: ['Inter', 'sans-serif'], display: ['Poppins', 'sans-serif'] } } } };</script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #111; color: #fff; font-family: Inter, sans-serif; }
+    .manage-surface { background: #1b1b1b; }
+    .banner { box-shadow: 5px 5px 0 rgba(82,185,70,.22); }
+    .trophy { animation: trophy 3s ease-in-out infinite; }
+    .pop { animation: pop .55s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes trophy { 0%,100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(4deg) translateY(-4px); } }
+    @keyframes pop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="border-b border-white/10 bg-black px-4 py-3 sm:px-8">
+    <div class="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
+      <div class="flex items-center gap-7"><span class="font-display text-lg font-black tracking-[-.08em]">JOUST</span><span id="zoneLabel" class="hidden border-l border-white/15 pl-7 text-[10px] font-bold uppercase tracking-[.25em] text-white/40 sm:inline">Manage</span></div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center border border-white/15 bg-white/5 p-1" aria-label="Prototype view switcher"><button id="publicButton" onclick="switchView('public')" class="bg-primary px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-black">Public page</button><button id="manageButton" onclick="switchView('manage')" class="px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-white/45 hover:text-white">Manage page</button></div>
+        <span class="hidden h-8 w-8 border border-white/15 bg-white/5 text-center text-xs font-black leading-8 text-white/60 sm:block">D</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="manage-surface min-h-[calc(100vh-57px)]">
+    <div class="mx-auto max-w-[1440px] px-4 py-5 sm:px-8 sm:py-8">
+      <div class="mb-6 flex items-center justify-between gap-4"><div><button class="mb-4 text-xs text-white/40 hover:text-white">← Back to Dashboard</button><h1 class="font-display text-2xl font-bold sm:text-3xl">Sunday Showdown</h1><div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-white/40"><span class="flex items-center gap-2"><span class="h-2 w-2 bg-white/50"></span> COMPLETED</span><span>Single Elimination / No prize</span></div></div><button onclick="showToast('Result link copied')" class="border border-white/15 bg-black px-4 py-2.5 text-xs font-semibold text-white/70 hover:border-primary hover:text-primary">Share</button></div>
+
+      <div id="winnerBanner" class="pop banner relative overflow-hidden border border-primary/50 bg-black">
+        <div class="absolute inset-y-0 left-0 w-1 bg-primary"></div>
+        <div class="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div class="flex items-center gap-4"><div class="trophy flex h-14 w-14 shrink-0 items-center justify-center border border-primary/40 bg-primary/10 text-primary"><svg viewBox="0 0 48 48" class="h-8 w-8 fill-none stroke-current stroke-2" aria-hidden="true"><path d="M15 8h18v10c0 7-4 12-9 12s-9-5-9-12V8Z"/><path d="M15 11H8v5c0 5 3 8 8 8M33 11h7v5c0 5-3 8-8 8M24 30v7M16 41h16M19 37h10"/></svg></div><div><p class="text-[9px] font-black uppercase tracking-[.35em] text-primary">Tournament complete · 14 Sep 2026</p><h2 class="mt-1 font-display text-2xl font-black uppercase tracking-tight sm:text-3xl">Dembele won the final</h2><p class="mt-1 text-xs text-white/50">Defeated Mbappe <span class="font-mono text-white/75">2–0</span> · 1st place · 100 points</p></div></div>
+          <div class="flex shrink-0 flex-col gap-2 sm:items-end"><button onclick="showToast('Opening final results')" class="bg-primary px-5 py-3 text-[10px] font-black uppercase tracking-[.2em] text-black hover:bg-white">View final results</button><span class="font-mono text-[9px] uppercase tracking-[.12em] text-white/30">Winner banner · public + manage</span></div>
+        </div>
+      </div>
+
+      <div id="organizerBanner" class="pop mt-3 border border-primary/30 bg-primary/5">
+        <div class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div class="flex items-start gap-3"><div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center border border-primary text-primary"><span class="text-sm">+</span></div><div><p class="text-[9px] font-black uppercase tracking-[.3em] text-primary">Organizer access · <span id="organizerSpace">public page</span></p><p class="mt-1 text-xs text-white/70"><span class="font-semibold text-white">Register a current guest as a user</span> to keep their match history.</p><p class="mt-1 text-[10px] text-white/35">Only available for tournaments you organize.</p></div></div><button onclick="toggleGuestForm()" class="shrink-0 border border-primary/60 bg-primary/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-[.18em] text-primary hover:bg-primary hover:text-black">Register existing guest</button></div>
+        <div id="guestForm" class="hidden border-t border-primary/20 px-5 py-4"><div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label><span class="mb-1 block text-[9px] font-black uppercase tracking-[.2em] text-white/40">Current guest</span><select id="currentGuest" class="w-full border border-white/15 bg-black px-3 py-2.5 text-sm outline-none focus:border-primary"><option>Mbappe</option><option>Sanchez</option></select></label><label><span class="mb-1 block text-[9px] font-black uppercase tracking-[.2em] text-white/40">Username</span><input id="username" value="Mbappe" class="w-full border border-white/15 bg-black px-3 py-2.5 text-sm outline-none focus:border-primary"></label><label><span class="mb-1 block text-[9px] font-black uppercase tracking-[.2em] text-white/40">Email</span><input id="email" type="email" class="w-full border border-white/15 bg-black px-3 py-2.5 text-sm outline-none placeholder:text-white/25 focus:border-primary" placeholder="user@example.com"></label><label><span class="mb-1 block text-[9px] font-black uppercase tracking-[.2em] text-white/40">Password</span><input id="password" type="password" class="w-full border border-white/15 bg-black px-3 py-2.5 text-sm outline-none focus:border-primary"></label><button onclick="registerGuest()" class="bg-primary px-4 py-2.5 text-[10px] font-black uppercase tracking-[.18em] text-black hover:bg-white sm:col-span-2 lg:col-span-4 lg:justify-self-end">Register as user</button></div></div>
+      </div>
+
+      <nav class="mt-8 flex gap-1 border-b border-white/10"><button class="border-b-2 border-primary px-4 py-3 text-[11px] font-black uppercase tracking-[.14em] text-primary">Rounds</button><button class="px-4 py-3 text-[11px] font-black uppercase tracking-[.14em] text-white/40">Players · 8</button><button class="px-4 py-3 text-[11px] font-black uppercase tracking-[.14em] text-white/40">Settings</button></nav>
+      <section class="mt-6 grid gap-6 lg:grid-cols-[1fr_330px]"><div class="border border-white/10 bg-[#111] p-5"><div class="mb-5 flex items-center justify-between"><h3 class="text-sm font-black uppercase tracking-[.18em]">Final standings</h3><span class="font-mono text-[9px] text-white/30">READ ONLY · COMPLETED</span></div><div class="space-y-2"><div class="flex items-center gap-3 border border-primary/30 bg-primary/10 px-4 py-3"><span class="font-mono text-xs text-primary">01</span><span class="h-8 w-8 border border-primary bg-primary/20 text-center text-xs font-black leading-8 text-primary">D</span><span class="flex-1 text-sm font-bold uppercase">Dembele</span><span class="font-mono text-sm font-bold text-primary">100 pts</span></div><div class="flex items-center gap-3 border border-white/10 px-4 py-3"><span class="font-mono text-xs text-white/35">02</span><span class="h-8 w-8 border border-white/15 bg-white/5 text-center text-xs font-black leading-8 text-white/60">M</span><span class="flex-1 text-sm font-bold uppercase text-white/70">Mbappe</span><span class="font-mono text-sm text-white/40">70 pts</span></div><div class="flex items-center gap-3 border border-white/10 px-4 py-3"><span class="font-mono text-xs text-white/35">03</span><span class="h-8 w-8 border border-white/15 bg-white/5 text-center text-xs font-black leading-8 text-white/60">S</span><span class="flex-1 text-sm font-bold uppercase text-white/70">Sanchez</span><span class="font-mono text-sm text-white/40">50 pts</span></div></div></div><aside class="border border-white/10 bg-[#111] p-5"><p class="text-[9px] font-black uppercase tracking-[.3em] text-white/35">Completion summary</p><div class="mt-5 space-y-4 text-xs"><div class="flex justify-between border-b border-white/10 pb-3"><span class="text-white/45">Matches played</span><span class="font-mono">7</span></div><div class="flex justify-between border-b border-white/10 pb-3"><span class="text-white/45">Champion</span><span class="font-semibold text-primary">Dembele</span></div><div class="flex justify-between"><span class="text-white/45">Completed</span><span class="font-mono text-white/70">14 Sep 2026</span></div></div></aside></section>
+    </div>
+  </main>
+  <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2 translate-y-3 border border-primary bg-black px-5 py-3 text-[10px] font-black uppercase tracking-[.2em] text-primary opacity-0 transition-all">Done</div>
+  <script>
+    const toast = document.getElementById('toast');
+    function switchView(view) {
+      const manage = view === 'manage';
+      document.getElementById('zoneLabel').textContent = manage ? 'Manage' : 'Public';
+      document.getElementById('organizerSpace').textContent = manage ? 'manage page' : 'public page';
+      document.getElementById('publicButton').className = manage ? 'px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-white/45 hover:text-white' : 'bg-primary px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-black';
+      document.getElementById('manageButton').className = manage ? 'bg-primary px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-black' : 'px-3 py-2 text-[9px] font-black uppercase tracking-[.18em] text-white/45 hover:text-white';
+      showToast(manage ? 'Manage page preview' : 'Public page preview');
+    }
+    function toggleGuestForm() { const form = document.getElementById('guestForm'); form.classList.toggle('hidden'); if (!form.classList.contains('hidden')) document.getElementById('guestName').focus(); }
+    function registerGuest() { const username = document.getElementById('username'); const email = document.getElementById('email'); const password = document.getElementById('password'); if (!email.value.trim() || !password.value) { showToast('Enter email and password'); return; } document.getElementById('guestForm').classList.add('hidden'); showToast(username.value.trim() + ' registered; match history preserved'); }
+    function showToast(message) { toast.textContent = message; toast.classList.remove('opacity-0', 'translate-y-3'); toast.classList.add('opacity-100', 'translate-y-0'); clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => { toast.classList.add('opacity-0', 'translate-y-3'); toast.classList.remove('opacity-100', 'translate-y-0'); }, 2200); }
+  </script>
+</body>
+</html>

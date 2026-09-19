@@ -141,9 +141,11 @@ export default function PresetManager() {
 
     const config = isHybrid
       ? {
+          ...baseRules,
           seedingMode,
           phase1: baseRules,
           phase2: {
+            ...baseRules,
             topCutSize: Math.max(2, topCutSize),
             bestOf: phase2BestOf,
           },
