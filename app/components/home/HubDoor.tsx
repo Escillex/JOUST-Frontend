@@ -45,29 +45,30 @@ export default function HubDoor({
   const isInverse = inverse && !live;
   const inverseBg = isInverse ? ACCENT[accent] : "bg-surface";
   const textColor = isInverse ? "text-black" : "text-white";
-  const titleColor = isInverse ? "text-black" : "text-white";
   const descColor = isInverse ? "text-black/80" : "text-white/60";
 
   return (
     <Link
       href={href}
-      className={`@container group relative flex flex-col h-full w-full gap-1.5 border p-4 min-h-[104px] transition-colors ${inverseBg} ${
-        live ? "border-[#FF4D4D]/55 hover:border-[#FF4D4D]" : isInverse ? "border-transparent" : "border-white/10 hover:border-white/30"
+      className={`@container group relative flex flex-col h-full w-full gap-2 border p-4 min-h-[104px] overflow-hidden transition-colors ${inverseBg} ${
+        live ? "border-[#FF4D4D]/60 hover:border-[#FF4D4D]" : isInverse ? "border-black/10 hover:border-black/30" : "border-white/10 hover:border-primary/60"
       } ${className}`}
     >
       {!isInverse && (
         <span
           aria-hidden
-          className={`absolute inset-x-0 top-0 h-[2px] ${live ? "bg-[#FF4D4D]" : ACCENT[accent]}`}
+          className={`absolute inset-y-0 left-0 w-1 ${live ? "bg-[#FF4D4D]" : ACCENT[accent]}`}
         />
       )}
+      <span aria-hidden className={`absolute right-3 top-3 h-3 w-3 border-r border-t ${isInverse ? "border-black/35" : "border-white/20 group-hover:border-primary"}`} />
       {title && (
-        <span className={`text-[length:min(11px,8cqw)] whitespace-nowrap font-black uppercase tracking-[0.16em] font-poppins ${titleColor}`}>
+        <span className={`text-[length:min(10px,7cqw)] whitespace-nowrap font-black uppercase tracking-[0.24em] font-poppins ${isInverse ? "text-black/75" : "text-white/55"}`}>
           {title}
         </span>
       )}
-      <div className={`flex-1 flex flex-col justify-center min-h-0 text-[11.5px] leading-snug ${descColor}`}>{children}</div>
-      {foot && <div className={`mt-auto pt-1.5 flex items-center gap-1.5 ${textColor}`}>{foot}</div>}
+      <div className={`flex-1 flex flex-col justify-between min-h-0 py-2 text-[11.5px] leading-snug ${descColor}`}>{children}</div>
+      {foot && <div className={`mt-auto border-t ${isInverse ? "border-black/15" : "border-white/10"} pt-2 flex items-center gap-1.5 ${textColor}`}>{foot}</div>}
+      <span aria-hidden className={`absolute bottom-3 right-3 h-2 w-2 border-b border-r ${isInverse ? "border-black/35" : "border-white/20 group-hover:border-primary"}`} />
     </Link>
   );
 }

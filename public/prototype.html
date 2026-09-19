@@ -19,10 +19,66 @@
     .pop { animation: pop .55s cubic-bezier(.2,.8,.2,1) both; }
     @keyframes trophy { 0%,100% { transform: rotate(-4deg) translateY(0); } 50% { transform: rotate(4deg) translateY(-4px); } }
     @keyframes pop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .home-preview { background: #1b1b1b; }
+    .phone-frame { box-shadow: 12px 12px 0 rgba(0,0,0,.35); }
+    .home-door { position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.12); background: #0a0a0a; }
+    .home-door::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--door-accent, #52b946); }
+    .home-door::after { content: ''; position: absolute; right: 12px; bottom: 12px; width: 9px; height: 9px; border-right: 1px solid rgba(255,255,255,.3); border-bottom: 1px solid rgba(255,255,255,.3); }
+    .home-door.inverse { background: var(--door-accent, #7ee074); color: #000; border-color: rgba(0,0,0,.15); }
+    .home-door.inverse::after { border-color: rgba(0,0,0,.35); }
+    .door-label { font-size: 9px; font-weight: 900; letter-spacing: .28em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+    .home-avatar { display: grid; place-items: center; width: 104px; height: 104px; flex: 0 0 auto; border: 2px solid #52b946; background: #111; color: #52b946; font: 900 48px/1 Poppins, sans-serif; }
+    .award-strip { display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 12px; }
+    .plaque-preview { display: flex; align-items: center; justify-content: center; width: 150px; height: 38px; border: 1px solid rgba(82,185,70,.6); background: #151515; color: #fff; font: 900 8px/1.1 Poppins, sans-serif; letter-spacing: .12em; text-align: center; text-transform: uppercase; }
+    .medal-preview { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid rgba(255,255,255,.3); border-radius: 999px; background: #52b946; color: #000; font: 900 11px/1 Poppins, sans-serif; }
+    .number-display { font: 900 32px/.95 Poppins, sans-serif; letter-spacing: -.08em; }
+    .prototype-caption { font: 900 10px/1.2 Poppins, sans-serif; letter-spacing: .28em; text-transform: uppercase; color: rgba(255,255,255,.42); }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
 <body class="min-h-screen">
+  <section class="home-preview border-b border-white/10 px-4 py-8 sm:px-8">
+    <div class="mx-auto max-w-[900px]">
+      <div class="mb-5 flex items-end justify-between gap-4">
+        <div><p class="prototype-caption text-primary">Mobile home · component proposal</p><h1 class="mt-2 font-display text-2xl font-black uppercase tracking-tight sm:text-3xl">Profile-led hub</h1></div>
+        <span class="hidden border border-primary/40 px-3 py-2 font-mono text-[9px] uppercase tracking-[.16em] text-primary sm:block">Grid unchanged</span>
+      </div>
+      <div class="grid gap-8 lg:grid-cols-2">
+        <div>
+          <p class="mb-3 prototype-caption">No active tournament</p>
+          <div class="phone-frame mx-auto max-w-[390px] border border-white/15 bg-[#111] p-3">
+            <div class="mb-3 flex items-center justify-between border-b border-white/10 pb-3"><span class="font-display text-lg font-black tracking-[-.08em]">hobby<span class="text-primary">+</span></span><span class="border border-white/15 px-2 py-1 text-[9px] text-white/50">5</span></div>
+            <div class="grid h-[650px] grid-cols-3 grid-rows-4 gap-2.5">
+              <div class="home-door col-span-3 row-span-2 flex flex-col justify-between gap-4 p-4" style="--door-accent:#52b946">
+                <span class="absolute right-3 top-3 h-3 w-3 border-r border-t border-primary"></span>
+                <div class="flex items-center gap-4 pt-2"><div class="home-avatar">O</div><div class="min-w-0"><p class="door-label text-primary">Profile / player</p><h2 class="mt-2 font-display text-3xl font-black uppercase leading-[.9] tracking-[-.06em]">Organizer2</h2><p class="mt-2 font-mono text-xs text-white/40">@org2</p></div></div>
+                <div class="award-strip"><div class="plaque-preview">Sunday Showdown · Champion</div><div class="medal-preview">1</div><div class="medal-preview">W</div></div>
+                <div class="grid grid-cols-3 gap-3 border-t border-white/10 pt-3"><div><p class="door-label">Rank</p><p class="mt-2 font-display text-2xl font-black">#4</p></div><div><p class="door-label">Points</p><p class="mt-2 font-display text-2xl font-black text-primary">5</p></div><div><p class="door-label">Win rate</p><p class="mt-2 font-display text-2xl font-black">33%</p></div></div>
+              </div>
+              <div class="home-door col-span-2 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#5aa9e6"><span class="door-label">Leaderboard</span><div><p class="whitespace-nowrap font-display text-[1.35rem] font-black uppercase leading-none tracking-[-.08em]">UNRANKED</p><p class="mt-2 text-xs text-white/45">Pick the games you play</p></div><p class="border-t border-white/10 pt-2 font-mono text-[9px] uppercase tracking-[.12em] text-white/30">0 games tracked</p></div>
+              <div class="home-door inverse col-span-1 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#c76ad6"><span class="door-label text-black/70">Community</span><div><p class="font-display text-xl font-black uppercase tracking-tight">Pikapi</p><span class="mt-2 block font-mono text-[9px] uppercase tracking-[.12em] text-black/60">Latest champion</span></div></div>
+              <div class="home-door col-span-2 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#7ee074"><span class="door-label">Your record</span><div><p class="number-display">#4 <span class="text-xl tracking-normal text-white/60">· 5 pts</span></p><p class="mt-2 text-xs text-white/45">1W 2L 0D · 33%</p></div></div>
+              <div class="home-door inverse col-span-1 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#7ee074"><span class="door-label text-black/70">Matches</span><p class="font-display text-4xl font-black uppercase tracking-[-.08em]">Play</p><span class="self-end text-2xl">↗</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="mb-3 prototype-caption">Active tournament</p>
+          <div class="phone-frame mx-auto max-w-[390px] border border-white/15 bg-[#111] p-3">
+            <div class="mb-3 flex items-center justify-between border-b border-white/10 pb-3"><span class="font-display text-lg font-black tracking-[-.08em]">hobby<span class="text-primary">+</span></span><span class="border border-white/15 px-2 py-1 text-[9px] text-white/50">5</span></div>
+            <div class="grid h-[650px] grid-cols-3 grid-rows-3 gap-2.5">
+              <div class="home-door col-span-2 row-span-1 flex flex-col justify-between gap-3 p-4" style="--door-accent:#52b946"><span class="door-label text-primary">Profile / player</span><div class="flex items-center gap-3"><div class="home-avatar h-16 w-16 text-3xl">O</div><div class="min-w-0"><h2 class="font-display text-2xl font-black uppercase leading-[.9] tracking-[-.06em]">Organizer2</h2><p class="mt-1 font-mono text-[10px] text-white/40">@org2</p></div></div><div class="award-strip"><div class="plaque-preview w-[120px]">Champion</div><div class="medal-preview h-7 w-7 text-[9px]">1</div></div></div>
+              <div class="home-door col-span-1 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#5aa9e6"><span class="door-label">Board</span><p class="whitespace-nowrap font-display text-[1.05rem] font-black uppercase leading-none tracking-[-.08em]">Unranked</p><span class="font-mono text-[9px] uppercase tracking-[.12em] text-white/35">Pick games</span></div>
+              <div class="home-door col-span-2 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#52b946"><span class="door-label text-primary">Next match · live</span><p class="font-display text-2xl font-black uppercase leading-[.9] tracking-tight">Sunday Showdown</p><p class="text-xs text-primary">Action required</p></div>
+              <div class="home-door inverse col-span-1 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#c76ad6"><span class="door-label text-black/70">Community</span><div><p class="font-display text-lg font-black uppercase">View</p><span class="mt-2 block font-mono text-[9px] uppercase tracking-[.12em] text-black/60">Explore community</span></div></div>
+              <div class="home-door col-span-2 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#7ee074"><span class="door-label">Your record</span><p class="number-display">#4 <span class="text-lg tracking-normal text-white/60">· 5 pts</span></p><span class="font-mono text-[9px] uppercase tracking-[.12em] text-white/35">1W 2L 0D · 33%</span></div>
+              <div class="home-door inverse col-span-1 row-span-1 flex flex-col justify-between p-4" style="--door-accent:#7ee074"><span class="door-label text-black/70">Matches</span><p class="font-display text-3xl font-black uppercase tracking-[-.08em]">Play</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
   <header class="border-b border-white/10 bg-black px-4 py-3 sm:px-8">
     <div class="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
       <div class="flex items-center gap-7"><span class="font-display text-lg font-black tracking-[-.08em]">JOUST</span><span id="zoneLabel" class="hidden border-l border-white/15 pl-7 text-[10px] font-bold uppercase tracking-[.25em] text-white/40 sm:inline">Manage</span></div>

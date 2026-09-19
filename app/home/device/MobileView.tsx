@@ -1,8 +1,9 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
-import NowCard from "../../components/home/NowCard";
 import HubDoor, { FaceStack } from "../../components/home/HubDoor";
+import Medal from "../../components/awards/Medal";
+import Plaque from "../../components/awards/Plaque";
+import { showcaseOf } from "../../components/awards/group";
 import GameIcon from "../../components/ui/GameIcon";
 import { displayNameOf, handleOf, profileHref, resolveImageUrl } from "../../utils/api";
 import type { UserAward } from "../../tournaments/types";
@@ -34,8 +35,6 @@ export default function MobileView({ user, awards, data }: Props) {
   const live = urgent ? urgent.status === "ONGOING" || entryAction(urgent).tone === "live" : false;
   const record = data.record;
   const topBoard = data.boards.find((b) => b.myRank != null) ?? data.boards[0] ?? null;
-  const openCount = data.openToJoin.length;
-
   let recommended = null;
   if (!urgent && data.openToJoin.length > 0) {
     const userGameIds = new Set(data.boards.map((b) => b.game.id));
@@ -52,7 +51,7 @@ export default function MobileView({ user, awards, data }: Props) {
           accent="primary"
           className="col-span-2 row-span-1"
         >
-          <div className="flex items-center gap-[6%] h-full mt-1">
+          <div className="flex items-center gap-[6%] mt-1">
             <span className="relative w-[clamp(4rem,20cqw,7rem)] aspect-square shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-[clamp(1.5rem,10cqw,3rem)] font-black text-primary font-poppins overflow-hidden">
               {user?.avatarUrl ? (
                 <Image src={resolveImageUrl(user.avatarUrl)} alt="" aria-hidden fill className="object-cover" unoptimized />
@@ -71,6 +70,7 @@ export default function MobileView({ user, awards, data }: Props) {
               )}
             </div>
           </div>
+          <MobileAwardStrip awards={awards} compact />
         </HubDoor>
 
         {/* Leaderboard [1x1] */}
@@ -80,7 +80,7 @@ export default function MobileView({ user, awards, data }: Props) {
           accent="board"
           className="col-span-1 row-span-1"
         >
-          <span className="text-white font-black font-poppins text-[clamp(0.875rem,12cqw,2rem)] leading-[0.95] uppercase tracking-tighter block line-clamp-2 break-words mt-1">
+          <span className="text-white font-black font-poppins text-[clamp(0.8rem,6cqw,1.1rem)] leading-[0.95] uppercase tracking-[-0.08em] block whitespace-nowrap mt-1">
             {topBoard && topBoard.myRank ? `${topBoard.game.name} #${topBoard.myRank}` : "UNRANKED"}
           </span>
           <span className="text-[clamp(0.7rem,8cqw,0.875rem)] text-white/50 block mt-1">
@@ -112,20 +112,15 @@ export default function MobileView({ user, awards, data }: Props) {
           </div>
         </HubDoor>
 
-        {/* Matches [1x1] */}
+        {/* Community [1x1] — stays above Play in both mobile states. */}
         <HubDoor
-          href="/tournaments"
-          title="Matches"
-          accent="record"
+          href="/community"
+          title="Community"
+          accent="community"
           inverse={true}
-          className="col-span-1 row-span-1 relative group"
+          className="col-span-1 row-span-1"
         >
-          <span className="text-black font-black font-poppins text-[clamp(1.5rem,20cqw,3rem)] uppercase tracking-tighter block mt-1">PLAY</span>
-          <div className="absolute bottom-3 right-3 text-black/60 group-hover:text-black transition-colors">
-            <svg className="w-[clamp(1.5rem,15cqw,2.25rem)] h-[clamp(1.5rem,15cqw,2.25rem)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H9.5a4.5 4.5 0 0 1 0-9h1" /><path d="M15 16l4-4-4-4" />
-            </svg>
-          </div>
+          <CommunitySummary community={data.community} />
         </HubDoor>
 
         {/* ROW 3 */}
@@ -150,21 +145,20 @@ export default function MobileView({ user, awards, data }: Props) {
           )}
         </HubDoor>
 
-        {/* Community [1x1] */}
+        {/* Matches [1x1] — stays below Community in both mobile states. */}
         <HubDoor
-          href="/community"
-          title="Community"
-          accent="community"
+          href="/tournaments"
+          title="Matches"
+          accent="record"
           inverse={true}
-          className="col-span-1 row-span-1"
+          className="col-span-1 row-span-1 relative group"
         >
-          {data.community.champion ? (
-            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block line-clamp-2 break-words mt-1">{data.community.champion.name}</span>
-          ) : data.community.newMembers > 0 ? (
-            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block mt-1">+{data.community.newMembers} new</span>
-          ) : (
-            <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block mt-1">View</span>
-          )}
+          <span className="text-black font-black font-poppins text-[clamp(1.5rem,20cqw,3rem)] uppercase tracking-tighter block mt-1">PLAY</span>
+          <div className="absolute bottom-3 right-3 text-black/60 group-hover:text-black transition-colors">
+            <svg className="w-[clamp(1.5rem,15cqw,2.25rem)] h-[clamp(1.5rem,15cqw,2.25rem)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H9.5a4.5 4.5 0 0 1 0-9h1" /><path d="M15 16l4-4-4-4" />
+            </svg>
+          </div>
         </HubDoor>
       </div>
     );
@@ -188,8 +182,9 @@ export default function MobileView({ user, awards, data }: Props) {
           ) : undefined
         }
       >
-        <div className="flex items-center gap-[6%] h-full mt-1">
-          <span className="relative w-[clamp(5rem,20cqw,12rem)] aspect-square shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-[clamp(2rem,10cqw,4rem)] font-black text-primary font-poppins overflow-hidden">
+          <div className="flex h-full min-h-0 flex-col gap-4 mt-1">
+            <div className="flex min-h-0 flex-1 items-center gap-[6%]">
+          <span className="relative w-[clamp(6rem,24cqw,12rem)] aspect-square shrink-0 border-2 border-primary bg-component-background flex items-center justify-center text-[clamp(2.5rem,12cqw,4rem)] font-black text-primary font-poppins overflow-hidden">
             {user?.avatarUrl ? (
               <Image src={resolveImageUrl(user.avatarUrl)} alt="" aria-hidden fill className="object-cover" unoptimized />
             ) : (
@@ -211,6 +206,11 @@ export default function MobileView({ user, awards, data }: Props) {
               </span>
             ) : null}
           </div>
+          </div>
+          <MobileAwardStrip awards={awards} />
+          <div className="mt-auto">
+            <MobileProfileStats record={record} />
+          </div>
         </div>
       </HubDoor>
 
@@ -229,7 +229,7 @@ export default function MobileView({ user, awards, data }: Props) {
           ) : undefined
         }
       >
-        <span className="text-white font-black font-poppins text-[clamp(1.25rem,10cqw,2.5rem)] leading-[0.95] uppercase tracking-tighter block line-clamp-2 break-words mt-1">
+        <span className="text-white font-black font-poppins text-[clamp(1.1rem,7cqw,1.75rem)] leading-[0.95] uppercase tracking-tighter block whitespace-nowrap mt-1">
           {topBoard && topBoard.myRank ? `${topBoard.game.name} #${topBoard.myRank}` : "UNRANKED"}
         </span>
         <span className="text-[clamp(0.75rem,5cqw,1.125rem)] text-white/50 block mt-1">
@@ -242,16 +242,10 @@ export default function MobileView({ user, awards, data }: Props) {
         href="/community"
         title="Community"
         accent="community"
-        inverse={true}
-        className="col-span-1 row-span-1"
-      >
-        {data.community.champion ? (
-          <span className="text-[clamp(0.75rem,12cqw,1.25rem)] font-black font-poppins uppercase tracking-wider block line-clamp-2 break-words mt-1">{data.community.champion.name}</span>
-        ) : data.community.newMembers > 0 ? (
-          <span className="text-[clamp(0.875rem,12cqw,1.5rem)] font-black font-poppins uppercase tracking-wider block mt-1">+{data.community.newMembers} new</span>
-        ) : (
-          <span className="text-[clamp(0.875rem,12cqw,1.5rem)] font-black font-poppins uppercase tracking-wider block mt-1">View</span>
-        )}
+          inverse={true}
+          className="col-span-1 row-span-1"
+        >
+          <CommunitySummary community={data.community} />
       </HubDoor>
 
       {/* 4. Your Record [2x1] (Swapped to Row 4) */}
@@ -290,6 +284,106 @@ export default function MobileView({ user, awards, data }: Props) {
           </svg>
         </div>
       </HubDoor>
+    </div>
+  );
+}
+
+/**
+ * The profile door is the phone home screen's identity object, so its awards
+ * stay visible here instead of becoming an unrelated count in another tile.
+ * The parent HubDoor is already the profile link; these are deliberately
+ * non-interactive artwork elements to avoid nesting links inside that card.
+ */
+function MobileAwardStrip({ awards, compact = false }: { awards: UserAward[]; compact?: boolean }) {
+  const { pinned, plaque } = showcaseOf(awards);
+  if (!plaque && pinned.length === 0) return null;
+
+  return (
+    <div className={`flex items-center gap-2 ${compact ? "mt-2" : "border-t border-white/10 pt-3"}`} aria-label="Profile awards">
+      {plaque && (
+        <Plaque
+          name={plaque.name}
+          imageUrl={plaque.imageUrl}
+          size="sm"
+          count={plaque.grants.length}
+          title={plaque.description ?? plaque.name}
+          className={compact ? "max-w-[150px]" : "max-w-[220px]"}
+        />
+      )}
+      {pinned.map((g) => (
+        <Medal
+          key={g.awardId}
+          name={g.name}
+          imageUrl={g.imageUrl}
+          grants={g.grants}
+          sizeClass={compact ? "w-8 h-8" : "w-10 h-10"}
+          showDetail={false}
+        />
+      ))}
+      <span className="sr-only">{plaque ? plaque.name : "Pinned awards"}</span>
+    </div>
+  );
+}
+
+function CommunitySummary({ community }: { community: DashboardData["community"] }) {
+  if (community.champion) {
+    return (
+      <div className="mt-1">
+        <span className="block line-clamp-2 break-words text-[clamp(0.75rem,10cqw,1.1rem)] font-black font-poppins uppercase tracking-wider">
+          {community.champion.name}
+        </span>
+        <span className="mt-2 block font-mono text-[9px] uppercase tracking-[0.12em] text-black/60">
+          Latest champion
+        </span>
+      </div>
+    );
+  }
+
+  if (community.newMembers > 0) {
+    return (
+      <div className="mt-1">
+        <span className="block text-[clamp(0.75rem,10cqw,1.1rem)] font-black font-poppins uppercase tracking-wider">
+          +{community.newMembers} new
+        </span>
+        <span className="mt-2 block font-mono text-[9px] uppercase tracking-[0.12em] text-black/60">
+          This week
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1">
+      <span className="block text-[clamp(0.75rem,10cqw,1.1rem)] font-black font-poppins uppercase tracking-wider">View</span>
+      <span className="mt-2 block font-mono text-[9px] uppercase tracking-[0.12em] text-black/60">Explore community</span>
+    </div>
+  );
+}
+
+/** Keeps the large profile hero useful even when the account has no showcase awards. */
+function MobileProfileStats({ record }: { record: DashboardData["record"] }) {
+  if (!record) {
+    return (
+      <p className="border-t border-white/10 pt-3 font-mono text-[9px] uppercase tracking-[0.16em] text-white/35">
+        Play a match to build your record
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
+      <div>
+        <span className="text-[9px] font-black uppercase tracking-[0.24em] text-white/45">Rank</span>
+        <p className="mt-1.5 text-xl font-black font-poppins leading-none text-white">#{record.rank}</p>
+      </div>
+      <div>
+        <span className="text-[9px] font-black uppercase tracking-[0.24em] text-white/45">Points</span>
+        <p className="mt-1.5 text-xl font-black font-poppins leading-none text-primary">{record.points}</p>
+      </div>
+      <div>
+        <span className="text-[9px] font-black uppercase tracking-[0.24em] text-white/45">Win rate</span>
+        <p className="mt-1.5 text-xl font-black font-poppins leading-none text-white">{(record.matchWinPct * 100).toFixed(0)}%</p>
+      </div>
     </div>
   );
 }
