@@ -52,7 +52,6 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
     }
   };
 
-  const [expiryDays, setExpiryDays] = useState(30);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillResult, setBackfillResult] = useState("");
 
@@ -215,26 +214,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
     }
   };
 
-  const handleUpdateExpiry = async () => {
-    setLoading(true);
-    try {
-      const res = await authenticatedFetch(API_ENDPOINTS.DEV.GUEST_EXPIRY, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days: expiryDays }),
-      });
-      if (res.ok) {
-        toast(`Guest expiration period updated to ${expiryDays} days`, "success");
-      } else {
-        const err = await res.json();
-        toast(err.message || "Failed to update expiration period", "error");
-      }
-    } catch {
-      toast("Could not reach the server", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   // No confirm() popup (project rule). The button shows a per-row
   // "Deleting..." state instead, and the result is reported by a toast.
@@ -546,25 +526,7 @@ export default function DevPanel({ tournaments, onRefresh }: Props) {
             </p>
           </div>
 
-          <div className="space-y-4">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Guest Expiration (Days)</label>
-            <div className="flex flex-wrap gap-3 md:gap-4">
-              <input 
-                type="number"
-                value={expiryDays}
-                onChange={(e) => setExpiryDays(parseInt(e.target.value))}
-                className="flex-1 bg-neutral-950 border border-neutral-800 px-4 py-3 text-sm focus:outline-none focus:border-primary transition-all text-foreground"
-              />
-              <button 
-                onClick={handleUpdateExpiry}
-                disabled={loading}
-                className="px-8 py-3 bg-amber-500 text-background text-[10px] font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all active:scale-95"
-              >
-                Apply Period
-              </button>
-            </div>
-            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest italic">Default: 30 days. Resets on server restart.</p>
-          </div>
+          <p className="text-xs leading-relaxed text-white/50">Guest registration expires 30 days after tournament completion, or when staff reassigns the guest name. This retention period is fixed.</p>
 
           <div className="space-y-4">
             <label className="block text-[10px] font-black uppercase tracking-widest text-neutral-500">Per-Game Leaderboard Stats</label>

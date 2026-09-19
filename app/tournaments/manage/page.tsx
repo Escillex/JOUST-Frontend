@@ -106,7 +106,8 @@ export default function ManageTournaments() {
             </h1>
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <Link href="/tournaments/manage/guests" className="border border-primary/40 px-4 py-2.5 text-xs font-semibold text-primary">Guest registration</Link>
             <button
               onClick={async () => {
                 setLoading(true);

@@ -289,7 +289,9 @@ export const API_ENDPOINTS = {
     ROLES: (id: string) => `/auth/roles/${id}`,
     // Guests are created through TOURNAMENTS.JOIN_GUEST, which attaches them to
     // a tournament in one call; there is no standalone guest-creation flow.
+    GUESTS: "/auth/guests",
     CONVERT_GUEST: (id: string) => `/auth/convert-guest/${id}`,
+    EXCLUDE_GUEST_TOURNAMENT: (guestId: string, tournamentId: string) => `/auth/guests/${guestId}/tournaments/${tournamentId}/exclude`,
     DELETE_USER: (id: string) => `/auth/users/${id}`,
     UPDATE_PROFILE: (id: string) => `/auth/users/${id}/profile`,
     ADMIN_CREATE_USER: '/auth/users',

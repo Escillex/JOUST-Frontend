@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { usePolling } from "../../../utils/usePolling";
 import { useTournamentSocket } from "../../../utils/useTournamentSocket";
@@ -23,6 +24,7 @@ import RoundControlPanel from "../../../components/tournaments/manage/RoundContr
 import ManageSection from "../../../components/tournaments/manage/ManageSection";
 import PairingsView from "../../../components/tournaments/PairingsView";
 import TournamentCompletionBanner from "../../../components/tournaments/TournamentCompletionBanner";
+import { GUEST_RETENTION_NOTICE } from "../../../utils/guestPolicy";
 import { uniqueGuestNames } from "../../../utils/guestName";
 
 type ManageTab = "rounds" | "players" | "settings" | "builds";
@@ -258,7 +260,7 @@ function ControlRoomContent() {
       });
       const data = await safeJson(res);
       if (res.ok) { 
-        toast("Guest registered", "success"); 
+        toast("Guest added to this tournament", "success"); 
         setGuestUsername(""); 
         setIsGuestModalOpen(false); 
         fetchData(); 
@@ -542,6 +544,8 @@ function ControlRoomContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
           <div className="bg-[#1B1B1B] border border-white/20 rounded max-w-md w-full p-6 space-y-4 shadow-[0_0_40px_rgba(0,0,0,1)]">
             <h3 className="text-sm font-semibold text-white mb-4">Add Guest Participant</h3>
+            <p className="mb-3 text-xs leading-relaxed text-white/60">{GUEST_RETENTION_NOTICE}</p>
+            <Link href={`/tournaments/manage/guests?q=${encodeURIComponent(guestUsername.trim())}`} className="mb-4 block text-xs text-primary underline">Returning player? Register their existing results first</Link>
             <input
               autoFocus
               placeholder="Guest Username"

@@ -200,6 +200,7 @@ export interface Tournament {
   /** When the last match actually finished (2026-09-10). Distinct from `date`,
    *  which is when it was scheduled to start. */
   completedAt?: string | null;
+  winnerName?: string | null;
   /** The champion, once there is one. Served by every tournament listing. */
   winner?: {
     id?: string;

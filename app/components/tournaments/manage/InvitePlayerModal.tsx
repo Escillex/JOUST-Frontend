@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { authenticatedFetch, API_ENDPOINTS, safeJson } from "../../../utils/api";
 import { Tournament } from "../../../tournaments/types";
-import SearchableSelect from "../../ui/SearchableSelect";
 import { useToast } from "../../ui/Toast";
 
 interface Props {
@@ -15,7 +14,8 @@ interface Props {
 
 interface UserOption {
   id: string;
-  username: string;
+  username: string | null;
+  displayName?: string | null;
   isGuest?: boolean;
 }
 
@@ -23,19 +23,34 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
   const { toast } = useToast();
   const [users, setUsers] = useState<UserOption[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUser, setSelectedUser] = useState<UserOption | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const [forceAdd, setForceAdd] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const loadUsers = useCallback(async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.AUTH.USERS);
-    if (!res.ok) return;
-    const data = await safeJson(res);
-    if (Array.isArray(data)) setUsers(data);
-  }, []);
-
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      const res = await authenticatedFetch(API_ENDPOINTS.SEARCH.QUERY(query), {
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted && res.ok) {
+        const data = await safeJson(res);
+        setUsers(Array.isArray(data?.users) ? data.users : []);
+      }
+      if (!controller.signal.aborted) setSearching(false);
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery]);
 
   // Filter out users who are already participants and guests, who cannot accept
   // an invitation — they are organizer-managed via Add Guest instead.
@@ -44,6 +59,12 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
       !u.isGuest &&
       !tournament.participants.some((p) => p.userId === u.id)
   );
+  const selectUser = (user: UserOption) => {
+    setSelectedUserId(user.id);
+    setSelectedUser(user);
+    setSearchQuery("");
+    setUsers([]);
+  };
 
   const handleInvite = async () => {
     if (!selectedUserId || busy) return;
@@ -58,7 +79,7 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
           body: JSON.stringify({ userId: selectedUserId }),
         });
         if (res.ok) {
-          const username = available.find((u) => u.id === selectedUserId)?.username ?? "Player";
+          const username = selectedUser?.username ?? "Player";
           toast(`${username} has been added to the tournament`, "success");
           onInvited();
           onClose();
@@ -73,7 +94,7 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
           body: JSON.stringify({ userId: selectedUserId }),
         });
         if (res.ok) {
-          const username = available.find((u) => u.id === selectedUserId)?.username ?? "Player";
+          const username = selectedUser?.username ?? "Player";
           toast(`Invitation sent to ${username}`, "success");
           onInvited();
           onClose();
@@ -107,12 +128,60 @@ export default function InvitePlayerModal({ tournament, tournamentId, onClose, o
         <div className="p-4 space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-[#888888] block">Search Players</label>
-            <SearchableSelect
-              options={available.map((u) => ({ value: u.id, label: u.username }))}
-              value={selectedUserId}
-              onChange={setSelectedUserId}
-              placeholder="Type to search for a player..."
-            />
+            <div className="relative">
+              <input
+                type="search"
+                value={selectedUser ? selectedUser.username ?? "" : searchQuery}
+                onChange={(event) => {
+                  setSelectedUserId("");
+                  setSelectedUser(null);
+                  setSearchQuery(event.target.value);
+                  setUsers([]);
+                  setSearching(false);
+                }}
+                onFocus={() => {
+                  if (selectedUser) {
+                    setSelectedUserId("");
+                    setSelectedUser(null);
+                    setSearchQuery("");
+                    setUsers([]);
+                    setSearching(false);
+                  }
+                }}
+                placeholder="Type a username to search..."
+                aria-label="Search players"
+                autoComplete="off"
+                className="w-full h-10 bg-background border border-white/20 px-3 pr-10 text-sm text-white focus:outline-none focus:border-primary transition-colors rounded placeholder:text-white/40"
+              />
+              <svg className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" strokeWidth={2} />
+                <path d="m20 20-4-4" strokeWidth={2} strokeLinecap="round" />
+              </svg>
+
+              {searchQuery.trim() && !selectedUserId && (
+                <div className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded border border-white/20 bg-[#1A1A1A] shadow-xl">
+                  {searching ? (
+                    <div className="px-3 py-2 text-sm text-white/50">Searching players...</div>
+                  ) : available.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-white/50">No available players found</div>
+                  ) : (
+                    available.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => selectUser(user)}
+                        className="block w-full px-3 py-2 text-left text-sm text-white transition-colors hover:bg-white/10"
+                      >
+                        <span className="block font-medium">{user.username || "Unnamed player"}</span>
+                        {user.displayName && user.displayName !== user.username && (
+                          <span className="block text-xs text-white/45">{user.displayName}</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer group">

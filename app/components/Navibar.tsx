@@ -67,12 +67,13 @@ export default function Navibar() {
    */
   const navLinks: { name: string; href: string }[] = [];
   if (inManageMode) {
-    if (isAdmin || (loading && pathname.startsWith("/admin"))) {
+    if (isOrganizer) {
       navLinks.push(
         { name: "Manage", href: "/tournaments/manage" },
-        { name: "Admin", href: "/admin" },
+        { name: "Guests", href: "/tournaments/manage/guests" },
       );
     }
+    if (isAdmin) navLinks.push({ name: "Admin", href: "/admin" });
   } else {
     if (user) navLinks.push({ name: "Home", href: "/home" });
     navLinks.push(
@@ -135,7 +136,7 @@ export default function Navibar() {
             {navLinks.map((link) => {
               const isActive =
                 inManageMode
-                  ? pathname === link.href || (link.href === "/tournaments/manage" && pathname.startsWith("/tournaments/manage"))
+                  ? pathname === link.href
                   : pathname === link.href || (link.name === "Manage" && pathname.startsWith("/admin"));
               const linkDelays: Record<string, number> = {
                 Home: 0,

@@ -51,13 +51,13 @@ export default function MobileBottomNav() {
   }
 
   // 2. User Viewport: Responsive 3-Tab Controller (Tournaments, Home, Menu)
-  const isTournamentsActive = pathname.startsWith("/tournaments") && pathname !== "/tournaments/manage";
+  const isTournamentsActive = pathname.startsWith("/tournaments") && !pathname.startsWith("/tournaments/manage");
   const isHomeActive = pathname === "/home";
   
   const isMenuTabActive = 
     pathname.startsWith("/profile") || 
     pathname === "/leaderboards" || 
-    pathname === "/tournaments/manage" || 
+    pathname.startsWith("/tournaments/manage") || 
     pathname === "/admin";
   const isMoreActive = isMenuTabActive || isMenuOpen;
 
@@ -209,8 +209,7 @@ export default function MobileBottomNav() {
               admin panel — so only an ADMIN has anywhere to navigate between.
               An organizer in management mode gets a way back and nothing else;
               a second button pointing at the page they are already on is noise. */}
-          {user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") &&
-            !(inManageMode && !user?.roles?.includes("ADMIN")) && (
+          {user?.roles?.some((r: string) => r === "ADMIN" || r === "ORGANIZER") && (
             <Link
               href="/tournaments/manage"
               onClick={() => setIsMenuOpen(false)}
@@ -227,6 +226,10 @@ export default function MobileBottomNav() {
               </svg>
               Manage
             </Link>
+          )}
+
+          {user?.roles?.some((role) => role === "ADMIN" || role === "ORGANIZER") && (
+            <Link href="/tournaments/manage/guests" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-4 border border-white/10 px-6 py-4 text-[10px] font-black uppercase tracking-widest text-primary">Guest registration</Link>
           )}
 
           {/* System Administrator Panel — always accessible to admins */}

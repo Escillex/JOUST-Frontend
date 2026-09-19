@@ -409,7 +409,9 @@ export default function PairingsView({
     );
   }
 
-  const matches = round?.matches ?? [];
+  // The API may return completed matches in a different order after a score
+  // write. A deterministic id order keeps cards in fixed positions.
+  const matches = [...(round?.matches ?? [])].sort((a, b) => a.id.localeCompare(b.id));
   const reported = matches.filter((m) => m.status === "COMPLETED").length;
   // Re-resolved from the latest data every render, so the drawer shows the
   // match as it is now rather than as it was when it was clicked.

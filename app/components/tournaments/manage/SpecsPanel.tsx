@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { GUEST_RETENTION_NOTICE } from "../../../utils/guestPolicy";
 import React, { useState, useEffect } from "react";
 import { Tournament } from "../../../tournaments/types";
 import { getTournamentConfig } from "../../../utils/formatConfig";
@@ -89,32 +91,6 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
     } finally {
       setReassigning(false);
     }
-  };
-
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!tournament.guestCleanupAt) {
-      setTimeLeft(null);
-      return;
-    }
-    const interval = setInterval(() => {
-      const diff = new Date(tournament.guestCleanupAt!).getTime() - Date.now();
-      if (diff <= 0) {
-        setTimeLeft(0);
-        clearInterval(interval);
-        fetchData();
-      } else {
-        setTimeLeft(Math.floor(diff / 1000));
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [tournament.guestCleanupAt]);
-
-  const handleCancelCleanup = async () => {
-    const res = await authenticatedFetch(API_ENDPOINTS.TOURNAMENTS.CANCEL_CLEANUP(tournamentId), { method: "PATCH" });
-    if (res.ok) { setMessage("Cleanup halted."); fetchData(); }
-    else { setMessage("Failed to halt cleanup."); }
   };
 
   const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -416,20 +392,10 @@ export default function SpecsPanel({ tournament, tournamentId, isEditing, editSt
 
 
 
-       {timeLeft !== null && timeLeft > 0 && (
-        <div className="mt-6 p-4 bg-background border border-[#FF4D4D]/20 rounded flex flex-col items-center gap-4">
-           <div className="text-center">
-             <p className="text-xs font-semibold text-[#FF4D4D] mb-1">Guest Data Cleanup Warning</p>
-             <p className="text-xl font-mono text-[#FF4D4D]">
-               {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-             </p>
-           </div>
-           <button 
-             onClick={handleCancelCleanup}
-             className="w-full py-2 bg-background border border-[#FF4D4D]/50 text-[#FF4D4D] font-semibold text-xs rounded hover:bg-[#FF4D4D]/10 transition-colors"
-           >
-             Halt Cleanup
-           </button>
+      {tournament.status === "COMPLETED" && (
+        <div className="mt-6 border border-white/10 p-4 text-xs leading-relaxed text-white/60">
+          <p>{GUEST_RETENTION_NOTICE}</p>
+          <Link href="/tournaments/manage/guests" className="mt-3 inline-block text-primary underline">Open guest registration</Link>
         </div>
       )}
     </div>

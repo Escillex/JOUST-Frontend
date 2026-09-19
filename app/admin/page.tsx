@@ -16,7 +16,6 @@ import GrantAwardModal from "../components/awards/GrantAwardModal";
 import UserRegistry, { AdminUser } from "../components/admin/UserRegistry";
 import TournamentTable, { AdminTournament } from "../components/admin/TournamentTable";
 import UserModal from "../components/admin/UserModal";
-import ConvertGuestModal from "../components/admin/ConvertGuestModal";
 import DevPanel from "../components/admin/DevPanel";
 import PresetManager from "../components/admin/PresetManager";
 import GameManager from "../components/admin/GameManager";
@@ -142,7 +141,6 @@ export default function AdminDashboard() {
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
-  const [guestToConvert, setGuestToConvert] = useState<AdminUser | null>(null);
 
   // F6. Deleting a user who is still active in a live tournament is refused by the
   // backend. This drives a two-step confirm: (1) you must forfeit them first,
@@ -397,26 +395,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleConvertGuest = async (guestId: string, data: any) => {
-    // This function must THROW when the request fails. The modal only
-    // closes when this promise resolves, so throwing keeps the modal
-    // open and lets the admin fix the input and try again. The old
-    // version swallowed the error, so the modal closed and it looked
-    // like the conversion worked when it did not.
-    const res = await authenticatedFetch(API_ENDPOINTS.AUTH.CONVERT_GUEST(guestId), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const errData = await safeJson(res);
-      const msg = errData?.message || "Failed to convert guest";
-      toast(msg, "error");
-      throw new Error(msg);
-    }
-    await fetchData();
-    toast("Guest converted to a registered account", "success");
-  };
+
 
   if (isAuthorized === false) return null;
 
@@ -651,7 +630,7 @@ export default function AdminDashboard() {
                       users={users}             
                       onDelete={handleDeleteUser}
                       onBatchDelete={handleBatchDelete}
-                      onConvert={setGuestToConvert}
+                      onConvert={(guest) => router.push(`/tournaments/manage/guests?q=${encodeURIComponent(guest.username || "")}`)}
                       onEdit={(u) => { setUserToEdit(u); setIsUserModalOpen(true); }}
                       onAward={(u) => setAwardTarget({ id: u.id || u.sub!, name: u.username })}
                   onCreateClick={() => { setUserToEdit(null); setIsUserModalOpen(true); }}
@@ -800,12 +779,7 @@ export default function AdminDashboard() {
     />
   )}
 
-  <ConvertGuestModal 
-    guest={guestToConvert}
-    isOpen={!!guestToConvert}
-    onClose={() => setGuestToConvert(null)}
-    onSubmit={handleConvertGuest}
-  />
+
 
   <style jsx global>{`
     .custom-scrollbar::-webkit-scrollbar { width: 8px; }

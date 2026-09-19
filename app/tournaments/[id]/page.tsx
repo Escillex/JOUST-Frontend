@@ -361,11 +361,12 @@ function TournamentViewContent() {
   // Swiss and round robin are not trees; their structure is the standings
   // table, so they get no Bracket tab at all.
   const isTree = system === "SINGLE_ELIMINATION" || system === "DOUBLE_ELIMINATION" || system === "HYBRID";
+  const hasStandings = system !== "SINGLE_ELIMINATION" && system !== "DOUBLE_ELIMINATION";
 
   const tabs: { id: TabId; label: string }[] = [
     ...(isTree ? [{ id: "bracket" as TabId, label: "Bracket" }] : []),
     ...(hasRounds ? [{ id: "pairings" as TabId, label: "Match Table" }] : []),
-    ...(hasRounds ? [{ id: "standings" as TabId, label: "Standings" }] : []),
+    ...(hasRounds && hasStandings ? [{ id: "standings" as TabId, label: "Standings" }] : []),
     { id: "overview", label: "Overview" },
     { id: "players", label: `Players · ${tournament.participants.length}` },
     { id: "builds", label: "Builds" },
@@ -617,7 +618,7 @@ function TournamentViewContent() {
 
         <TournamentCompletionBanner
           tournament={tournament}
-          onViewResults={() => setTab("standings")}
+          onViewResults={() => setTab(hasStandings ? "standings" : "bracket")}
           onUpdated={() => fetchData(true)}
         />
 
